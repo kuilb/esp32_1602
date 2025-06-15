@@ -27,19 +27,23 @@ void init(){                        //初始化引脚
 }
 
 void setup() {
-    Serial.begin(BaudRate);
-    setHigh(LCD_BLA);
-    while(!Serial){}
-    delay(800);
-    Serial.println("Wireless 1602A V1.0 by Kulib");
-    Serial.println("2025/6/15");
-    Serial.println("开始初始化...");
-
     init();
     initrgb();
     initKanaMap();  // 初始化假名表
     lcd_init();
     startButtonTask();
+
+    // 欢迎消息
+    lcd_text("Wireless 1602A",LCD_line1);
+    lcd_text("V1.0",LCD_line2);
+
+    Serial.begin(BaudRate);
+    setHigh(LCD_BLA);
+    while(!Serial){}
+    delay(1500);
+    Serial.println("Wireless 1602A V1.0 by Kulib");
+    Serial.println("2025/6/15");
+    Serial.println("开始初始化...");
 
     // 挂载FFAT
     if (!FFat.begin()) {
@@ -68,11 +72,6 @@ void setup() {
     else{
         Serial.println("FFat已挂载");
     }
-
-    // 欢迎消息
-    lcd_text("Wireless 1602A",LCD_line1);
-    lcd_text("V1.0",LCD_line2);
-    delay(1000);
 
     wifiinit();
 }
