@@ -4,6 +4,8 @@
 #include "myhader.h"
 #include "mydefine.h"
 #include "network.h"
+#include "button.h"
+#include "menu.h"
 
 /**
  * @brief 按钮状态结构体
@@ -12,11 +14,11 @@
  * 按下开始时间和是否已触发事件的状态信息。
  */
 struct ButtonState {
-    uint8_t pin;
-    const char* label;
-    bool lastState;
-    unsigned long pressStartTime;
-    bool triggered;
+    uint8_t pin;                  ///< GPIO 引脚编号
+    const char* label;            ///< 按钮标识符字符串（如 "UP", "CENTER"）
+    bool lastState;               ///< 上一次读取的电平状态（LOW 或 HIGH）
+    unsigned long pressStartTime; ///< 按钮按下时的时间戳（用于判断按下时长）
+    bool triggered;               ///< 是否已触发按下事件（防止重复触发）
 };
 
 /**
@@ -34,6 +36,8 @@ extern ButtonState buttons[];
  */
 extern const int buttonCount;
 
+extern volatile bool buttonJustPressed[];
+
 /**
  * @brief WiFi 客户端对象，用于发送按钮信息
  * 
@@ -42,21 +46,31 @@ extern const int buttonCount;
 extern WiFiClient client;
 
 /**
- * @brief 按键处理任务函数
- * 
- * 该任务在 FreeRTOS 线程中运行，持续检测所有按钮的状态变化。
- * - 监听按钮按下事件，经过防抖时间后触发一次按下动作。
- * - 通过 WiFi 客户端向服务器发送按键标签消息。
- * - 确保按键按下时只发送一次消息，松开后重置状态。
- * 
- * @param[in] pvParameters 任务参数指针
+ * @brief 按键扫描任务（运行于独立线程）
+ *
+ * 周期性扫描所有定义的按键引脚，检测按下和松开状态。
+ * 更新 `buttonJustPressed[]` 状态数组，
+ * 供其他任务（如按键事件处理任务）读取使用。
+ *
+ * @param pvParameters 未使用
  */
-void buttonTask(void *pvParameters);
+void scanButtonsTask(void *pvParameters);
 
 /**
- * @brief 启动按键检测任务
+ * @brief 按键事件处理任务（运行于独立线程）
  * 
- * 创建并启动名为 "Button Task" 的 FreeRTOS 任务，
+ * 负责检测按键状态并触发对应事件：
+ * - 检测 Center + Up 组合键长按（1秒）进入菜单模式（inMenuMode）。
+ * - 非菜单模式下，将按键事件通过 WiFiClient 发送出去。
+ * - 菜单模式下按键处理交由其他模块处理，此任务暂时休眠。
+ * 
+ * @param pvParameters 未使用
+ */
+void handleButtonsTask(void *pvParameters);
+
+/**
+ * @brief 启动按键相关任务
+ * 
  */
 void startButtonTask();
 

@@ -166,7 +166,7 @@ void enterConfigMode() {
 
     // 在屏幕上显示ip
     lcd_text("Connect to AP",1);
-    lcd_text("IP:" + WiFi.softAPIP().toString(),LCD_line2);
+    lcd_text("IP:" + WiFi.softAPIP().toString(),2);
 }
 
 void connectToWiFi() {
@@ -185,7 +185,7 @@ void connectToWiFi() {
 
     // 在屏幕上显示状态
     lcd_text("WIFI connecting",1);
-    lcd_text(" ",LCD_line2);
+    lcd_text(" ",2);
 
     WiFi.begin(savedSSID.c_str(), savedPassword.c_str());
 
@@ -215,7 +215,7 @@ void connectToWiFi() {
 
         // 在屏幕上显示ip
         lcd_text("SSID:" + savedSSID ,1);
-        lcd_text("IP:" + WiFi.localIP().toString(),LCD_line2);
+        lcd_text("IP:" + WiFi.localIP().toString(),2);
     } else {
         Serial.println("\n连接失败, 进入配网");
         updateColor(CRGB::Red);  // 失败变红

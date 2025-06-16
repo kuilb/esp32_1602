@@ -13,6 +13,9 @@
  */
 extern int lcdCursor;
 
+// 当前背光亮度（0~255），初始为最大亮度
+extern int brightness;
+
 /**
  * @brief 触发 LCD 的 E 引脚以启动数据处理
  * 
@@ -30,6 +33,27 @@ void trigger_E();
  * @param[in] mode 写入模式：0 表示命令（CMD），1 表示字符（CHR）
  */
 void gpio_write(int data,int mode);
+
+/**
+ * @brief 初始化 LCD 背光的 PWM 控制
+ * 
+ * 使用 LEDC 模块在 LCD_BLA 引脚输出 PWM 信号，控制亮度。
+ */
+inline void initLcdBacklightPwm(uint8_t initialDuty = 255);
+
+/**
+ * @brief 设置 LCD 背光亮度（使用 PWM）
+ * 
+ * @param duty 占空比亮度值，范围 0~255
+ */
+void setLcdBrightness(uint8_t duty);
+
+/**
+ * @brief 改变当前亮度值
+ * 
+ * @param delta 增量值（可以为负值）
+ */
+void changeBrightness(int delta);
 
 /**
  * @brief 初始化 LCD 显示模块

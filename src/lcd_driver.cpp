@@ -2,6 +2,8 @@
 
 int lcdCursor = 0;  // 当前光标位置，全局变量 0~31
 
+int brightness = 255;  // 默认亮度
+
 //触发E引脚
 void trigger_E(){                     
     delayMicroseconds(15);
@@ -36,7 +38,39 @@ void gpio_write(int data,int mode){
     trigger_E();
 }
 
+// 初始化 LCD 背光
+inline void initLcdBacklightPwm(uint8_t initialDuty) {
+    ledcSetup(LCD_BLA_PWM_CHANNEL, LCD_BLA_PWM_FREQ, LCD_BLA_PWM_RESOLUTION);
+    ledcAttachPin(LCD_BLA_PWM_PIN, LCD_BLA_PWM_CHANNEL);
+    ledcWrite(LCD_BLA_PWM_CHANNEL, initialDuty);  // 设置初始亮度
+}
+
+/**
+ * @brief 改变当前亮度值
+ * 
+ * @param delta 增量值（可以为负值）
+ */
+void changeBrightness(int delta) {
+    brightness += delta;
+    if (brightness < 0) brightness = 0;
+    if (brightness > 255) brightness = 255;
+    setLcdBrightness(brightness);
+}
+
+/**
+ * @brief 设置 LCD 背光亮度（0-255）
+ * 
+ * @param[in] duty 占空比（亮度值），范围 0~255
+ */
+inline void setLcdBrightness(uint8_t duty) {
+    if (duty > LCD_BLA_PWM_MAX_DUTY) duty = LCD_BLA_PWM_MAX_DUTY;
+    ledcWrite(LCD_BLA_PWM_CHANNEL, duty);
+}
+
+
 void lcd_init(){
+    initLcdBacklightPwm(255);           // 默认亮度 255
+
     gpio_write(0x33,CMD);               // 设置LCD进入8位模式
     delay(50);
     gpio_write(0x32,CMD);               // 设置LCD切换为4位模式

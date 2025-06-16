@@ -8,6 +8,7 @@
 #include "protocol.h"
 #include "playbuffer.h"
 #include "button.h"
+#include "menu.h"
 using namespace std;
 
 void init(){                        //初始化引脚
@@ -35,7 +36,7 @@ void setup() {
 
     // 欢迎消息
     lcd_text("Wireless 1602A",1);
-    lcd_text("V1.0",LCD_line2);
+    lcd_text("V1.0",2);
 
     Serial.begin(BaudRate);
     setHigh(LCD_BLA);
@@ -53,7 +54,7 @@ void setup() {
         }
         if (!FFat.begin()) {
             lcd_text("NO FFat", 1);
-            lcd_text("Check Serial", LCD_line2);
+            lcd_text("Check Serial", 2);
             Serial.println("仍然无法挂载FFat, 请检查Flash分区设置");
             updateColor(CRGB::Red);  // 失败变红
             int fadeStep = 2;
@@ -77,6 +78,12 @@ void setup() {
 }
 
 void loop(){
+    // 如果进入菜单模式，暂停所有主任务流程
+    if (inMenuMode) {
+        handleMenuInterface();
+        return;
+    }
+
     if (inConfigMode) {
         AP_server.handleClient();
     }

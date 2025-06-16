@@ -57,6 +57,16 @@ inline void setInput(int pin) {
 #define LCD_BLA             8   ///< LCD 背光控制引脚（可接 PWM 实现调光）
 
 // ==============================
+// PWM 参数定义（LCD 背光）
+// ==============================
+
+#define LCD_BLA_PWM_PIN         LCD_BLA       ///< LCD 背光控制引脚
+#define LCD_BLA_PWM_CHANNEL     0             ///< PWM 通道（0~7）
+#define LCD_BLA_PWM_FREQ        5000          ///< PWM 频率（Hz）
+#define LCD_BLA_PWM_RESOLUTION  8             ///< 分辨率（位数）：8-bit → 0~255
+#define LCD_BLA_PWM_MAX_DUTY    ((1 << LCD_BLA_PWM_RESOLUTION) - 1) ///< 最大占空比
+
+// ==============================
 // 按键引脚定义（带方向语义）
 // ==============================
 
