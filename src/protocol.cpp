@@ -6,7 +6,7 @@ int utf8ToUnicode(uint8_t c0, uint8_t c1, uint8_t c2) {
 }
 
 // 解码函数
-void prosessIncoming(const uint8_t* raw, unsigned int bodyLen) {
+void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
     // Serial.print("\nProcess start:");
     // Serial.println(millis());
 
@@ -101,8 +101,8 @@ void prosessIncoming(const uint8_t* raw, unsigned int bodyLen) {
             
             // 显示点阵
             lcd_createChar(customCharIndex, charMap);
-            lcd_dis_costom(customCharIndex);
-            lcd_next_cousor();
+            lcd_dis_custom(customCharIndex);
+            lcd_next_cursor();
 
             // 循环使用 slot
             customCharIndex = (customCharIndex + 1) % 8;

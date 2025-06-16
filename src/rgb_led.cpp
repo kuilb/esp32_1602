@@ -6,7 +6,7 @@ CRGB currentColor;                  // 当前颜色
 uint8_t currentBrightness = 128;    // 默认亮度一半
 SemaphoreHandle_t ledMutex;         // 控制颜色访问的互斥锁
 
-// 设置颜色（线程安全）
+// 设置颜色
 void updateColor(CRGB newColor) {
   if (xSemaphoreTake(ledMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
     currentColor = newColor;
@@ -14,7 +14,7 @@ void updateColor(CRGB newColor) {
   }
 }
 
-// 设置亮度（线程安全）
+// 设置亮度
 void updateBrightness(uint8_t newBrightness) {
   if (xSemaphoreTake(ledMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
     currentBrightness = newBrightness;
@@ -35,6 +35,7 @@ void rgbTask(void* pvParameters) {
   }
 }
 
+// 初始化RGB
 void initrgb(){
   FastLED.addLeds<SK6812, RGB_PIN, GRB>(leds, 1);
 

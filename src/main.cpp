@@ -34,7 +34,7 @@ void setup() {
     startButtonTask();
 
     // 欢迎消息
-    lcd_text("Wireless 1602A",LCD_line1);
+    lcd_text("Wireless 1602A",1);
     lcd_text("V1.0",LCD_line2);
 
     Serial.begin(BaudRate);
@@ -52,7 +52,7 @@ void setup() {
             Serial.println("FFat已格式化!");
         }
         if (!FFat.begin()) {
-            lcd_text("NO FFat", LCD_line1);
+            lcd_text("NO FFat", 1);
             lcd_text("Check Serial", LCD_line2);
             Serial.println("仍然无法挂载FFat, 请检查Flash分区设置");
             updateColor(CRGB::Red);  // 失败变红

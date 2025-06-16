@@ -2,6 +2,7 @@
 
 unsigned long lastDisplayTime = 0;   // 上一帧显示时间戳
 bool isDisplayingCache = false;      // 当前是否正在播放缓存
+
 // 播放缓存内容
 void tryDisplayCachedFrames() {
     if (frameCache.empty()) {
@@ -16,7 +17,7 @@ void tryDisplayCachedFrames() {
     if (!isDisplayingCache) {
         isDisplayingCache = true;
         lastDisplayTime = now;
-        prosessIncoming(frameCache.front().data.data(), frameCache.front().data.size());
+        processIncoming(frameCache.front().data.data(), frameCache.front().data.size());
         // Serial.println("display buffer (first)");
         frameCache.pop_front();
         return;
@@ -25,7 +26,7 @@ void tryDisplayCachedFrames() {
     // 匹配帧率
     if (now - lastDisplayTime >= frameCache.front().frameIntervalMs) {
         lastDisplayTime = now;
-        prosessIncoming(frameCache.front().data.data(), frameCache.front().data.size());
+        processIncoming(frameCache.front().data.data(), frameCache.front().data.size());
         // Serial.println("display buffer (interval)");
         frameCache.pop_front();
     }

@@ -2,7 +2,8 @@
 
 int lcdCursor = 0;  // 当前光标位置，全局变量 0~31
 
-void triggle_E(){                     //触发E引脚
+//触发E引脚
+void trigger_E(){                     
     delayMicroseconds(15);
     setHigh(LCD_E);
     delayMicroseconds(15);
@@ -10,7 +11,8 @@ void triggle_E(){                     //触发E引脚
     delayMicroseconds(15);
 }
 
-void gpio_write(int data,int mode){   //写入一个数据或指令
+// 写入一个数据或指令
+void gpio_write(int data,int mode){
 
     //设定模式(指令/字符)
     if (mode == 0) {
@@ -24,14 +26,14 @@ void gpio_write(int data,int mode){   //写入一个数据或指令
     if (data & 0x40) setHigh(LCD_D6); else setLow(LCD_D6);
     if (data & 0x20) setHigh(LCD_D5); else setLow(LCD_D5);
     if (data & 0x10) setHigh(LCD_D4); else setLow(LCD_D4);
-    triggle_E();
+    trigger_E();
 
     //后四位
     if (data & 0x08) setHigh(LCD_D7); else setLow(LCD_D7);
     if (data & 0x04) setHigh(LCD_D6); else setLow(LCD_D6);
     if (data & 0x02) setHigh(LCD_D5); else setLow(LCD_D5);
     if (data & 0x01) setHigh(LCD_D4); else setLow(LCD_D4);
-    triggle_E();
+    trigger_E();
 }
 
 void lcd_init(){
@@ -51,7 +53,14 @@ void lcd_init(){
 
 // 显示函数(用于简单显示/调试)
 void lcd_text(String ltext,int line){
-    gpio_write(line,CMD);               //命令写入:行数
+    // 设置行地址
+    if (line == 1)
+        gpio_write(LCD_line1, CMD);
+    else if (line == 2)
+        gpio_write(LCD_line2, CMD);
+    else
+        return; // 非法行号，直接返回
+
     int tsize=ltext.length();
     for(int size=0;size<16;size++){     //逐字写入
         if(size>tsize-1){
@@ -82,7 +91,7 @@ void lcd_setCursor(int col, int row){
 }
 
 // 光标向后移动一格
-void lcd_next_cousor(){
+void lcd_next_cursor(){
     lcdCursor++;
     if (lcdCursor >= 32) {
         lcd_setCursor(17, 0);   //将光标设置为显示区域外
@@ -95,32 +104,32 @@ void lcd_next_cousor(){
 
 // 写入一字节的自定义字符
 void lcd_createChar(int slot, uint8_t data[8]){
-    if (slot < 0 || slot > 7) return;  // 限制 slot 范围
+    if (slot < 0 || slot > 7) return;       // 限制 slot 范围
 
-    int cgram_addr = 0x40 | (slot << 3);  // CGRAM 写入起始地址
-    gpio_write(cgram_addr, CMD);    // 设置 CGRAM 地址（指令模式）
+    int cgram_addr = 0x40 | (slot << 3);    // CGRAM 写入起始地址
+    gpio_write(cgram_addr, CMD);            // 设置 CGRAM 地址（指令模式）
 
     // 连续写入 8 字节点阵数据
     for (int i = 0; i < 8; i++) {
-        gpio_write(data[i], CHR);   // 字符数据（数据模式）
+        gpio_write(data[i], CHR);           // 字符数据（数据模式）
     }
 
     // 设置回 DDRAM 当前光标对应位置
     int row = (lcdCursor < 16) ? 0 : 1;
     int col = lcdCursor % 16;
-    lcd_setCursor(col, row);        // 将光标设置回当前显示位置
+    lcd_setCursor(col, row);                // 将光标设置回当前显示位置
 }
 
 // 显示自定义字符
-void lcd_dis_costom(int index){
+void lcd_dis_custom(int index){
     if (index < 0 || index > 7) return; // 只能是 0~7 槽
         gpio_write(index, CHR);         // 写入字符数据（模式 1 表示数据模式）
 }
 
 // 显示普通字符
-void lcd_dis_chr(char text){   //显示函数
-        gpio_write(int(text),CHR); //直接写入
-        lcd_next_cousor();
+void lcd_dis_chr(char text){        //显示函数
+        gpio_write(int(text),CHR);  //直接写入
+        lcd_next_cursor();
 }
 
 // 清屏

@@ -3,17 +3,36 @@
 
 #include "myhader.h"
 
+/**
+ * @brief 将指定 GPIO 引脚设置为高电平
+ * 
+ * @param[in] pin GPIO 引脚号
+ */
 #define setHigh(pin)        gpio_set_level((gpio_num_t)(pin), 1)
+
+/**
+ * @brief 将指定 GPIO 引脚设置为低电平
+ * 
+ * @param[in] pin GPIO 引脚号
+ */
 #define setLow(pin)         gpio_set_level((gpio_num_t)(pin), 0)
 
+/**
+ * @brief 将指定 GPIO 引脚配置为输出模式
+ * 
+ * @param[in] pin GPIO 引脚号
+ */
 inline void setOutput(int pin) {
     gpio_set_direction((gpio_num_t)pin, GPIO_MODE_OUTPUT);
 }
 
-// inline void setInput(int pin) {
-//     gpio_set_direction((gpio_num_t)pin, GPIO_MODE_INPUT);
-// }
-
+/**
+ * @brief 将指定 GPIO 引脚配置为输入模式（带内部下拉）
+ * 
+ * @param[in] pin GPIO 引脚号
+ * 
+ * @note 启用内部下拉，禁用上拉电阻，适合按钮等默认低电平输入设备
+ */
 inline void setInput(int pin) {
     gpio_config_t io_conf = {};
     io_conf.intr_type = GPIO_INTR_DISABLE;
@@ -25,35 +44,52 @@ inline void setInput(int pin) {
 }
 
 
-// 以下是引脚定义
-#define LCD_RS              9           // 数据/指令切换引脚
-#define LCD_E               10          // 触发引脚
-#define LCD_D4              11          // 四位数据引脚
-#define LCD_D5              12
-#define LCD_D6              13
-#define LCD_D7              14
-#define LCD_BLA             8           // 背光控制
+// ==============================
+// LCD 引脚定义
+// ==============================
 
-#define BOTTEN_UP           17          // 按钮             
-#define BOTTEN_DOWN         18            
-#define BOTTEN_LEFT         6
-#define BOTTEN_RIGHT        4
-#define BOTTEN_CENTER       5
+#define LCD_RS              9   ///< LCD 寄存器选择（数据/指令）引脚
+#define LCD_E               10  ///< LCD 使能引脚（触发数据传输）
+#define LCD_D4              11  ///< LCD 数据引脚 D4
+#define LCD_D5              12  ///< LCD 数据引脚 D5
+#define LCD_D6              13  ///< LCD 数据引脚 D6
+#define LCD_D7              14  ///< LCD 数据引脚 D7
+#define LCD_BLA             8   ///< LCD 背光控制引脚（可接 PWM 实现调光）
 
-#define RGB_PIN             35           // 板载RGB灯
+// ==============================
+// 按键引脚定义（带方向语义）
+// ==============================
 
-// 以下是命令定义
-#define CMD                 0            // 命令为0
-#define CHR                 1            // 数据为1
-#define char_per_line       16           // 每行16个字符
-#define LCD_line1           0x80         // 第一行地址
-#define LCD_line2           0xc0         // 第二行地址
+#define BOTTEN_UP           17  ///< 向上按键
+#define BOTTEN_DOWN         18  ///< 向下按键
+#define BOTTEN_LEFT         6   ///< 向左按键
+#define BOTTEN_RIGHT        4   ///< 向右按键
+#define BOTTEN_CENTER       5   ///< 确认/中心按键
 
-//以下是常用设置
-#define BaudRate            115200       // 串口波特率
-#define MAX_CACHE_SIZE      200          // 最大缓存包数
-#define MAX_LATENCY_MS      1500         // 最多缓存 1500ms 画面
-#define CONNECT_PORT        13000        // 连接端口
-#define DEBOUNCE_TIME       30          // 按钮消抖时长
+// ==============================
+// 板载外设
+// ==============================
+
+#define RGB_PIN             35  ///< 板载 RGB 灯控制引脚
+
+// ==============================
+// LCD 显示命令定义
+// ==============================
+
+#define CMD                 0   ///< 表示发送的是 LCD 命令
+#define CHR                 1   ///< 表示发送的是 LCD 字符数据
+
+#define LCD_line1           0x80 ///< LCD 第一行 DDRAM 起始地址
+#define LCD_line2           0xc0 ///< LCD 第二行 DDRAM 起始地址
+
+// ==============================
+// 系统参数设置
+// ==============================
+
+#define BaudRate            115200  ///< 串口通信波特率
+#define MAX_CACHE_SIZE      200     ///< 最大缓存帧数量
+#define MAX_LATENCY_MS      1500    ///< 最大缓存延迟（单位：毫秒）
+#define CONNECT_PORT        13000   ///< TCP/UDP 通信端口号
+#define DEBOUNCE_TIME       30      ///< 按钮消抖时间（单位：毫秒）
 
 #endif

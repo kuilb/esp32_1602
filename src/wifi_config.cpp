@@ -1,24 +1,46 @@
 #include "wifi_config.h"
 
-// 配网用
+// 配网模式使用的 Web 服务器（监听端口 80）
 WebServer AP_server(80);
+
+// 用户通过网页输入的 SSID 与密码
 String ssid_input, password_input;
+
+// 保存的 WiFi SSID 和密码（初始化为空字符串）
 String savedSSID = "", savedPassword = "";
+
+// 当前是否处于配网模式的标志位
 bool inConfigMode = false;
 
 // 保存WiFi信息
 void saveWiFiCredentials(const String& ssid, const String& password) {
   File file = FFat.open("/wifi.txt", "w");
-  if (file) {
-    file.println(ssid);
-    file.println(password);
+    if (!file) {
+        Serial.println("保存WiFi信息失败, 无法打开文件");
+        lcd_text("Save WiFi Fail", 1);
+        lcd_text("Check FS/Retry", 2);
+        return;
+    }
+    if (!file.println(ssid)) {
+        Serial.println("保存WiFi信息失败, 写入SSID失败");
+        lcd_text("Save WiFi Fail", 1);
+        lcd_text("SSID Write Err", 2);
+        file.close();
+        return;
+    }
+    if (!file.println(password)) {
+        Serial.println("保存WiFi信息失败, 写入密码失败");
+        lcd_text("Save WiFi Fail", 1);
+        lcd_text("Pass Write Err", 2);
+        file.close();
+        return;
+    }
     file.flush();
     file.close();
+
     Serial.println("WiFi 信息已保存");
-  }
-  else {
-    Serial.println("保存WiFi信息失败");
-  }
+    lcd_text("Config Saved", 1);
+    lcd_text("Restarting", 2);
 }
 
 // 加载WiFi信息
@@ -143,7 +165,7 @@ void enterConfigMode() {
     AP_server.begin();
 
     // 在屏幕上显示ip
-    lcd_text("Connect to AP",LCD_line1);
+    lcd_text("Connect to AP",1);
     lcd_text("IP:" + WiFi.softAPIP().toString(),LCD_line2);
 }
 
@@ -162,7 +184,7 @@ void connectToWiFi() {
     Serial.println(savedSSID);
 
     // 在屏幕上显示状态
-    lcd_text("WIFI connecting",LCD_line1);
+    lcd_text("WIFI connecting",1);
     lcd_text(" ",LCD_line2);
 
     WiFi.begin(savedSSID.c_str(), savedPassword.c_str());
@@ -192,7 +214,7 @@ void connectToWiFi() {
         Serial.println(WiFi.localIP());
 
         // 在屏幕上显示ip
-        lcd_text("SSID:" + savedSSID ,LCD_line1);
+        lcd_text("SSID:" + savedSSID ,1);
         lcd_text("IP:" + WiFi.localIP().toString(),LCD_line2);
     } else {
         Serial.println("\n连接失败, 进入配网");
@@ -201,6 +223,7 @@ void connectToWiFi() {
     }
 }
 
+// 初始化wifi
 void wifiinit(){
   // 连接WiFi
   if (digitalRead(BOTTEN_CENTER)) {

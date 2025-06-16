@@ -26,7 +26,7 @@ void buttonTask(void *pvParameters) {
                     btn.pressStartTime = millis();
                     btn.triggered = false;
                 } else if (currentState == HIGH && !btn.triggered) {
-                    // 按下保持中，判断是否超过300ms
+                    // 按下保持中
                     if (millis() - btn.pressStartTime >= DEBOUNCE_TIME) {
                         Serial.println(btn.label);
                         //client.write(String("KEY:") + btn.label + "\n");

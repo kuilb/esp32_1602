@@ -79,7 +79,7 @@ void receiveClientData() {
 
                         // 无缓存, 尝试播放当前帧
                         if (frameInterval == 0) {
-                            prosessIncoming(fullPacket.data(), fullPacket.size());
+                            processIncoming(fullPacket.data(), fullPacket.size());
                         } 
                         else {
                             if (frameCache.size() < MAX_CACHE_SIZE) {
