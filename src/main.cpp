@@ -33,6 +33,7 @@ void setup() {
     initKanaMap();  // 初始化假名表
     lcd_init();
     startButtonTask();
+    initMenu();
 
     // 欢迎消息
     lcd_text("Wireless 1602A",1);
@@ -78,12 +79,6 @@ void setup() {
 }
 
 void loop(){
-    // 如果进入菜单模式，暂停所有主任务流程
-    if (inMenuMode) {
-        handleMenuInterface();
-        return;
-    }
-
     if (inConfigMode) {
         AP_server.handleClient();
     }

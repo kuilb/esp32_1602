@@ -51,9 +51,6 @@ void scanButtonsTask(void *pvParameters) {
 
 // 处理按键事件
 void handleButtonsTask(void *pvParameters) {
-    static unsigned long comboStart = 0;
-    static bool comboTriggered = false;
-
     while (true) {
         if (inMenuMode) {
             // 菜单模式下按键逻辑交由菜单处理函数处理（另写）
@@ -66,22 +63,9 @@ void handleButtonsTask(void *pvParameters) {
 
         // 按键按下
         if (center && up) {
-            if (!comboTriggered) {
-                if (comboStart == 0) {
-                    comboStart = millis();
-                } 
-                // 按住1秒进入
-                else if (millis() - comboStart > 600) {
-                    inMenuMode = true;
-                    Serial.println("[Menu] Combo triggered: Center + Up");
-                    comboTriggered = true;
-                }
-            }
+            inMenuMode = true;
+            Serial.println("[Menu] Combo triggered: Center + Up");
         } 
-        else {
-            comboStart = 0;
-            comboTriggered = false;
-        }
 
         // 若已连接则发送按键消息
         if (clientConnected && client.connected()) {

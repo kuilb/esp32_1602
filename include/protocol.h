@@ -4,6 +4,7 @@
 #include "myhader.h"
 #include "lcd_driver.h"
 #include "kanamap.h"
+#include "menu.h"
 
 /**
  * @brief 将UTF-8编码的假名字符转换为Unicode编码

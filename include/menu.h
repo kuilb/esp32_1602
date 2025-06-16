@@ -16,7 +16,7 @@ enum ButtonIndex {
     CENTER = 4
 };
 
-// 初始化菜单系统（可选）
+// 初始化菜单系统
 void initMenu();
 
 /**
@@ -34,5 +34,8 @@ void handleMenuInterface();
 
 // 外部访问菜单状态
 extern volatile bool inMenuMode;
+
+extern TaskHandle_t menuTaskHandle;
+void menuTask(void* parameter);
 
 #endif

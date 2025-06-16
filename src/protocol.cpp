@@ -7,6 +7,9 @@ int utf8ToUnicode(uint8_t c0, uint8_t c1, uint8_t c2) {
 
 // 解码函数
 void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
+    if (inMenuMode) {
+        return;
+    }
     // Serial.print("\nProcess start:");
     // Serial.println(millis());
 

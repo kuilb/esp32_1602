@@ -5,7 +5,7 @@ volatile bool inMenuMode = false;
 
 // 初始化函数（可扩展）
 void initMenu() {
-    // 可放置菜单初始化资源
+    xTaskCreate(menuTask, "MenuTask", 2048, NULL, 1, &menuTaskHandle);
 }
 
 // 判断是否经过了指定的时间间隔
@@ -44,9 +44,6 @@ void handleMenuInterface() {
         // 只显示菜单，不处理按键
         return;
     }
-
-    // while(hasElapsed(menuEnterTime, 400)){}
-
 
     // 显示当前菜单项
     lcd_text("Menu:", 1);
@@ -141,4 +138,15 @@ void handleMenuInterface() {
     }
 
     delay(120);  // 节流
+}
+
+TaskHandle_t menuTaskHandle = NULL;
+// 菜单任务函数
+void menuTask(void* parameter) {
+    while (true) {
+        if (inMenuMode) {
+            handleMenuInterface();  // 非阻塞实现
+        }
+        vTaskDelay(10 / portTICK_PERIOD_MS);  // 每 10ms 更新一次
+    }
 }
