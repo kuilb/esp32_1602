@@ -7,18 +7,6 @@
 #include "menu.h"
 
 /**
- * @brief 将UTF-8编码的假名字符转换为Unicode编码
- * 
- * @param[in] c0 UTF-8编码的第1字节
- * @param[in] c1 UTF-8编码的第2字节
- * @param[in] c2 UTF-8编码的第3字节
- * @return int 对应的Unicode编码值
- * 
- * @note 该函数假设输入为3字节UTF-8编码，适用于假名字符。
- */
-int utf8ToUnicode(uint8_t c0, uint8_t c1, uint8_t c2);
-
-/**
  * @brief 解析并显示接收到的数据帧内容
  * 
  * @param[in] raw    指向接收数据缓冲区的指针

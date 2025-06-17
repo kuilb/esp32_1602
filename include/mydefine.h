@@ -83,16 +83,6 @@ inline void setInput(int pin) {
 #define RGB_PIN             35  ///< 板载 RGB 灯控制引脚
 
 // ==============================
-// LCD 显示命令定义
-// ==============================
-
-#define CMD                 0   ///< 表示发送的是 LCD 命令
-#define CHR                 1   ///< 表示发送的是 LCD 字符数据
-
-#define LCD_line1           0x80 ///< LCD 第一行 DDRAM 起始地址
-#define LCD_line2           0xc0 ///< LCD 第二行 DDRAM 起始地址
-
-// ==============================
 // 系统参数设置
 // ==============================
 

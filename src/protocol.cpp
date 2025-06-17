@@ -1,15 +1,16 @@
 #include "protocol.h"
 
+static unsigned int frameCount = 0;
+static unsigned int lastSecond = 0;
+static float currentFPS = 0.0f;
+
 // 假名unicode转换
-int utf8ToUnicode(uint8_t c0, uint8_t c1, uint8_t c2) {
+int _utf8ToUnicode(uint8_t c0, uint8_t c1, uint8_t c2) {
   return ((c0 & 0x0F) << 12) | ((c1 & 0x3F) << 6) | (c2 & 0x3F);
 }
 
 // 解码函数
 void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
-    if (inMenuMode) {
-        return;
-    }
     // Serial.print("\nProcess start:");
     // Serial.println(millis());
 
@@ -20,6 +21,25 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
     //     Serial.print(" ");
     // }
     // Serial.println();
+
+    if (inMenuMode) {
+        return;
+    }
+
+    // 帧率统计
+    uint32_t now = millis();
+    uint32_t currentSecond = now / 1000;
+
+    frameCount++;
+
+    if (currentSecond != lastSecond) {
+        currentFPS = frameCount * 1000.0f / (now - lastSecond * 1000.0f);
+        frameCount = 0;
+        lastSecond = currentSecond;
+
+        // 打印 FPS
+        Serial.println("FPS:"+ (String)currentFPS);
+    }
 
     if (bodyLen < 5) {  // 头(2) + 长度(1) + 帧率(2) + 最少1字节数据
         Serial.println("数据包太短，无法解析");
@@ -34,12 +54,11 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
 
     // 读取帧率字段（两字节，高字节先发）
     uint16_t frameInterval = (raw[3] << 8) | raw[4];
-    Serial.print("帧率 (ms): ");
-    Serial.println(frameInterval);
+    // Serial.print("帧率 (ms): ");
+    // Serial.println(frameInterval);
 
     // 初始化显示
-    lcd_setCursor(0, 0);    // 回到屏幕起点
-    lcdCursor = 0;          // 重置全局光标
+    lcdResetCursor();
 
     unsigned int i = 5;          // 从数据体开始
     uint8_t customCharIndex = 0; // 自定义字符编号（0~7）
@@ -59,7 +78,7 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
                 if (i + 1 >= bodyLen) break;
                 char c1 = raw[++i];
                 char c2 = raw[i+=2];
-                int key = utf8ToUnicode(c, c1, c2) - 12000;
+                int key = _utf8ToUnicode(c, c1, c2) - 12000;
                 //Serial.println(key);
                 //Serial.println(kanaMap[key]);
 
@@ -86,7 +105,7 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
             // 输出缓存中的普通字符
             if (charBuffer.length() > 0) {
                 //uint32_t t0_dis_char = millis();
-                lcd_print(charBuffer);
+                lcdPrint(charBuffer);
                 charBuffer = "";
                 //Serial.print("显示buffer耗时: ");
                 //Serial.println(millis() - t0_dis_char);
@@ -103,9 +122,8 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
             }
             
             // 显示点阵
-            lcd_createChar(customCharIndex, charMap);
-            lcd_dis_custom(customCharIndex);
-            lcd_next_cursor();
+            lcdCreateChar(customCharIndex, charMap);
+            lcdDisCustom(customCharIndex);
 
             // 循环使用 slot
             customCharIndex = (customCharIndex + 1) % 8;
@@ -120,12 +138,12 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
 
     // 输出剩余字符
     if (charBuffer.length() > 0) {
-        lcd_print(charBuffer);
+        lcdPrint(charBuffer);
     }
 
     // 填充空格至满屏
     while (lcdCursor < 32) {
-        lcd_dis_chr(' ');
+        lcdDisChar(' ');
     }
 
     // Serial.print("Process end:");

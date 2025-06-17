@@ -4,6 +4,17 @@
 #include "myhader.h"
 #include "mydefine.h"
 
+// ==============================
+// LCD 显示命令定义
+// ==============================
+
+#define CMD                 0   ///< 表示发送的是 LCD 命令
+#define CHR                 1   ///< 表示发送的是 LCD 字符数据
+
+#define LCD_line1           0x80 ///< LCD 第一行 DDRAM 起始地址
+#define LCD_line2           0xc0 ///< LCD 第二行 DDRAM 起始地址
+
+
 /**
  * @brief 当前 LCD 光标位置
  * 
@@ -15,31 +26,6 @@ extern int lcdCursor;
 
 // 当前背光亮度（0~255），初始为最大亮度
 extern int brightness;
-
-/**
- * @brief 触发 LCD 的 E 引脚以启动数据处理
- * 
- * 向 LCD 的 Enable（E）引脚发送一个上升沿脉冲，  
- * 通知 LCD 开始处理当前传输的数据或指令。
- */
-void trigger_E();
-
-/**
- * @brief 向 LCD 缓冲区写入一个字节的数据
- * 
- * 根据指定的模式（命令或字符）将 8 位数据写入 LCD 的数据线。
- * 
- * @param[in] data 要写入的数据字节（8 位）
- * @param[in] mode 写入模式：0 表示命令（CMD），1 表示字符（CHR）
- */
-void gpio_write(int data,int mode);
-
-/**
- * @brief 初始化 LCD 背光的 PWM 控制
- * 
- * 使用 LEDC 模块在 LCD_BLA 引脚输出 PWM 信号，控制亮度。
- */
-inline void initLcdBacklightPwm(uint8_t initialDuty = 255);
 
 /**
  * @brief 设置 LCD 背光亮度（使用 PWM）
@@ -77,24 +63,11 @@ void lcd_init();
 void lcd_text(String ltext,int line);
 
 /**
- * @brief 设置 LCD 光标的位置
- * 
- * 将光标移动到指定的列和行，以便在该位置显示字符。  
- * 
- * @param[in] col 列索引（0~15）
- * @param[in] row 行索引（0 表示第一行，1 表示第二行）
+ * @brief 将 LCD 光标重置到屏幕左上角 (0,0)，并重置全局光标位置变量。
+ *
+ * 通常在每次刷新、写入新内容或初始化帧时调用。
  */
-void lcd_setCursor(int col, int row);
-
-/**
- * @brief 光标向后移动一格
- * 
- * 将当前光标位置向右移动一个字符位置。  
- * 当光标超出显示范围(32)时，  
- * 将光标设置到显示区域之外，  
- * 用于标识光标已超出显示边界。
- */
-void lcd_next_cursor();
+void lcdResetCursor();
 
 /**
  * @brief 在 CGRAM 中创建自定义字符
@@ -106,7 +79,7 @@ void lcd_next_cursor();
  * @param[in] slot 自定义字符槽位编号，范围 0~7
  * @param[in] data 包含 8 字节点阵数据的数组，每字节对应字符的一行像素
  */
-void lcd_createChar(int slot, uint8_t data[8]);
+void lcdCreateChar(int slot, uint8_t data[8]);
 
 /**
  * @brief 显示自定义字符
@@ -117,7 +90,7 @@ void lcd_createChar(int slot, uint8_t data[8]);
  * 
  * @param[in] index 自定义字符槽位编号（0~7）
  */
-void lcd_dis_custom(int index);
+void lcdDisCustom(int index);
 
 /**
  * @brief 显示普通字符
@@ -128,15 +101,7 @@ void lcd_dis_custom(int index);
  * 
  * @param[in] text 要显示的字符
  */
-void lcd_dis_chr(char text);
-
-/**
- * @brief 清屏并重置光标位置
- * 
- * 发送清屏命令清除 LCD 显示内容，  
- * 并将光标重置到第一行第一列。  
- */
-void lcd_clear();
+void lcdDisChar(char text);
 
 /**
  * @brief 显示整段普通字符文本
@@ -147,6 +112,6 @@ void lcd_clear();
  * 
  * @param[in] s 要显示的字符串
  */
-void lcd_print(String s);
+void lcdPrint(String s);
 
 #endif
