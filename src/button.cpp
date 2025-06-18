@@ -1,11 +1,11 @@
 #include "button.h"
 
 ButtonState buttons[] = {
-    {BOTTEN_UP,     "UP",     LOW, 0, false},
-    {BOTTEN_DOWN,   "DOWN",   LOW, 0, false},
-    {BOTTEN_LEFT,   "LEFT",   LOW, 0, false},
-    {BOTTEN_RIGHT,  "RIGHT",  LOW, 0, false},
-    {BOTTEN_CENTER, "CENTER", LOW, 0, false},
+    {BUTTEN_UP,     "UP",     LOW, 0, false},
+    {BUTTEN_DOWN,   "DOWN",   LOW, 0, false},
+    {BUTTEN_LEFT,   "LEFT",   LOW, 0, false},
+    {BUTTEN_RIGHT,  "RIGHT",  LOW, 0, false},
+    {BUTTEN_CENTER, "CENTER", LOW, 0, false},
 };
 
 const int buttonCount = sizeof(buttons) / sizeof(buttons[0]);
@@ -53,7 +53,7 @@ void scanButtonsTask(void *pvParameters) {
 void handleButtonsTask(void *pvParameters) {
     while (true) {
         if (inMenuMode) {
-            // 菜单模式下按键逻辑交由菜单处理函数处理（另写）
+            // 菜单模式下按键逻辑交由菜单处理函数处理
             vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }
@@ -64,6 +64,7 @@ void handleButtonsTask(void *pvParameters) {
         // 按键按下
         if (center && up) {
             inMenuMode = true;
+            currentState = STATE_MENU;
             Serial.println("[Menu] Combo triggered: Center + Up");
         } 
 

@@ -64,17 +64,17 @@ void lcd_init(){
     _initLcdBacklightPwm(255);            // 默认亮度 255
 
     _gpio_write(0x33,CMD);               // 设置LCD进入8位模式
-    delay(50);
+    delay(5);
     _gpio_write(0x32,CMD);               // 设置LCD切换为4位模式
-    delay(50);
+    delay(5);
     _gpio_write(0x06,CMD);               // 设置向右写入字符，设置屏幕内容不滚动
-    delay(50);
+    delay(5);
     _gpio_write(0x0C,CMD);               // 开启屏幕显示，关闭光标显示，关闭光标闪烁
-    delay(50);
+    delay(5);
     _gpio_write(0x28,CMD);               // 设定数据总线为四位，显示2行字符，使用5*8字符点阵
-    delay(50);
+    delay(5);
     _gpio_write(0x01,CMD);               // 清屏并将地址指针归位
-    delay(50);
+    delay(5);
 }
 
 // 显示函数(用于简单显示/调试)
@@ -99,7 +99,7 @@ void lcd_text(String ltext,int line){
 }
 
 // 设置光标位置
-void _setCursor(int col, int row){
+void lcdSetCursor(int col, int row){
     //Serial.print("set cursor in "+String(col)+","+String(row) + " ");
     int addr = 0;
     if (row == 0) {
@@ -117,7 +117,7 @@ void _setCursor(int col, int row){
 }
 
 void lcdResetCursor(){
-    _setCursor(0, 0);    // 回到屏幕起点
+    lcdSetCursor(0, 0);    // 回到屏幕起点
     lcdCursor = 0;          // 重置全局光标
 }
 
@@ -125,12 +125,12 @@ void lcdResetCursor(){
 void _nextCursor(){
     lcdCursor++;
     if (lcdCursor >= 32) {
-        _setCursor(17, 0);   //将光标设置为显示区域外
+        lcdSetCursor(17, 0);   //将光标设置为显示区域外
     }
 
     int row = (lcdCursor < 16) ? 0 : 1;
     int col = lcdCursor % 16;
-    _setCursor(col, row);
+    lcdSetCursor(col, row);
 }
 
 // 写入一字节的自定义字符
@@ -148,7 +148,7 @@ void lcdCreateChar(int slot, uint8_t data[8]){
     // 设置回 DDRAM 当前光标对应位置
     int row = (lcdCursor < 16) ? 0 : 1;
     int col = lcdCursor % 16;
-    _setCursor(col, row);                // 将光标设置回当前显示位置
+    lcdSetCursor(col, row);                // 将光标设置回当前显示位置
 }
 
 // 显示自定义字符

@@ -70,11 +70,11 @@ inline void setInput(int pin) {
 // 按键引脚定义（带方向语义）
 // ==============================
 
-#define BOTTEN_UP           17  ///< 向上按键
-#define BOTTEN_DOWN         18  ///< 向下按键
-#define BOTTEN_LEFT         6   ///< 向左按键
-#define BOTTEN_RIGHT        4   ///< 向右按键
-#define BOTTEN_CENTER       5   ///< 确认/中心按键
+#define BUTTEN_UP           17  ///< 向上按键
+#define BUTTEN_DOWN         18  ///< 向下按键
+#define BUTTEN_LEFT         6   ///< 向左按键
+#define BUTTEN_RIGHT        4   ///< 向右按键
+#define BUTTEN_CENTER       5   ///< 确认/中心按键
 
 // ==============================
 // 板载外设

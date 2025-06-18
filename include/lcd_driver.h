@@ -114,4 +114,6 @@ void lcdDisChar(char text);
  */
 void lcdPrint(String s);
 
+void lcdSetCursor(int col, int row);
+
 #endif

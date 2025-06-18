@@ -6,8 +6,10 @@
 #include "network.h"
 #include "wifi_config.h"
 #include "button.h"
+#include "clock.h"
+#include "badappleplayer.h"
 
-// 按钮索引枚举，方便调用
+// 按钮索引枚举
 enum ButtonIndex {
     UP = 0,
     DOWN = 1,
@@ -15,6 +17,40 @@ enum ButtonIndex {
     RIGHT = 3,
     CENTER = 4
 };
+
+// 功能界面枚举
+enum InterfaceState {
+    STATE_MENU,
+    STATE_BRIGHTNESS,
+    STATE_CLOCK,
+    STATE_OTHER
+};
+
+extern InterfaceState currentState;
+
+// 菜单状态
+typedef enum MenuState {
+    MENU_NONE = -1,
+
+    MENU_MAIN,
+    MENU_SETTINGS,
+    MENU_WIFI_CONFIG,
+    MENU_ABOUT
+} MenuState;
+
+// 菜单栏的项目
+typedef struct MenuItem {
+    const char* name;                   // 显示的名称
+    void (*action)();                   // 执行的操作（可为 NULL）
+    MenuState nextState;                // 进入的下一级菜单
+} MenuItem;
+
+// 菜单
+typedef struct Menu {
+    const MenuItem* items;              // 菜单的内容
+    int itemCount;                      // 内容数量
+} Menu;
+
 
 // 初始化菜单系统
 void initMenu();

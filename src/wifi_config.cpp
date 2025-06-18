@@ -14,43 +14,43 @@ bool inConfigMode = false;
 
 // 保存WiFi信息
 void saveWiFiCredentials(const String& ssid, const String& password) {
-  File file = FFat.open("/wifi.txt", "w");
-    if (!file) {
-        Serial.println("保存WiFi信息失败, 无法打开文件");
-        lcd_text("Save WiFi Fail", 1);
-        lcd_text("Check FS/Retry", 2);
-        return;
-    }
-    if (!file.println(ssid)) {
-        Serial.println("保存WiFi信息失败, 写入SSID失败");
-        lcd_text("Save WiFi Fail", 1);
-        lcd_text("SSID Write Err", 2);
-        file.close();
-        return;
-    }
-    if (!file.println(password)) {
-        Serial.println("保存WiFi信息失败, 写入密码失败");
-        lcd_text("Save WiFi Fail", 1);
-        lcd_text("Pass Write Err", 2);
-        file.close();
-        return;
-    }
-    file.flush();
-    file.close();
+  File file = SPIFFS.open("/wifi.txt", "w");
+  if (!file) {
+      Serial.println("保存WiFi信息失败, 无法打开文件");
+      lcd_text("Save WiFi Fail", 1);
+      lcd_text("Check FS/Retry", 2);
+      return;
+  }
+  if (!file.println(ssid)) {
+      Serial.println("保存WiFi信息失败, 写入SSID失败");
+      lcd_text("Save WiFi Fail", 1);
+      lcd_text("SSID Write Err", 2);
+      file.close();
+      return;
+  }
+  if (!file.println(password)) {
+      Serial.println("保存WiFi信息失败, 写入密码失败");
+      lcd_text("Save WiFi Fail", 1);
+      lcd_text("Pass Write Err", 2);
+      file.close();
+      return;
+  }
+  file.flush();
+  file.close();
 
-    Serial.println("WiFi 信息已保存");
-    lcd_text("Config Saved", 1);
-    lcd_text("Restarting", 2);
+  Serial.println("WiFi 信息已保存");
+  lcd_text("Config Saved", 1);
+  lcd_text("Restarting", 2);
 }
 
 // 加载WiFi信息
 void loadWiFiCredentials() {
-    if (!FFat.exists("/wifi.txt")) {
+    if (!SPIFFS.exists("/wifi.txt")) {
         savedSSID = "";
         savedPassword = "";
         return;
     }
-    File file = FFat.open("/wifi.txt", "r");
+    File file = SPIFFS.open("/wifi.txt", "r");
     if (file) {
         savedSSID = file.readStringUntil('\n');
         savedSSID.trim();
@@ -62,6 +62,7 @@ void loadWiFiCredentials() {
         savedPassword = "";
     }
 }
+
 
 // 配网网页
 void handleRoot() {
@@ -226,7 +227,7 @@ void connectToWiFi() {
 // 初始化wifi
 void wifiinit(){
   // 连接WiFi
-  if (digitalRead(BOTTEN_CENTER)) {
+  if (digitalRead(BUTTEN_CENTER)) {
       Serial.println("按键按下，强制进入配网模式");
       updateColor(CRGB::Purple);  // 手动配网紫灯
       enterConfigMode();

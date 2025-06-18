@@ -80,7 +80,7 @@ void initKanaMap() {
     // ば行
     kanaMap[400] = "\xca\xde"; kanaMap[496] = "\xca\xde";  // ば
     kanaMap[403] = "\xcb\xde"; kanaMap[499] = "\xcb\xde";  // び
-    kanaMap[406] = "\xcd\xde"; kanaMap[502] = "\xcc\xde";  // ぶ
+    kanaMap[406] = "\xcc\xde"; kanaMap[502] = "\xcc\xde";  // ぶ
     kanaMap[409] = "\xcd\xde"; kanaMap[505] = "\xcd\xde";  // べ
     kanaMap[412] = "\xce\xde"; kanaMap[508] = "\xce\xde";  // ぼ
 

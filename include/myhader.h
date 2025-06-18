@@ -8,6 +8,9 @@
 #include <WiFi.h>             ///< ESP32 WiFi 功能支持（连接、热点、IP 获取等）
 #include <WebServer.h>        ///< 简易 HTTP Web Server（用于配网页面）
 #include <FFat.h>             ///< 使用 Flash Fat 文件系统（用于存储配置）
+#include <LittleFS.h>
+#include <SPIFFS.h>
+#include <time.h>             ///< 标准 time 结构
 
 #include <freertos/FreeRTOS.h>   ///< FreeRTOS 基础支持
 #include <freertos/task.h>       ///< FreeRTOS 任务管理
