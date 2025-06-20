@@ -16,9 +16,9 @@ struct LyricLine {
 const LyricLine lyrics[] = {
     {0,     "Bad Apple!!",          "in 1602A"},
     {60,    "Code by",              "Kulib"},
-    {120,    "Original Vocals:",     "nomico"},
+    {120,   "Vocals:",              "nomico"},
     {180,   "Lyrics:",              "Haruka"},
-    {240,   "Composition",         "ZUN"},
+    {240,   "Composition",          "ZUN"},
     {300,   " ",                    " "},
     {885,   "ながれてく",           "ときのなかででも"},
     {992,   "けだるさがほら",       "グルグルまわって"},

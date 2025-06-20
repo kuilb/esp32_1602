@@ -129,6 +129,11 @@ void playBadAppleFromFileRaw(const char* path) {
     lcd_text(" ",2);
 
     while (file.available() >= frameSize) {
+        if(buttonJustPressed[CENTER] && buttonJustPressed[UP]){
+            currentState = STATE_MENU;
+            break;
+        }
+
         unsigned long now = millis();
         if (now - lastFrameTime >= 33) {
             file.read(frame, frameSize);
