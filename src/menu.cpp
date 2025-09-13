@@ -50,7 +50,8 @@ void enterBrightnessScreen() {
         }
     }
 
-    lcd_text("Back to Menu", 1);
+    lcd_text("saved", 1);
+    lcd_text("Back to Menu", 2);
     delay(500);
 }
 
@@ -68,15 +69,27 @@ void connectInfo(){
     if (WiFi.status() == WL_CONNECTED) {
         lcd_text("SSID:" + savedSSID, 1);
         lcd_text("IP:" + WiFi.localIP().toString(), 2);
-    } else {
+    } 
+    else {
         lcd_text("Not Connected", 1);
         lcd_text("", 2);
     }
-    delay(2000);
+    delay(300);
+
+    for(;;){
+        if(buttonJustPressed[CENTER]){
+            currentState = STATE_MENU;
+            return;
+        }
+    }
 }
 
 void setClockInterface(){
     currentState = STATE_CLOCK;
+}
+
+void setWeatherInterface(){
+    currentState = STATE_WEATHER;
 }
 
 void playBadAppleWrapper() {
@@ -86,7 +99,7 @@ void playBadAppleWrapper() {
 const MenuItem mainMenuItems[] = {
     {"Wireless Screen",     enterWirelessScreen, MENU_NONE},       // 无线屏幕
     {"Clock",               setClockInterface, MENU_NONE},       // 时钟
-    {"Weather",             NULL, MENU_NONE},       // 天气
+    {"Weather",             setWeatherInterface, MENU_NONE},       // 天气
     {"Settings",            NULL, MENU_SETTINGS},   // 设置
     {"About",               NULL, MENU_ABOUT},      // 关于
     {"Bad Apple",           playBadAppleWrapper, MENU_NONE}        // Bad Apple
@@ -139,7 +152,7 @@ const int visibleLines = 2;  // LCD 屏行数
 
 // 初始化函数（可扩展）
 void initMenu() {
-    xTaskCreate(menuTask, "MenuTask", 8192, NULL, 1, &menuTaskHandle);
+    xTaskCreate(menuTask, "MenuTask", 16384, NULL, 1, &menuTaskHandle);
 }
 
 // 判断是否经过了指定的时间间隔
@@ -258,17 +271,40 @@ void menuTask(void* parameter) {
                     handleMenuInterface();
                     break;
                 case STATE_CLOCK:
-                    if(!timeSynced){setupTime();}
-                    // 始终检查是否需要退出
-                    if(buttonJustPressed[CENTER] && buttonJustPressed[UP]){
-                        currentState = STATE_MENU;
-                        break;;
+                    if(!timeSynced){
+                        setupTime();
                     }
 
                     // 每隔1秒刷新一次时间显示（非阻塞）
                     if (millis() - lastClockUpdate > 1000) {
                         updateClockScreen();
                         lastClockUpdate = millis();
+                    }
+
+                    // 始终检查是否需要退出
+                    if(buttonJustPressed[CENTER]){
+                        currentState = STATE_MENU;
+                        break;
+                    }
+
+                    break;
+
+                case STATE_WEATHER: 
+                    if(!timeSynced){
+                        setupTime();
+                    }
+
+                    // 每隔30分钟更新一次天气数据（非阻塞）
+                    if(!weatherSynced || (millis() - lastWeatherUpdate > 30 * 60 * 1000)){
+                        Serial.println("Updating weather...");
+                        fetchWeatherData();
+                        lastWeatherUpdate = millis();
+                    }
+
+                    // 始终检查是否需要退出
+                    if(buttonJustPressed[CENTER]){
+                        currentState = STATE_MENU;
+                        break;
                     }
                     
                     break;

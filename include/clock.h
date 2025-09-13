@@ -13,4 +13,6 @@ void setupTime();
 
 void updateClockScreen();
 
+int get_timestamp();
+
 #endif

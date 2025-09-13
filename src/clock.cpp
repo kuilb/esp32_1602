@@ -3,6 +3,13 @@
 bool timeSynced = false;
 
 void setupTime() {
+    if(WiFi.status() != WL_CONNECTED) {
+        Serial.println("WiFi not connected, cannot sync time.");
+        lcd_text("no connect", 1);
+        lcd_text("exiting...", 2);
+        return;
+    }
+
     configTime(8 * 3600, 0, "ntp.aliyun.com", "ntp1.aliyun.com", "ntp.ntsc.ac.cn");
     Serial.println("Waiting for NTP time sync...");
 
@@ -10,7 +17,17 @@ void setupTime() {
     lcd_text("NTP time sync...", 2);
 
     static unsigned long lastAttempt = 0;
-    if (timeSynced) return;
+    if (timeSynced)  {
+        struct tm timeinfo;
+        if (getLocalTime(&timeinfo)) {
+            // 获取 UNIX 时间戳
+            time_t unixTimestamp = mktime(&timeinfo);
+            
+            // 打印 UNIX 时间戳
+            Serial.print("UNIX Timestamp: ");
+            Serial.println(unixTimestamp);
+        }
+    }
 
     unsigned long now = millis();
     if (now - lastAttempt > 1000) {
@@ -36,10 +53,10 @@ void updateClockScreen() {
             char dateBuf[17];
 
             // 格式化时间，例如 "14:23:08"
-            strftime(timeBuf, sizeof(timeBuf), "%H:%M:%S", &timeinfo);
+            strftime(timeBuf, sizeof(timeBuf), "    %H:%M:%S", &timeinfo);
             
             // 格式化日期和星期，例如 "06/17 Tue"
-            strftime(dateBuf, sizeof(dateBuf), "%m/%d %a", &timeinfo);
+            strftime(dateBuf, sizeof(dateBuf), "   %m/%d  %a", &timeinfo);
 
             lcd_text(dateBuf, 2);   // 第1行显示日期 + 星期
             lcd_text(timeBuf, 1);   // 第2行显示时间

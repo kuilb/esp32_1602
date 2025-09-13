@@ -129,21 +129,44 @@ void playBadAppleFromFileRaw(const char* path) {
     lcd_text(" ",2);
 
     while (file.available() >= frameSize) {
+        // for(int i=0;i<5;i++){
+        //     if(buttonJustPressed[i]){
+        //         Serial.println(i);
+        //     }
+        // }
+        
         if(buttonJustPressed[CENTER] && buttonJustPressed[UP]){
             currentState = STATE_MENU;
             break;
         }
 
         unsigned long now = millis();
-        if (now - lastFrameTime >= 33) {
+        
+        // 快退：每次快退20帧
+        if(buttonJustPressed[LEFT]){
+            currentFrame = max(0, currentFrame - 20);
+            file.seek(currentFrame * frameSize, SeekSet);
+            file.read(frame, frameSize);
+            processBadapple(frame, currentFrame);
+            lastFrameTime = now;
+        }
+        // 快进：每次快进10帧
+        else if(buttonJustPressed[RIGHT]){
+            currentFrame = min((int)(file.size() / frameSize) - 1, currentFrame + 10);
+            file.seek(currentFrame * frameSize, SeekSet);
+            file.read(frame, frameSize);
+            processBadapple(frame, currentFrame);
+            lastFrameTime = now;
+        }
+        else if (now - lastFrameTime >= 33) {
             file.read(frame, frameSize);
             processBadapple(frame, currentFrame);
 
             lastFrameTime += 33;  // 累加，不用now避免抖动误差
             currentFrame++;
         }
-        // 可选：yield(); 防止看门狗复位
-        yield();
+        // 防止看门狗复位
+        // yield();
     }
 
     file.close();

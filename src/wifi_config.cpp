@@ -24,14 +24,14 @@ void saveWiFiCredentials(const String& ssid, const String& password) {
   if (!file.println(ssid)) {
       Serial.println("保存WiFi信息失败, 写入SSID失败");
       lcd_text("Save WiFi Fail", 1);
-      lcd_text("SSID Write Err", 2);
+      lcd_text("Write Err", 2);
       file.close();
       return;
   }
   if (!file.println(password)) {
       Serial.println("保存WiFi信息失败, 写入密码失败");
       lcd_text("Save WiFi Fail", 1);
-      lcd_text("Pass Write Err", 2);
+      lcd_text("Write Err", 2);
       file.close();
       return;
   }
@@ -40,7 +40,7 @@ void saveWiFiCredentials(const String& ssid, const String& password) {
 
   Serial.println("WiFi 信息已保存");
   lcd_text("Config Saved", 1);
-  lcd_text("Restarting", 2);
+  lcd_text("Restarting...", 2);
 }
 
 // 加载WiFi信息

@@ -4,20 +4,6 @@
 #include "myhader.h"
 
 /**
- * @brief 将指定 GPIO 引脚设置为高电平
- * 
- * @param[in] pin GPIO 引脚号
- */
-#define setHigh(pin)        gpio_set_level((gpio_num_t)(pin), 1)
-
-/**
- * @brief 将指定 GPIO 引脚设置为低电平
- * 
- * @param[in] pin GPIO 引脚号
- */
-#define setLow(pin)         gpio_set_level((gpio_num_t)(pin), 0)
-
-/**
  * @brief 将指定 GPIO 引脚配置为输出模式
  * 
  * @param[in] pin GPIO 引脚号

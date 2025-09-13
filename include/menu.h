@@ -8,6 +8,7 @@
 #include "button.h"
 #include "clock.h"
 #include "badappleplayer.h"
+#include "weather.h"
 
 // 按钮索引枚举
 enum ButtonIndex {
@@ -23,6 +24,7 @@ enum InterfaceState {
     STATE_MENU,
     STATE_BRIGHTNESS,
     STATE_CLOCK,
+    STATE_WEATHER,
     STATE_OTHER
 };
 

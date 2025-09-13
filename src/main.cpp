@@ -71,7 +71,6 @@ void setup() {
     lcd_text("V1.0",2);
 
     Serial.begin(BaudRate);
-    setHigh(LCD_BLA);
     while(!Serial){}
     delay(1500);
     Serial.println("Wireless 1602A V1.0 by Kulib");

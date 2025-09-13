@@ -6,6 +6,8 @@
 // ==============================
 
 #include <WiFi.h>             ///< ESP32 WiFi 功能支持（连接、热点、IP 获取等）
+#include <WiFiClientSecure.h> ///< 支持 HTTPS 的 WiFi 客户端
+#include <HTTPClient.h>       ///< HTTP 客户端（用于网络请求）
 #include <WebServer.h>        ///< 简易 HTTP Web Server（用于配网页面）
 #include <FFat.h>             ///< 使用 Flash Fat 文件系统（用于存储配置）
 #include <LittleFS.h>
@@ -24,7 +26,9 @@
 // ==============================
 
 #include <FastLED.h>          ///< 控制 WS2812 等 RGB 灯条的库
-
+#include <ArduinoJson.h>      ///< JSON 解析库（用于天气数据解析）
+#include <sodium.h>           ///< libsodium 加密库（用于 JWT 签名）
+#include <zlib_turbo.h>       ///< Gzip 解压库
 
 // ==============================
 // STL 容器扩展
