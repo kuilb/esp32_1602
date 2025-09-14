@@ -95,8 +95,9 @@ void lcd_text(String ltext,int line){
 }
 
 // 设置光标位置
-void lcdSetCursor(){
+void lcdSetCursor(int changecursor){
     //Serial.print("set cursor in "+String(col)+","+String(row) + " ");
+    lcdCursor=changecursor;
     int row = (lcdCursor < 16) ? 0 : 1;
     int col = lcdCursor % 16;
 
@@ -116,19 +117,15 @@ void lcdSetCursor(){
 }
 
 void lcdResetCursor(){
-    lcdCursor = 0;          // 重置全局光标
-    lcdSetCursor();    // 回到屏幕起点
+    lcdSetCursor(0);    // 回到屏幕起点
 }
 
 // 光标向后移动一格
 void _nextCursor(){
-    lcdCursor++;
     if (lcdCursor >= 32) {
-        lcdCursor=33;  
-        lcdSetCursor();   //将光标设置为显示区域外
+        lcdSetCursor(33);   //将光标设置为显示区域外
     }
-
-    lcdSetCursor();
+    lcdSetCursor(lcdCursor+1);
 }
 
 // 写入一字节的自定义字符
@@ -144,7 +141,7 @@ void lcdCreateChar(int slot, uint8_t data[8]){
     }
 
     // 设置回 DDRAM 当前光标对应位置
-    lcdSetCursor();                // 将光标设置回当前显示位置
+    lcdSetCursor(lcdCursor);                // 将光标设置回当前显示位置
 }
 
 // 显示自定义字符

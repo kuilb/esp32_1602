@@ -1,8 +1,4 @@
 #include "weather.h"
-#include <HTTPClient.h>
-#include <zlib_turbo.h>
-
-
 
 // Base64URL编码
 String base64url_encode(const uint8_t* data, size_t len) {
@@ -70,7 +66,7 @@ String generate_jwt(const String& kid, const String& project_id, const uint8_t* 
 
 // 你的API参数
 const char* apiHost = "k2436grq42.re.qweatherapi.com"; // 和风天气API Host
-const char* location = "101010100"; // 北京LocationID
+const char* location = "101280306"; // LocationID
 const String kid = "K75DVFV3J5";
 const String project_id = "4KDX498E6E";
 //const uint8_t seed32[32] = { /* 你的Ed25519 seed，32字节 */ };
@@ -94,13 +90,56 @@ String humidity = "";
 String pressure = "";
 String obsTime = "";
 unsigned long lastWeatherUpdate = 0;
+unsigned int interface_num = 0; // 当前显示的界面编号
 
 // 只负责显示天气信息
 void updateWeatherScreen() {
-    lcd_text("Beijing", 1); // 第一行显示城市（最多16字符）
-    String line2 = (getWeatherInEnglish(currentWeather)  + " T" + currentTemp +" "+"W"+windScale); // 第二行天气+温度
-    lcd_text(line2, 2);
-    Serial.println("weather:"+currentWeather+" temp:"+currentTemp+" city:"+currentCity+" time:"+weatherUpdateTime+" feels:"+feelsLike+" wind:"+windDir+windScale+" humi:"+humidity+" pres:"+pressure+" obs:"+obsTime);
+    if(interface_num == 0){
+        lcdResetCursor();
+        lcd_text("HuiCheng Qu", 1); // 第一行显示城市
+
+        lcdSetCursor(16); 
+        lcdCreateChar(0,getWeatherLeftIcon(currentWeather));
+        lcdCreateChar(1,getWeatherRightIcon(currentWeather));
+        lcdCreateChar(2, tempIcon);
+        lcdCreateChar(3, celsius);
+
+        lcdDisCustom(0);
+        lcdDisCustom(1);
+        lcdDisCustom(2);
+        lcdPrint(currentTemp);
+        lcdDisCustom(3);
+        lcdPrint(" Feel" + feelsLike);
+        lcdDisCustom(3);
+
+        for(int i=lcdCursor;i<32;i++) lcdDisChar(' '); // 清除剩余部分
+        
+    } else if(interface_num == 1){
+        lcdResetCursor();
+        lcdCreateChar(4, getWindIcon(windDir));
+        lcdPrint("Wind ");
+        lcdDisCustom(4);
+        lcdPrint(windScale);
+
+        lcdSetCursor(16); 
+        lcdPrint("Humi:"); // 第二行显示湿度
+        lcdPrint(humidity);
+        // lcdPrint("%");
+        for(int i=lcdCursor;i<32;i++) lcdDisChar(' '); // 清除剩余部分
+
+    } else if(interface_num == 2){
+        lcdResetCursor();
+        lcdPrint("Pres:");
+        lcdPrint(pressure);
+        // lcdPrint("hPa");
+        for(int i=lcdCursor;i<32;i++) lcdDisChar(' '); // 清除剩余部分
+
+        // lcd_text("Obs:", 2); // 第二行显示观测时间
+        // lcdSetCursor(16); 
+        // lcdPrint(obsTime);
+        for(int i=lcdCursor;i<32;i++) lcdDisChar(' '); // 清除剩余部分
+    }
+    Serial.println("\nweather:"+currentWeather+"\ntemp:"+currentTemp+"\ncity:"+currentCity+"\ntime:"+weatherUpdateTime+"\nfeels:"+feelsLike+"\nwind:"+windDir+windScale+"\nhumi:"+humidity+"\npres:"+pressure+"\nobs:"+obsTime);
 }
 
 // 负责网络请求和数据解析（HTTPS + gzip解压）
@@ -113,6 +152,9 @@ void fetchWeatherData() {
         lcd_text("Weather failed", 2);
         return;
     }
+
+    lcd_text("Updating weather", 1);
+    lcd_text("Please wait...", 2);
 
     Serial.println("[DEBUG] Generating JWT token...");
 
@@ -158,7 +200,7 @@ void fetchWeatherData() {
     }
 
     int payloadSize = http.getSize();
-    Serial.printf("[DEBUG] Payload size: %d\n", payloadSize);
+    //Serial.printf("[DEBUG] Payload size: %d\n", payloadSize);
 
     uint8_t *pCompressed = (uint8_t *)malloc(payloadSize + 8);
     if (!pCompressed) {
@@ -172,7 +214,7 @@ void fetchWeatherData() {
     WiFiClient *stream = http.getStreamPtr();
     long startMillis = millis();
     int iCount = 0;
-    Serial.println("[DEBUG] Start reading compressed data...");
+    //Serial.println("[DEBUG] Start reading compressed data...");
     while (iCount < payloadSize && (millis() - startMillis) < 4000) {
         if (stream->available()) {
             pCompressed[iCount++] = stream->read();
@@ -180,15 +222,15 @@ void fetchWeatherData() {
             vTaskDelay(5);
         }
     }
-    Serial.printf("[DEBUG] Compressed data read: %d bytes\n", iCount);
+    //Serial.printf("[DEBUG] Compressed data read: %d bytes\n", iCount);
     http.end();
 
     String jsonData;
     zlib_turbo zt;
     if (pCompressed[0] == 0x1f && pCompressed[1] == 0x8b) {
-        Serial.println("[DEBUG] It's a gzip file!");
+        //Serial.println("[DEBUG] It's a gzip file!");
         int uncompSize = zt.gzip_info(pCompressed, payloadSize);
-        Serial.printf("[DEBUG] gzip_info returned: %d\n", uncompSize);
+        //Serial.printf("[DEBUG] gzip_info returned: %d\n", uncompSize);
         if (uncompSize > 0) {
             uint8_t *pUncompressed = (uint8_t *)malloc(uncompSize + 8);
             if (!pUncompressed) {
@@ -227,7 +269,7 @@ void fetchWeatherData() {
     free(pCompressed);
 
     //Serial.println("[DEBUG] Weather API JSON:");
-    Serial.println(jsonData);
+    //Serial.println(jsonData);
 
     //Serial.println("[DEBUG] Start JSON parsing...");
     DynamicJsonDocument doc(2048);
@@ -241,7 +283,7 @@ void fetchWeatherData() {
     }
 
     String code = doc["code"].as<String>();
-    Serial.println("[DEBUG] code: " + code);
+    //Serial.println("[DEBUG] code: " + code);
     if (code != "200") {
         lcd_text("API error", 1);
         lcd_text(("code:" + code).substring(0, 16), 2);
