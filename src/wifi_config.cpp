@@ -53,6 +53,7 @@ void loadWiFiCredentials() {
     File file = SPIFFS.open("/wifi.txt", "r");
     if (file) {
         savedSSID = file.readStringUntil('\n');
+        Serial.println("Loaded SSID: " + savedSSID);
         savedSSID.trim();
         savedPassword = file.readStringUntil('\n');
         savedPassword.trim();

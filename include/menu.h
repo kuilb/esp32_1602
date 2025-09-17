@@ -9,6 +9,7 @@
 #include "clock.h"
 #include "badappleplayer.h"
 #include "weather.h"
+#include "web_setting.h"
 
 // 按钮索引枚举
 enum ButtonIndex {

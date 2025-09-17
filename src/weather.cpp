@@ -1,82 +1,5 @@
 #include "weather.h"
 
-// Base64URL编码
-String base64url_encode(const uint8_t* data, size_t len) {
-    String b64 = "";
-    const char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-    int val = 0, valb = -6;
-    for (size_t i = 0; i < len; i++) {
-        val = (val << 8) + data[i];
-        valb += 8;
-        while (valb >= 0) {
-            b64 += table[(val >> valb) & 0x3F];
-            valb -= 6;
-        }
-    }
-    if (valb > -6) b64 += table[((val << 8) >> (valb + 8)) & 0x3F];
-    // Base64URL不需要填充
-    return b64;
-}
-
-// 生成JWT Token
-String generate_jwt(const String& kid, const String& project_id, const uint8_t* seed32) {
-    //Serial.println("[DEBUG] start generate_jwt...");
-
-    // Header
-    StaticJsonDocument<128> header;
-    header["alg"] = "EdDSA";
-    header["kid"] = kid;
-    String header_json;
-    serializeJson(header, header_json);
-    String header_b64 = base64url_encode((const uint8_t*)header_json.c_str(), header_json.length());
-    //Serial.println("[DEBUG] header_b64: " + header_b64);
-
-    // Payload
-    StaticJsonDocument<128> payload;
-    unsigned long now = time(nullptr);
-    payload["sub"] = project_id;
-    payload["iat"] = now - 30;
-    payload["exp"] = now + 8000; // 有效期8000秒
-    //Serial.println("[DEBUG] sub: " + project_id);
-    //Serial.printf("[DEBUG] iat: %lu\n", now - 30);
-    //Serial.printf("[DEBUG] exp: %lu\n", now + 8000);
-
-    String payload_json;
-    serializeJson(payload, payload_json);
-    String payload_b64 = base64url_encode((const uint8_t*)payload_json.c_str(), payload_json.length());
-    //Serial.println("[DEBUG] payload_b64: " + payload_b64);
-
-    // 签名
-    String signing_input = header_b64 + "." + payload_b64;
-    uint8_t pk[crypto_sign_PUBLICKEYBYTES], sk[crypto_sign_SECRETKEYBYTES];
-    crypto_sign_seed_keypair(pk, sk, seed32);
-    //Serial.println("[DEBUG] Public Key: " + String((char*)pk));
-    //Serial.println("[DEBUG] Secret Key: " + String((char*)sk));
-
-    uint8_t signature[crypto_sign_BYTES];
-    unsigned long long siglen;
-    crypto_sign_detached(signature, &siglen,
-        (const unsigned char*)signing_input.c_str(), signing_input.length(), sk);
-
-    String signature_b64 = base64url_encode(signature, siglen);
-
-    // 拼接JWT
-    return signing_input + "." + signature_b64;
-}
-
-// 你的API参数
-const char* apiHost = "k2436grq42.re.qweatherapi.com"; // 和风天气API Host
-const char* location = "101280306"; // LocationID
-const String kid = "K75DVFV3J5";
-const String project_id = "4KDX498E6E";
-//const uint8_t seed32[32] = { /* 你的Ed25519 seed，32字节 */ };
-const uint8_t seed32[32] = {
-  0x2C, 0x89, 0x83, 0xA2, 0xDD, 0x37, 0xA2, 0x10,
-  0xB3, 0x33, 0xBD, 0xEE, 0x8F, 0xFE, 0xFF, 0x59,
-  0xA2, 0x60, 0x6D, 0xEC, 0x43, 0x24, 0xAB, 0xAE,
-  0x4E, 0xDA, 0x75, 0xE5, 0xDF, 0x07, 0xA2, 0x8A
-}; 
-
 // 天气数据
 bool weatherSynced = false;
 String currentWeather = "N/A";
@@ -96,7 +19,12 @@ unsigned int interface_num = 0; // 当前显示的界面编号
 void updateWeatherScreen() {
     if(interface_num == 0){
         lcdResetCursor();
-        lcd_text("HuiCheng Qu", 1); // 第一行显示城市
+        extern char* city_name;
+        if (city_name && strlen(city_name) > 0) {
+            lcd_text(city_name, 1); // 第一行显示配置地名
+        } else {
+            lcd_text("N/A", 1);
+        }
 
         lcdSetCursor(16); 
         lcdCreateChar(0,getWeatherLeftIcon(currentWeather));
@@ -120,6 +48,7 @@ void updateWeatherScreen() {
         lcdPrint("Wind ");
         lcdDisCustom(4);
         lcdPrint(windScale);
+        for(int i=lcdCursor;i<15;i++) lcdDisChar(' '); // 清除剩余部分
 
         lcdSetCursor(16); 
         lcdPrint("Humi:"); // 第二行显示湿度
@@ -139,54 +68,53 @@ void updateWeatherScreen() {
         // lcdPrint(obsTime);
         for(int i=lcdCursor;i<32;i++) lcdDisChar(' '); // 清除剩余部分
     }
-    Serial.println("\nweather:"+currentWeather+"\ntemp:"+currentTemp+"\ncity:"+currentCity+"\ntime:"+weatherUpdateTime+"\nfeels:"+feelsLike+"\nwind:"+windDir+windScale+"\nhumi:"+humidity+"\npres:"+pressure+"\nobs:"+obsTime);
 }
 
 // 负责网络请求和数据解析（HTTPS + gzip解压）
-void fetchWeatherData() {
+bool fetchWeatherData() {
     Serial.println("[DEBUG] Enter fetchWeatherData");
 
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("[DEBUG] WiFi not found");
         lcd_text("WiFi not found", 1);
         lcd_text("Weather failed", 2);
-        return;
+        return false;
     }
+
+    // 检查 API 配置是否完整
+    if (strlen(apiHost) == 0 || strlen(base64_key) == 0 || strlen(kid) == 0 || strlen(project_id) == 0) {
+        Serial.println("[DEBUG] Missing API configuration");
+        lcd_text("API config missing", 1);
+        lcd_text(" ", 2);
+        return false;
+    }
+
+    generateSeed32();
+
+    Serial.println("[DEBUG] API config OK, fetching weather...");
 
     lcd_text("Updating weather", 1);
     lcd_text("Please wait...", 2);
 
-    Serial.println("[DEBUG] Generating JWT token...");
+    // 去掉 apiHost 和 location 前后空格
+    String hostStr = String(apiHost);
+    hostStr.trim();
+    String locStr = String(location);
+    locStr.trim();
 
-    // 检查参数
-    Serial.print("[DEBUG] kid: ");
-    Serial.println(kid);
-    
-    Serial.print("[DEBUG] project_id: ");
-    Serial.println(project_id);
-
-    if (seed32 == nullptr) {
-        Serial.println("[ERROR] seed32 is null!");
-    }
-    
-    Serial.print("[DEBUG] seed32: ");
-    for (int i = 0; i < 32; ++i) {
-        Serial.printf("%02X ", seed32[i]);
-    }
-    Serial.println();
-
+    // 生成 JWT
     String jwtToken = generate_jwt(kid, project_id, seed32);
     Serial.println("[DEBUG] JWT token: " + jwtToken);
 
-    String url = String("https://") + apiHost + "/v7/weather/now?location=" + location;
-    Serial.println("[DEBUG] Request URL: " + url);
+    // 拼接 URL
+    String url = "https://" + hostStr + "/v7/weather/now?location=" + locStr;
+    Serial.println("[DEBUG] Final Request URL: " + url);
 
     HTTPClient http;
     http.begin(url);
     http.addHeader("Accept-Encoding", "gzip");
     http.addHeader("Authorization", "Bearer " + jwtToken);
 
-    Serial.println("[DEBUG] Sending HTTP GET...");
     int httpCode = http.GET();
     Serial.printf("[DEBUG] HTTP code: %d\n", httpCode);
 
@@ -196,11 +124,17 @@ void fetchWeatherData() {
         lcd_text("HTTP error", 1);
         lcd_text(String(httpCode), 2);
         http.end();
-        return;
+        return false; // 直接返回，避免解析空数据
     }
 
     int payloadSize = http.getSize();
-    //Serial.printf("[DEBUG] Payload size: %d\n", payloadSize);
+    if (payloadSize <= 0) {
+        Serial.println("[DEBUG] Empty payload");
+        lcd_text("Empty payload", 1);
+        lcd_text("", 2);
+        http.end();
+        return false;
+    }
 
     uint8_t *pCompressed = (uint8_t *)malloc(payloadSize + 8);
     if (!pCompressed) {
@@ -208,13 +142,12 @@ void fetchWeatherData() {
         lcd_text("Mem fail", 1);
         lcd_text("", 2);
         http.end();
-        return;
+        return false;
     }
 
     WiFiClient *stream = http.getStreamPtr();
     long startMillis = millis();
     int iCount = 0;
-    //Serial.println("[DEBUG] Start reading compressed data...");
     while (iCount < payloadSize && (millis() - startMillis) < 4000) {
         if (stream->available()) {
             pCompressed[iCount++] = stream->read();
@@ -222,56 +155,51 @@ void fetchWeatherData() {
             vTaskDelay(5);
         }
     }
-    //Serial.printf("[DEBUG] Compressed data read: %d bytes\n", iCount);
     http.end();
 
     String jsonData;
     zlib_turbo zt;
-    if (pCompressed[0] == 0x1f && pCompressed[1] == 0x8b) {
-        //Serial.println("[DEBUG] It's a gzip file!");
-        int uncompSize = zt.gzip_info(pCompressed, payloadSize);
-        //Serial.printf("[DEBUG] gzip_info returned: %d\n", uncompSize);
-        if (uncompSize > 0) {
-            uint8_t *pUncompressed = (uint8_t *)malloc(uncompSize + 8);
-            if (!pUncompressed) {
-                Serial.println("[DEBUG] malloc failed for uncompressed buffer");
-                lcd_text("Mem fail", 1);
-                lcd_text("", 2);
-                free(pCompressed);
-                return;
-            }
-            //Serial.println("[DEBUG] Start gunzip...");
-            int rc = zt.gunzip(pCompressed, payloadSize, pUncompressed);
-            //Serial.printf("[DEBUG] gunzip returned: %d\n", rc);
-            if (rc == ZT_SUCCESS) {
-                //Serial.printf("[DEBUG] Uncompressed size = %d bytes\n", uncompSize);
-                jsonData = String((char *)pUncompressed, uncompSize);
-                free(pUncompressed);
-            } else {
-                //Serial.println("[DEBUG] Gzip decompress failed");
-                lcd_text("Gzip failed", 1);
-                lcd_text("", 2);
-                free(pUncompressed);
-                free(pCompressed);
-                return;
-            }
-        } else {
-            //Serial.println("[DEBUG] gzip_info failed");
+
+    if (iCount >= 2 && pCompressed[0] == 0x1f && pCompressed[1] == 0x8b) {
+        int uncompSize = zt.gzip_info(pCompressed, iCount);
+        if (uncompSize <= 0) {
+            Serial.println("[DEBUG] gzip_info failed");
             lcd_text("Gzip info fail", 1);
             lcd_text("", 2);
             free(pCompressed);
-            return;
+            return false;
         }
+        uint8_t *pUncompressed = (uint8_t *)malloc(uncompSize + 8);
+        if (!pUncompressed) {
+            Serial.println("[DEBUG] malloc failed for uncompressed buffer");
+            lcd_text("Mem fail", 1);
+            lcd_text("", 2);
+            free(pCompressed);
+            return false;
+        }
+        int rc = zt.gunzip(pCompressed, iCount, pUncompressed);
+        if (rc != ZT_SUCCESS) {
+            Serial.println("[DEBUG] Gzip decompress failed");
+            lcd_text("Gzip failed", 1);
+            lcd_text("", 2);
+            free(pUncompressed);
+            free(pCompressed);
+            return false;
+        }
+        jsonData = String((char *)pUncompressed, uncompSize);
+        free(pUncompressed);
     } else {
-        //Serial.println("[DEBUG] Not a gzip file, try as plain text");
-        jsonData = String((char *)pCompressed, payloadSize);
+        jsonData = String((char *)pCompressed, iCount);
     }
     free(pCompressed);
 
-    //Serial.println("[DEBUG] Weather API JSON:");
-    //Serial.println(jsonData);
+    if (jsonData.length() == 0) {
+        Serial.println("[DEBUG] Empty response");
+        lcd_text("Empty response", 1);
+        lcd_text("", 2);
+        return false;
+    }
 
-    //Serial.println("[DEBUG] Start JSON parsing...");
     DynamicJsonDocument doc(2048);
     DeserializationError error = deserializeJson(doc, jsonData);
     if (error) {
@@ -279,17 +207,25 @@ void fetchWeatherData() {
         Serial.println(error.c_str());
         lcd_text("JSON failed", 1);
         lcd_text("", 2);
-        return;
+        return false;
+    }
+
+    if (!doc.containsKey("code")) {
+        Serial.println("[DEBUG] No 'code' field in response");
+        lcd_text("No code field", 1);
+        lcd_text("", 2);
+        return false;
     }
 
     String code = doc["code"].as<String>();
-    //Serial.println("[DEBUG] code: " + code);
     if (code != "200") {
+        Serial.println("[DEBUG] API returned error code: " + code);
         lcd_text("API error", 1);
-        lcd_text(("code:" + code).substring(0, 16), 2);
-        return;
+        lcd_text(("code:" + code).substring(0, min((int)code.length()+5, 16)), 2);
+        return false;
     }
 
+    // 成功解析，赋值天气数据
     currentCity = String(location);
     currentWeather = doc["now"]["text"].as<String>();
     currentTemp = doc["now"]["temp"].as<String>() + "C";
@@ -305,4 +241,5 @@ void fetchWeatherData() {
 
     Serial.println("[DEBUG] Weather data parsed and ready to display.");
     updateWeatherScreen();
+    return true;
 }

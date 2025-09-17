@@ -1,7 +1,10 @@
 #include "menu.h"
 
 // 菜单状态变量
+volatile bool isNewInterface = false;
 volatile bool inMenuMode = true;
+volatile bool isReadyToDisplay = false;
+long lastWeatherFail = -15000;
 InterfaceState currentState = STATE_MENU;
 
 void enterWirelessScreen(){
@@ -64,6 +67,11 @@ void resetWifi(){
     ESP.restart();
 }
 
+void setupWebSetting(){
+    web_setting_setupWebServer();
+    Serial.println("配置完成");
+}
+
 void connectInfo(){
     Serial.println("Status Info");
     if (WiFi.status() == WL_CONNECTED) {
@@ -85,10 +93,12 @@ void connectInfo(){
 }
 
 void setClockInterface(){
+    isNewInterface = true;
     currentState = STATE_CLOCK;
 }
 
 void setWeatherInterface(){
+    isNewInterface = true;
     currentState = STATE_WEATHER;
 }
 
@@ -106,6 +116,7 @@ const MenuItem mainMenuItems[] = {
 };
 
 const MenuItem settingsMenuItems[] = {
+    {"Web setting",     setupWebSetting, MENU_NONE},
     {"WiFi Config",     NULL, MENU_WIFI_CONFIG},
     {"Brightness",      enterBrightnessScreen, MENU_NONE},
     {"Return",          NULL, MENU_MAIN}
@@ -276,7 +287,8 @@ void menuTask(void* parameter) {
                     }
 
                     // 每隔1秒刷新一次时间显示（非阻塞）
-                    if (millis() - lastDisplayUpdate > 1000) {
+                    if (millis() - lastDisplayUpdate > 1000 || isNewInterface) {
+                        isNewInterface = false;
                         updateClockScreen();
                         lastDisplayUpdate = millis();
                     }
@@ -296,14 +308,25 @@ void menuTask(void* parameter) {
                     }
 
                     // 每隔10分钟更新一次天气数据（非阻塞）
-                    if(!weatherSynced || (millis() - lastWeatherUpdate > 10 * 60 * 1000)){
-                        Serial.println("Updating weather...");
-                        fetchWeatherData();
-                        lastWeatherUpdate = millis();
+                    if (!isReadyToDisplay || millis() - lastWeatherUpdate > 10*60*1000) {
+                        if (millis() - lastWeatherFail > 15*1000) { // 失败后15秒再试
+                            init_jwt();
+                            Serial.println("Fetching weather data...");
+                            if(fetchWeatherData()) {
+                                isReadyToDisplay = true;
+                                lastWeatherUpdate = millis();
+                            } else {
+                                isReadyToDisplay = false;
+                                lastWeatherFail = millis();
+                            }
+                        }
                     }
 
-                    if (millis() - lastDisplayUpdate > 10000) {
-                        updateWeatherScreen();
+                    if (isNewInterface) {
+                        isNewInterface = false;
+                        if(isReadyToDisplay) {
+                            updateWeatherScreen();
+                        }
                         lastDisplayUpdate = millis();
                     }
 
@@ -313,15 +336,22 @@ void menuTask(void* parameter) {
                         currentState = STATE_MENU;
                         break;
                     }
-                    if(buttonJustPressed[LEFT] && millis() - lastDisplayUpdate > 200){
-                        lastDisplayUpdate = millis();
-                        interface_num = (interface_num + 2) % 3; // 切换到上一个界面
-                        updateWeatherScreen();
+                    if(isReadyToDisplay == false){
+                        // lcdResetCursor();
+                        // lcd_text("No Data", 1);
+                        // lcd_text(" ", 2);
                     }
-                    if(buttonJustPressed[RIGHT] && millis() - lastDisplayUpdate > 200){
-                        lastDisplayUpdate = millis();
-                        interface_num = (interface_num + 1) % 3; // 切换到下一个界面
-                        updateWeatherScreen();
+                    else{
+                        if(buttonJustPressed[LEFT] && millis() - lastDisplayUpdate > 200){
+                            lastDisplayUpdate = millis();
+                            interface_num = (interface_num + 2) % 3; // 切换到上一个界面
+                            updateWeatherScreen();
+                        }
+                        if(buttonJustPressed[RIGHT] && millis() - lastDisplayUpdate > 200){
+                            lastDisplayUpdate = millis();
+                            interface_num = (interface_num + 1) % 3; // 切换到下一个界面
+                            updateWeatherScreen();
+                        }
                     }
                     
                     break;

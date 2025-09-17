@@ -10,6 +10,7 @@
 #include "button.h"
 #include "menu.h"
 #include "clock.h"
+#include "jwt_auth.h"
 using namespace std;
 
 void init(){                        //初始化引脚
@@ -68,17 +69,16 @@ void setup() {
 
     // 欢迎消息
     lcd_text("Wireless 1602A",1);
-    lcd_text("V1.0",2);
+    lcd_text("",2);
 
     Serial.begin(BaudRate);
     while(!Serial){}
-    delay(1500);
+    
     Serial.println("Wireless 1602A V1.0 by Kulib");
-    Serial.println("2025/6/15");
+    Serial.println("2025/9/15");
     Serial.println("开始初始化...");
 
-    #include <SPIFFS.h>
-
+    delay(1000);
     // 挂载 SPIFFS
     if (!SPIFFS.begin(true)) {  // true 表示失败时自动格式化
         Serial.println("无法挂载SPIFFS, 正在格式化...");
@@ -106,7 +106,7 @@ void setup() {
         listDir("/", 0);  // 打印根目录文件
     }
 
-
+    init_jwt();
     wifiinit();
     initMenu();
 }
