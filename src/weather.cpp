@@ -121,6 +121,44 @@ bool fetchWeatherData() {
     if (httpCode != 200) {
         Serial.print("[DEBUG] HTTP error: ");
         Serial.println(httpCode);
+        if (httpCode == 401) {
+            Serial.println("[DEBUG] HTTP 401响应内容:");
+            int payloadSize = http.getSize();
+            if (payloadSize > 0) {
+                uint8_t *pCompressed = (uint8_t *)malloc(payloadSize + 8);
+                if (pCompressed) {
+                    WiFiClient *stream = http.getStreamPtr();
+                    long startMillis = millis();
+                    int iCount = 0;
+                    while (iCount < payloadSize && (millis() - startMillis) < 4000) {
+                        if (stream->available()) {
+                            pCompressed[iCount++] = stream->read();
+                        } else {
+                            vTaskDelay(5);
+                        }
+                    }
+                    String respBody;
+                    zlib_turbo zt;
+                    if (iCount >= 2 && pCompressed[0] == 0x1f && pCompressed[1] == 0x8b) {
+                        int uncompSize = zt.gzip_info(pCompressed, iCount);
+                        if (uncompSize > 0) {
+                            uint8_t *pUncompressed = (uint8_t *)malloc(uncompSize + 8);
+                            if (pUncompressed) {
+                                int rc = zt.gunzip(pCompressed, iCount, pUncompressed);
+                                if (rc == ZT_SUCCESS) {
+                                    respBody = String((char *)pUncompressed, uncompSize);
+                                }
+                                free(pUncompressed);
+                            }
+                        }
+                    } else {
+                        respBody = String((char *)pCompressed, iCount);
+                    }
+                    Serial.println("[BODY]\n" + respBody);
+                    free(pCompressed);
+                }
+            }
+        }
         lcd_text("HTTP error", 1);
         lcd_text(String(httpCode), 2);
         http.end();

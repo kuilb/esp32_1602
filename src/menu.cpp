@@ -68,6 +68,10 @@ void resetWifi(){
 }
 
 void setupWebSetting(){
+    if(!timeSynced){
+        setupTime();
+    }
+
     web_setting_setupWebServer();
     Serial.println("配置完成");
 }

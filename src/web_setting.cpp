@@ -377,6 +377,7 @@ void web_setting_setupWebServer() {
             }
         }
         weatherSynced = false;
+        isReadyToDisplay = false;
         setting_server.send(200, "text/html; charset=utf-8", "<p>LocationID已设置为：" + locid + "<br>地名：" + cityname + "</p><a href='/'>返回配置页面</a>");
     });
     

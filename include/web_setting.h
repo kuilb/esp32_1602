@@ -4,6 +4,7 @@
 #include "myhader.h"
 #include "lcd_driver.h"
 #include "jwt_auth.h"
+#include "menu.h"
 
 void web_setting_setupWebServer();
 

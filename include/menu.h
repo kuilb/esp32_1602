@@ -11,6 +11,8 @@
 #include "weather.h"
 #include "web_setting.h"
 
+extern volatile bool isReadyToDisplay;
+
 // 按钮索引枚举
 enum ButtonIndex {
     UP = 0,
