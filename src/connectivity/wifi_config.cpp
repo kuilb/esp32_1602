@@ -1,7 +1,13 @@
 #include "wifi_config.h"
+#include <DNSServer.h>
+#include "clock.h"
 
 // 配网模式使用的 Web 服务器（监听端口 80）
 WebServer AP_server(80);
+
+// DNS 服务器用于强制门户
+DNSServer dnsServer;
+const byte DNS_PORT = 53;
 
 // 用户通过网页输入的 SSID 与密码
 String ssid_input, password_input;
@@ -162,6 +168,15 @@ void enterConfigMode() {
   WiFi.softAP("1602A_Config");
   Serial.println("配网网页开启于IP: " + WiFi.softAPIP().toString());
 
+  // 启动DNS服务器，将所有域名请求重定向到ESP32的IP
+  dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
+
+  // 强制门户：捕获所有DNS请求并重定向到配网页面
+  AP_server.onNotFound([](){
+    AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+    AP_server.send(302, "text/plain", "");
+  });
+
   // 扫描WiFi并展示列表
   AP_server.on("/", [](){
   String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>WiFi 配置</title>";
@@ -205,6 +220,31 @@ void enterConfigMode() {
   AP_server.send(200, "text/html; charset=utf-8", "<div style='font-family:Segoe UI,sans-serif;background:#e9f0fa;height:100vh;display:flex;justify-content:center;align-items:center;'><div style='background:#fff;padding:2em 2.5em;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);max-width:95%;width:420px;text-align:center;'><h2 style='color:#1976D2;'>WiFi信息已保存</h2><p style='color:#388E3C;'>设备正在重启，请稍候...</p></div></div>");
     delay(2000);
     ESP.restart();
+  });
+
+  // 添加常见的强制门户检测端点
+  // Android 设备检测
+  AP_server.on("/generate_204", [](){
+    AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+    AP_server.send(302, "text/plain", "");
+  });
+  
+  // iOS 设备检测
+  AP_server.on("/hotspot-detect.html", [](){
+    AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+    AP_server.send(302, "text/plain", "");
+  });
+  
+  // Windows 设备检测
+  AP_server.on("/ncsi.txt", [](){
+    AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+    AP_server.send(302, "text/plain", "");
+  });
+  
+  // 通用重定向端点
+  AP_server.on("/redirect", [](){
+    AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+    AP_server.send(302, "text/plain", "");
   });
 
   AP_server.begin();
@@ -257,10 +297,10 @@ void connectToWiFi() {
         Serial.println("\n已连接");
         Serial.print("IP: ");
         Serial.println(WiFi.localIP());
-
-        // 在屏幕上显示ip
-        lcd_text("SSID:" + savedSSID ,1);
-        lcd_text("IP:" + WiFi.localIP().toString(),2);
+        
+        // 联网成功后启动后台时间同步
+        Serial.println("启动后台时间同步...");
+        configTime(8 * 3600, 0, "ntp.aliyun.com", "ntp1.aliyun.com", "ntp.ntsc.ac.cn");
     } else {
         Serial.println("\n连接失败, 进入配网");
         updateColor(CRGB::Red);  // 失败变红

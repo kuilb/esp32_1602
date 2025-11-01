@@ -1,5 +1,8 @@
 #include "menu.h"
 
+// 函数前置声明
+void displayMenu(const Menu* menu, int menuIndex, int scrollOffset);
+
 // 菜单状态变量
 volatile bool isNewInterface = false;
 volatile bool inMenuMode = true;
@@ -162,11 +165,15 @@ Menu allMenus[] = {
 
 const Menu* currentMenu = &allMenus[MENU_MAIN]; // 初始为主菜单
 int menuCursor = 0;   // 当前菜单项光标位置
-int scrollOffset = 0;   // 当前显示窗口起始项
+int scrollOffset = -1;   // 当前显示窗口起始项，主菜单初始为-1以显示状态栏
 const int visibleLines = 2;  // LCD 屏行数
 
 // 初始化函数（可扩展）
 void initMenu() {
+    // 立即显示菜单界面，不等待WiFi或时间同步
+    displayMenu(currentMenu, menuCursor, scrollOffset);
+    
+    // 启动菜单任务
     xTaskCreate(menuTask, "MenuTask", 16384, NULL, 1, &menuTaskHandle);
 }
 
@@ -180,18 +187,53 @@ void displayMenu(const Menu* menu, int menuIndex, int scrollOffset) {
     // Serial.print((String)menuIndex + " ");
     // Serial.print((String)scrollOffset + "\n");
     lcdResetCursor();
-    for (int i = 0; i < visibleLines; i++) {
-        int menuIndex = scrollOffset + i;
-
-        if (menuIndex >= menu->itemCount) {
-            lcd_text(" ", i + 1);  // 清空无效行
-            continue;
+    
+    // 检查是否为主菜单，如果是则包含状态栏参与滚动
+    if (menu == &allMenus[MENU_MAIN]) {
+        // 主菜单：状态栏作为第-1项（虚拟项），可滚动但不可选中
+        for (int i = 0; i < visibleLines; i++) {
+            int displayIndex = scrollOffset + i;
+            
+            if (displayIndex == -1) {
+                // 显示状态栏（虚拟项-1）
+                String statusLine = "";
+                if (WiFi.status() == WL_CONNECTED) {
+                    statusLine = "W:OK ";
+                    if (timeSynced) {
+                        statusLine += "T:synced";
+                    } else {
+                        statusLine += "T:--";
+                    }
+                } else {
+                    statusLine = "offline mode";
+                }
+                
+                lcd_text(statusLine, i + 1);  // 状态栏始终没有光标
+            } else if (displayIndex >= 0 && displayIndex < menu->itemCount) {
+                // 显示正常菜单项
+                if (menuCursor == displayIndex)
+                    lcd_text(">" + (String)menu->items[displayIndex].name, i + 1);
+                else
+                    lcd_text(" " + (String)menu->items[displayIndex].name, i + 1);
+            } else {
+                lcd_text(" ", i + 1);  // 清空无效行
+            }
         }
+    } else {
+        // 其他菜单保持原有显示方式
+        for (int i = 0; i < visibleLines; i++) {
+            int menuItemIndex = scrollOffset + i;
 
-        if (menuCursor == menuIndex)
-            lcd_text(">" + (String)menu->items[menuIndex].name, i + 1);
-        else
-            lcd_text(" " + (String)menu->items[menuIndex].name, i + 1);
+            if (menuItemIndex >= menu->itemCount) {
+                lcd_text(" ", i + 1);  // 清空无效行
+                continue;
+            }
+
+            if (menuCursor == menuItemIndex)
+                lcd_text(">" + (String)menu->items[menuItemIndex].name, i + 1);
+            else
+                lcd_text(" " + (String)menu->items[menuItemIndex].name, i + 1);
+        }
     }
 }
 
@@ -242,10 +284,32 @@ void handleMenuInterface() {
 
     switch (lastPressedButton) {
         case LEFT:
-            if (menuCursor > 0) menuCursor--;
+            if (currentMenu == &allMenus[MENU_MAIN]) {
+                // 主菜单特殊处理：允许滚动到状态栏
+                if (menuCursor > 0) {
+                    menuCursor--;
+                } else if (scrollOffset > -1) {
+                    // 如果光标在第0项且还能向上滚动，则滚动显示状态栏
+                    scrollOffset--;
+                }
+            } else {
+                // 其他菜单正常处理
+                if (menuCursor > 0) menuCursor--;
+            }
             break;
         case RIGHT:
-            if (menuCursor < currentMenu->itemCount - 1) menuCursor++;
+            if (currentMenu == &allMenus[MENU_MAIN]) {
+                // 主菜单特殊处理
+                if (scrollOffset == -1 && menuCursor == 0) {
+                    // 如果当前显示状态栏且光标在第0项，向下滚动隐藏状态栏
+                    scrollOffset = 0;
+                } else if (menuCursor < currentMenu->itemCount - 1) {
+                    menuCursor++;
+                }
+            } else {
+                // 其他菜单正常处理
+                if (menuCursor < currentMenu->itemCount - 1) menuCursor++;
+            }
             break;
         case CENTER:
         // 如果有下一菜单，跳转
@@ -255,6 +319,13 @@ void handleMenuInterface() {
                 if (nextMenu) {
                     currentMenu = nextMenu;
                     menuCursor = 0; // 重置光标
+                    
+                    // 如果进入主菜单，初始化scrollOffset为-1以显示状态栏
+                    if (currentMenu == &allMenus[MENU_MAIN]) {
+                        scrollOffset = -1;
+                    } else {
+                        scrollOffset = 0;
+                    }
                 }
             }
             else if (currentMenu->items[menuCursor].action) {
@@ -264,11 +335,37 @@ void handleMenuInterface() {
     }
 
     // 更新 scrollOffset 以保持光标在可视区
-    if (menuCursor < scrollOffset) {
-        scrollOffset = menuCursor;
-    } 
-    else if (menuCursor >= scrollOffset + visibleLines) {
-        scrollOffset = menuCursor - visibleLines + 1;
+    if (currentMenu == &allMenus[MENU_MAIN]) {
+        // 主菜单特殊处理：状态栏滚动已在按键处理中控制
+        // 这里只处理正常的菜单项滚动逻辑
+        if (scrollOffset >= 0) {
+            // 正常菜单项的滚动逻辑
+            if (menuCursor < scrollOffset) {
+                scrollOffset = menuCursor;
+            } 
+            else if (menuCursor >= scrollOffset + visibleLines) {
+                scrollOffset = menuCursor - visibleLines + 1;
+            }
+        }
+        
+        // 确保scrollOffset在合理范围内
+        if (scrollOffset < -1) {
+            scrollOffset = -1;
+        }
+        
+        int maxScrollOffset = currentMenu->itemCount - visibleLines;
+        if (maxScrollOffset < -1) maxScrollOffset = -1;
+        if (scrollOffset > maxScrollOffset) {
+            scrollOffset = maxScrollOffset;
+        }
+    } else {
+        // 其他菜单的正常滚动逻辑
+        if (menuCursor < scrollOffset) {
+            scrollOffset = menuCursor;
+        } 
+        else if (menuCursor >= scrollOffset + visibleLines) {
+            scrollOffset = menuCursor - visibleLines + 1;
+        }
     }
 
     delay(120);  // 节流
@@ -278,8 +375,31 @@ TaskHandle_t menuTaskHandle = NULL;
 // 菜单任务函数
 void menuTask(void* parameter) {
     static unsigned long lastDisplayUpdate = 0;
+    static bool hasTriedTimeSync = false;  // 标记是否已经尝试过时间同步
 
     while (true) {
+        // 一次性后台时间同步检查
+        if (!hasTriedTimeSync && WiFi.status() == WL_CONNECTED && !timeSynced) {
+            hasTriedTimeSync = true;
+            Serial.println("后台尝试时间同步...");
+            
+            // 等待NTP服务器响应，最多5秒
+            unsigned long syncStart = millis();
+            while (millis() - syncStart < 5000) {
+                struct tm timeinfo;
+                if (getLocalTime(&timeinfo)) {
+                    timeSynced = true;
+                    Serial.println("后台时间同步成功!");
+                    break;
+                }
+                vTaskDelay(100 / portTICK_PERIOD_MS);
+            }
+            
+            if (!timeSynced) {
+                Serial.println("后台时间同步失败");
+            }
+        }
+        
         if (inMenuMode) {
             switch (currentState) {
                 case STATE_MENU:
@@ -288,6 +408,11 @@ void menuTask(void* parameter) {
                 case STATE_CLOCK:
                     if(!timeSynced){
                         setupTime();
+                        if(!timeSynced){
+                            delay(1000);
+                            currentState = STATE_MENU;
+                            break;
+                        }
                     }
 
                     // 每隔1秒刷新一次时间显示（非阻塞）
@@ -309,6 +434,11 @@ void menuTask(void* parameter) {
                 case STATE_WEATHER: 
                     if(!timeSynced){
                         setupTime();
+                        if(!timeSynced){
+                            delay(1000);
+                            currentState = STATE_MENU;
+                            break;
+                        }
                     }
 
                     // 每隔10分钟更新一次天气数据（非阻塞）

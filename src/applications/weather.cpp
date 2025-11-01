@@ -27,27 +27,61 @@ void updateWeatherScreen() {
         }
 
         lcdSetCursor(16); 
-        lcdCreateChar(0,getWeatherLeftIcon(currentWeather));
-        lcdCreateChar(1,getWeatherRightIcon(currentWeather));
-        lcdCreateChar(2, tempIcon);
-        lcdCreateChar(3, celsius);
+        
+        // 安全地获取天气图标，确保指针不为空
+        uint8_t* leftIcon = getWeatherLeftIcon(currentWeather);
+        uint8_t* rightIcon = getWeatherRightIcon(currentWeather);
+        
+        Serial.println("[WEATHER] Getting icons for weather: '" + currentWeather + "'");
+        Serial.println("[WEATHER] Left icon valid: " + String(leftIcon != nullptr));
+        Serial.println("[WEATHER] Right icon valid: " + String(rightIcon != nullptr));
+        
+        if (leftIcon && rightIcon) {
+            lcdCreateChar(0, leftIcon);
+            lcdCreateChar(1, rightIcon);
+            lcdCreateChar(2, tempIcon);
+            lcdCreateChar(3, celsius);
 
-        lcdDisCustom(0);
-        lcdDisCustom(1);
-        lcdDisCustom(2);
-        lcdPrint(currentTemp);
-        lcdDisCustom(3);
-        lcdPrint(" Feel" + feelsLike);
-        lcdDisCustom(3);
+            lcdDisCustom(0);
+            lcdDisCustom(1);
+            lcdDisCustom(2);
+            lcdPrint(currentTemp);
+            lcdDisCustom(3);
+            lcdPrint(" Feel" + feelsLike);
+            lcdDisCustom(3);
+        } else {
+            // 如果天气图标获取失败，显示文本形式
+            lcdCreateChar(2, tempIcon);
+            lcdCreateChar(3, celsius);
+            lcdPrint(currentWeather.substring(0, 8)); // 限制长度
+            lcdPrint(" ");
+            lcdDisCustom(2);
+            lcdPrint(currentTemp);
+            lcdDisCustom(3);
+        }
 
         for(int i=lcdCursor;i<32;i++) lcdDisChar(' '); // 清除剩余部分
         
     } else if(interface_num == 1){
         lcdResetCursor();
-        lcdCreateChar(4, getWindIcon(windDir));
-        lcdPrint("Wind ");
-        lcdDisCustom(4);
-        lcdPrint(windScale);
+        
+        // 安全地获取风向图标
+        uint8_t* windIcon = getWindIcon(windDir);
+        Serial.println("[WEATHER] Getting wind icon for direction: '" + windDir + "'");
+        Serial.println("[WEATHER] Wind icon valid: " + String(windIcon != nullptr));
+        
+        if (windIcon) {
+            lcdCreateChar(4, windIcon);
+            lcdPrint("Wind ");
+            lcdDisCustom(4);
+            lcdPrint(windScale);
+        } else {
+            lcdPrint("Wind:");
+            lcdPrint(windDir.substring(0, 6)); // 限制长度，显示文本
+            lcdPrint(" ");
+            lcdPrint(windScale);
+        }
+        
         for(int i=lcdCursor;i<15;i++) lcdDisChar(' '); // 清除剩余部分
 
         lcdSetCursor(16); 
@@ -84,8 +118,16 @@ bool fetchWeatherData() {
     // 检查 API 配置是否完整
     if (strlen(apiHost) == 0 || strlen(base64_key) == 0 || strlen(kid) == 0 || strlen(project_id) == 0) {
         Serial.println("[DEBUG] Missing API configuration");
-        lcd_text("API config missing", 1);
-        lcd_text(" ", 2);
+        lcd_text("No API config", 1);
+        lcd_text("Use web config", 2);
+        return false;
+    }
+
+    // 检查城市配置是否为空
+    if (!location || strlen(location) == 0) {
+        Serial.println("[DEBUG] Missing city/location configuration");
+        lcd_text("No City Set", 1);
+        lcd_text("Use Web Config", 2);
         return false;
     }
 
@@ -263,21 +305,34 @@ bool fetchWeatherData() {
         return false;
     }
 
-    // 成功解析，赋值天气数据
+    // 成功解析，赋值天气数据（添加安全检查）
     currentCity = String(location);
-    currentWeather = doc["now"]["text"].as<String>();
-    currentTemp = doc["now"]["temp"].as<String>() + "C";
-    feelsLike = doc["now"]["feelsLike"].as<String>() + "C";
-    windDir = doc["now"]["windDir"].as<String>();
-    windScale = doc["now"]["windScale"].as<String>();
-    humidity = doc["now"]["humidity"].as<String>() + "%";
-    pressure = doc["now"]["pressure"].as<String>() + "hPa";
-    obsTime = doc["now"]["obsTime"].as<String>();
-    weatherUpdateTime = doc["updateTime"].as<String>();
+    
+    // 安全地获取天气数据，避免空值
+    if (doc["now"]["text"].is<String>()) {
+        currentWeather = doc["now"]["text"].as<String>();
+        if (currentWeather.length() == 0) {
+            currentWeather = "Unknown";
+        }
+    } else {
+        currentWeather = "Unknown";
+    }
+    
+    currentTemp = (doc["now"]["temp"].is<String>() ? doc["now"]["temp"].as<String>() : "0") + "C";
+    feelsLike = (doc["now"]["feelsLike"].is<String>() ? doc["now"]["feelsLike"].as<String>() : "0") + "C";
+    windDir = doc["now"]["windDir"].is<String>() ? doc["now"]["windDir"].as<String>() : "";
+    windScale = doc["now"]["windScale"].is<String>() ? doc["now"]["windScale"].as<String>() : "0";
+    humidity = (doc["now"]["humidity"].is<String>() ? doc["now"]["humidity"].as<String>() : "0") + "%";
+    pressure = (doc["now"]["pressure"].is<String>() ? doc["now"]["pressure"].as<String>() : "0") + "hPa";
+    obsTime = doc["now"]["obsTime"].is<String>() ? doc["now"]["obsTime"].as<String>() : "";
+    weatherUpdateTime = doc["updateTime"].is<String>() ? doc["updateTime"].as<String>() : "";
+    
     weatherSynced = true;
     lastWeatherUpdate = millis();
 
     Serial.println("[DEBUG] Weather data parsed and ready to display.");
+    Serial.println("[DEBUG] currentWeather: " + currentWeather);
+    Serial.println("[DEBUG] currentTemp: " + currentTemp);
     updateWeatherScreen();
     return true;
 }

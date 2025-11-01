@@ -12,6 +12,14 @@
  */
 extern WebServer AP_server;
 
+// 前置声明DNSServer类
+class DNSServer;
+
+/**
+ * @brief DNS 服务器用于强制门户
+ */
+extern DNSServer dnsServer;
+
 /**
  * @brief 从用户网页输入的 WiFi SSID 和密码
  */

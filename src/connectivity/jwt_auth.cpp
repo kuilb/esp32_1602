@@ -93,41 +93,55 @@ int base64_decode(const char* input, uint8_t* output) {
 
 // -------- Extract seed32 from PKCS#8 DER --------
 bool extract_ed25519_seed(const uint8_t* der, size_t der_len, uint8_t* seed32) {
-    for (size_t i = 0; i < der_len; i++) {
+    Serial.println("[DER] Extracting Ed25519 seed from DER data...");
+    Serial.println("[DER] DER length: " + String(der_len));
+    
+    for (size_t i = 0; i < der_len - 1; i++) {
         // 查找连续 0x04 0x20 开头的 32 字节数据
-        if (der[i] == 0x04 && der[i+1] == 0x20) {
+        if (der[i] == 0x04 && der[i+1] == 0x20 && (i + 34) <= der_len) {
+            Serial.println("[DER] Found Ed25519 seed pattern at offset: " + String(i));
             memcpy(seed32, der + i + 2, 32);
+            Serial.println("[DER] Successfully extracted 32-byte seed");
             return true;
         }
     }
     // 打印调试信息
-    Serial.println("Failed to extract seed32! DER bytes:");
-    for (size_t i = 0; i < der_len; i++)
+    Serial.println("[DER] ERROR: Failed to extract seed32! DER bytes:");
+    for (size_t i = 0; i < der_len && i < 64; i++) { // 限制输出长度
         Serial.printf("%02X ", der[i]);
+        if ((i + 1) % 16 == 0) Serial.println();
+    }
+    if (der_len > 64) Serial.println("... (truncated)");
     Serial.println();
     return false;
 }
 
 // Base64 decode + 提取 seed 函数
 void generateSeed32() {
-    Serial.println("generating seed32 from base64 key...");
+    Serial.println("[SEED] Generating seed32 from base64 key...");
     
     if (strlen(base64_key) == 0) {
-        Serial.println("[DEBUG] No base64 key, cannot generate seed32");
+        Serial.println("[SEED] ERROR: No base64 key, cannot generate seed32");
         return;
     }
 
+    Serial.println("[SEED] Base64 key length: " + String(strlen(base64_key)));
+    Serial.println("[SEED] Base64 key (first 20 chars): " + String(base64_key).substring(0, 20) + "...");
+
     uint8_t der[128];
     int der_len = base64_decode(base64_key, der);
+    Serial.println("[SEED] DER decoded length: " + String(der_len));
+    
     if(!extract_ed25519_seed(der, der_len, seed32)) {
-        Serial.println("Failed to extract seed32!");
+        Serial.println("[SEED] ERROR: Failed to extract seed32!");
         return;
     }
-    Serial.print("Seed32: ");
+    Serial.print("[SEED] Extracted Seed32: ");
     for(int i=0;i<32;i++){
         Serial.printf("%02X", seed32[i]);
     }
     Serial.println();
+    Serial.println("[SEED] Seed32 generation completed successfully");
 }
 
 // Base64 URL-safe编码
@@ -145,6 +159,9 @@ String base64url_encode(const uint8_t* data, size_t len) {
     }
     if (valb > -6) b64 += table[((val << 8) >> (valb + 8)) & 0x3F];
     
+    // Base64URL规范：移除末尾的填充字符 '='
+    // 注意：这里不需要添加填充字符，因为JWT规范要求移除它们
+    
     return b64;
 }
 
@@ -156,35 +173,76 @@ String generate_jwt(const String& kid, const String& project_id, const uint8_t* 
     String project_trimmed = project_id;
     project_trimmed.trim();
 
-    // Header（只含alg和kid）
+    // Header（严格按照和风天气规范：只含alg和kid）
     StaticJsonDocument<128> header;
-    header["alg"] = "EdDSA";
-    header["kid"] = kid_trimmed;
+    header["alg"] = "EdDSA";  // 必须是EdDSA
+    header["kid"] = kid_trimmed;  // 凭据ID
+    // 注意：不添加typ、iss、aud、nbf等保留字段
     String header_json;
     serializeJson(header, header_json);
+    Serial.println("[JWT] Header: " + header_json);
     String header_b64 = base64url_encode((const uint8_t*)header_json.c_str(), header_json.length());
 
-    // Payload（只含sub/iat/exp）
+    // Payload（严格按照和风天气规范：只含sub、iat、exp）
     StaticJsonDocument<128> payload;
-    payload["sub"] = project_trimmed;
+    payload["sub"] = project_trimmed;  // 签发主体：项目ID
     unsigned long now = time(nullptr);
-    payload["iat"] = now - 30;
-    payload["exp"] = now + 8000;
+    
+    // 检查时间是否已同步 - 更严格的检查
+    if (now < 1609459200) { // 2021年1月1日的时间戳，如果小于这个值说明时间肯定不对
+        Serial.println("[JWT] ERROR: System time not synchronized! Current timestamp: " + String(now));
+        Serial.println("[JWT] Please ensure NTP time sync is working");
+        // 即使时间不对，也继续生成JWT，但会在调试中明确标识
+    } else {
+        Serial.println("[JWT] System time OK, timestamp: " + String(now));
+        // 打印可读时间用于调试
+        struct tm* timeinfo = localtime((time_t*)&now);
+        char timeStr[64];
+        strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", timeinfo);
+        Serial.println("[JWT] Current time: " + String(timeStr));
+    }
+    
+    unsigned long iat = now - 30;  // 签发时间：当前时间前30秒（防止时间误差）
+    unsigned long exp = now + 3600;  // 过期时间：1小时后（符合24小时内的要求）
+    
+    payload["iat"] = iat;
+    payload["exp"] = exp;
+    
+    Serial.println("[JWT] iat: " + String(iat) + ", exp: " + String(exp));
+    // 注意：不添加iss、aud、nbf、typ等保留字段
     String payload_json;
     serializeJson(payload, payload_json);
+    Serial.println("[JWT] Payload: " + payload_json);
     String payload_b64 = base64url_encode((const uint8_t*)payload_json.c_str(), payload_json.length());
 
-    // 签名 Ed25519(header.payload)
+    // 签名：使用Ed25519算法对header.payload进行签名
     String signing_input = header_b64 + "." + payload_b64;
+    Serial.println("[JWT] Signing input: " + signing_input);
+    
+    // 从seed生成Ed25519密钥对
     uint8_t pk[crypto_sign_PUBLICKEYBYTES], sk[crypto_sign_SECRETKEYBYTES];
     crypto_sign_seed_keypair(pk, sk, seed32);
+    
+    // 打印公钥用于调试
+    Serial.print("[JWT] Public key: ");
+    for(int i = 0; i < 8; i++) { // 只打印前8字节
+        Serial.printf("%02X", pk[i]);
+    }
+    Serial.println("...");
+    
+    // 使用Ed25519算法生成分离签名
     uint8_t signature[crypto_sign_BYTES];
     unsigned long long siglen;
     crypto_sign_detached(signature, &siglen,
         (const unsigned char*)signing_input.c_str(), signing_input.length(), sk);
+    
+    Serial.println("[JWT] Signature length: " + String(siglen));
+    // 对签名进行Base64URL编码
     String signature_b64 = base64url_encode(signature, siglen);
 
-    // 拼接JWT（header.payload.signature）
+    // 拼接最终JWT：header.payload.signature
     String jwt = signing_input + "." + signature_b64;
+    Serial.println("[JWT] Final JWT length: " + String(jwt.length()));
+    Serial.println("[JWT] Final JWT: " + jwt);
     return jwt;
 }

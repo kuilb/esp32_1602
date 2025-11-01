@@ -114,13 +114,27 @@ void processBadapple(const uint8_t* raw, int currentFrame) {
 // 播放 Bad Apple 原始帧数据（每帧64字节，不含协议头）
 void playBadAppleFromFileRaw(const char* path) {
     unsigned long lastFrameTime = millis();
+    Serial.println("尝试打开文件: " + String(path));
+    
+    // 检查文件是否存在
+    if (!SPIFFS.exists(path)) {
+        Serial.println("文件不存在");
+        lcd_text("File Not Found",1);
+        lcd_text(" ",2);
+        delay(1000);
+        return;
+    }
+    
     File file = SPIFFS.open(path, "r");
     if (!file) {
         Serial.println("无法打开文件");
+        lcd_text("Err Open File",1);
+        lcd_text(" ",2);
+        delay(1000);
         return;
-    } else {
-        Serial.println("已打开文件");
     }
+
+    Serial.println("文件大小: " + String(file.size()) + " 字节");
 
     const size_t frameSize = 64;
     uint8_t frame[frameSize];
@@ -129,13 +143,7 @@ void playBadAppleFromFileRaw(const char* path) {
     lcd_text(" ",2);
 
     while (file.available() >= frameSize) {
-        // for(int i=0;i<5;i++){
-        //     if(buttonJustPressed[i]){
-        //         Serial.println(i);
-        //     }
-        // }
-        
-        if(buttonJustPressed[CENTER] && buttonJustPressed[UP]){
+        if(buttonJustPressed[CENTER] && currentFrame >= 15){
             currentState = STATE_MENU;
             break;
         }
@@ -165,8 +173,6 @@ void playBadAppleFromFileRaw(const char* path) {
             lastFrameTime += 33;  // 累加，不用now避免抖动误差
             currentFrame++;
         }
-        // 防止看门狗复位
-        // yield();
     }
 
     file.close();

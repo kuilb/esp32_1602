@@ -11,6 +11,7 @@
 #include "menu.h"
 #include "clock.h"
 #include "jwt_auth.h"
+#include <DNSServer.h>
 using namespace std;
 
 void init(){                        //初始化引脚
@@ -113,6 +114,7 @@ void setup() {
 
 void loop(){
     if (inConfigMode) {
+        dnsServer.processNextRequest();  // 处理劫持DNS请求
         AP_server.handleClient();
     }
 

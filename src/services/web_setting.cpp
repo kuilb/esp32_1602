@@ -57,7 +57,7 @@ void web_setting_handleRoot() {
     // JavaScript
     html += "<script>"
         "function openCitySearch(){"
-        "  window.open('/citysearch','_blank','width=600,height=400');"
+        "  window.open('/citysearch','_blank','width=800,height=600');"
         "}"
         "function exitSettings(){"
         "  fetch('/exit').then(response => {"
@@ -204,8 +204,10 @@ void web_setting_setupWebServer() {
                 String key = file.readStringUntil('\n'); key.trim();
                 Serial.println("[CITYSEARCH] key: " + key);
                 file.close();
+                // 确保先生成seed32
+                generateSeed32();
                 // 生成JWT
-                jwtToken = generate_jwt(kid, project, seed32); // seed32需提前生成
+                jwtToken = generate_jwt(kid, project, seed32);
                 Serial.println("[CITYSEARCH] jwtToken: " + jwtToken);
             } else {
                 Serial.println("[CITYSEARCH] jwt_config.txt文件打开失败");
@@ -378,18 +380,40 @@ void web_setting_setupWebServer() {
         }
         weatherSynced = false;
         isReadyToDisplay = false;
-        setting_server.send(200, "text/html; charset=utf-8", "<p>LocationID已设置为：" + locid + "<br>地名：" + cityname + "</p><a href='/'>返回配置页面</a>");
+        
+        // 返回成功页面并自动关闭弹出窗口
+        String response = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>设置成功</title>";
+        response += "<style>body{font-family:Arial;text-align:center;padding:40px;background:#f0f2f5;}";
+        response += ".success{background:#fff;padding:30px;border-radius:8px;display:inline-block;box-shadow:0 0 10px rgba(0,0,0,0.1);}";
+        response += ".success h2{color:#4CAF50;margin-bottom:20px;}";
+        response += ".info{margin:10px 0;color:#666;}";
+        response += "</style>";
+        response += "<script>";
+        response += "setTimeout(function(){window.close();}, 2000);";  // 2秒后自动关闭
+        response += "</script>";
+        response += "</head><body>";
+        response += "<div class='success'>";
+        response += "<h2>✓ 设置成功</h2>";
+        response += "<div class='info'>LocationID: " + locid + "</div>";
+        response += "<div class='info'>城市: " + cityname + "</div>";
+        response += "<p>窗口将在2秒后自动关闭...</p>";
+        response += "</div></body></html>";
+        
+        setting_server.send(200, "text/html; charset=utf-8", response);
     });
     
     setting_server.begin();
     Serial.println("Web 服务器已启动，访问 IP 地址以配置参数");
+    
+    // 获取当前IP地址并显示
+    String ipAddress = WiFi.localIP().toString();
     lcd_text("Config Mode", 1);
-    lcd_text(" ", 2);
+    lcd_text(ipAddress.c_str(), 2);
     while(isConfigDone == false){
         setting_server.handleClient();
         delay(1);
     }
     lcd_text("Config Done", 1);
-    lcd_text(" ", 2);
+    lcd_text("Saved & Exit", 2);
     delay(500);
 }

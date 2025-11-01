@@ -57,13 +57,13 @@ inline void setLcdBrightness(uint8_t duty) {
 
 // 初始化 LCD 显示模块
 void lcd_init(){
-    _initLcdBacklightPwm(255);            // 默认亮度 255
+    _initLcdBacklightPwm(255);           // 默认亮度 255
 
     _gpio_write(0x33,CMD);               // 设置LCD进入8位模式
     delay(5);
     _gpio_write(0x32,CMD);               // 设置LCD切换为4位模式
     delay(5);
-    _gpio_write(0x06,CMD);               // 设置向右写入字符，设置屏幕内容不滚动
+    _gpio_write(0x06,CMD);               // 设定向右写入字符，设置屏幕内容不滚动
     delay(5);
     _gpio_write(0x0C,CMD);               // 开启屏幕显示，关闭光标显示，关闭光标闪烁
     delay(5);
@@ -86,7 +86,7 @@ void lcd_text(String ltext,int line){
     int tsize=ltext.length();
     for(int size=0;size<16;size++){     //逐字写入
         if(size>tsize-1){
-            _gpio_write(0x20,CHR);       //若字符串大小小于16，则填充空格
+            _gpio_write(0x20,CHR);       //若字符串长度小于16，则填充空格
         }
         else{
             _gpio_write(int(ltext[size]),CHR); //转换成RAW编码后写入

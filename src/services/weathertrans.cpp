@@ -14,6 +14,7 @@ uint8_t northWestWindIcon [] = {0x00, 0x10, 0x09, 0x05, 0x03, 0x0F, 0x00, 0x00};
 
 // 依据中文风向获取对应的图标
 uint8_t* getWindIcon(const String& windDirection) {
+    // 中文风向
     if (windDirection == "北风") {
         return northWindIcon;
     } else if (windDirection == "东风") {
@@ -30,8 +31,29 @@ uint8_t* getWindIcon(const String& windDirection) {
         return southWestWindIcon;
     } else if (windDirection == "西北风") {
         return northWestWindIcon;
-    } else {
-        return nullptr; // 没有匹配的风向
+    }
+
+    // 英文风向
+    else if (windDirection == "N") {
+        return northWindIcon;
+    } else if (windDirection == "E") {
+        return eastWindIcon;
+    } else if (windDirection == "S") {
+        return southWindIcon;
+    } else if (windDirection == "W") {
+        return westWindIcon;
+    } else if (windDirection == "NE") {
+        return northEastWindIcon;
+    } else if (windDirection == "SE") {
+        return southEastWindIcon;
+    } else if (windDirection == "SW") {
+        return southWestWindIcon;
+    } else if (windDirection == "NW") {
+        return northWestWindIcon;
+    }
+    
+    else {
+        return northWindIcon; // 返回默认的北风图标而不是 nullptr
     }
 }
 
@@ -82,6 +104,7 @@ uint8_t dustStormRightIcon[] = {0x00, 0x04, 0x02, 0x1F, 0x02, 0x04, 0x00, 0x00};
 
 // 函数：根据中文天气获取对应的左半部分图标
 uint8_t* getWeatherLeftIcon(const String& chineseWeather) {
+    // 中文天气
     if (chineseWeather == "晴") return sunnyLeftIcon;
     if (chineseWeather == "多云") return cloudyLeftIcon;
     if (chineseWeather == "阴") return overcastLeftIcon;
@@ -93,11 +116,31 @@ uint8_t* getWeatherLeftIcon(const String& chineseWeather) {
     if (chineseWeather == "雪") return snowLeftIcon;
     if (chineseWeather == "雷阵雨") return thunderLeftIcon;
     if (chineseWeather == "沙尘暴") return dustStormLeftIcon;
-    return nullptr;  // 返回 nullptr，如果没有匹配的天气
+    
+    // 日语天气
+    if (chineseWeather == "晴れ") return sunnyLeftIcon;
+    if (chineseWeather == "曇り") return cloudyLeftIcon;
+    if (chineseWeather == "雨") return lightRainLeftIcon;
+    if (chineseWeather == "雪") return snowLeftIcon;
+    if (chineseWeather == "雷雨") return thunderLeftIcon;
+    if (chineseWeather == "霧") return fogLeftIcon;
+    
+    // 英文天气
+    if (chineseWeather == "Sunny" || chineseWeather == "Clear") return sunnyLeftIcon;
+    if (chineseWeather == "Cloudy" || chineseWeather == "Partly Cloudy") return cloudyLeftIcon;
+    if (chineseWeather == "Overcast") return overcastLeftIcon;
+    if (chineseWeather == "Rain" || chineseWeather == "Light Rain") return lightRainLeftIcon;
+    if (chineseWeather == "Heavy Rain") return heavyRainLeftIcon;
+    if (chineseWeather == "Snow") return snowLeftIcon;
+    if (chineseWeather == "Thunderstorm") return thunderLeftIcon;
+    if (chineseWeather == "Fog") return fogLeftIcon;
+    
+    return sunnyLeftIcon;  // 返回默认的晴天图标
 }
 
 // 函数：根据中文天气获取对应的右半部分图标
 uint8_t* getWeatherRightIcon(const String& chineseWeather) {
+    // 中文天气
     if (chineseWeather == "晴") return sunnyRightIcon;
     if (chineseWeather == "多云") return cloudyRightIcon;
     if (chineseWeather == "阴") return overcastRightIcon;
@@ -109,7 +152,26 @@ uint8_t* getWeatherRightIcon(const String& chineseWeather) {
     if (chineseWeather == "雪") return snowRightIcon;
     if (chineseWeather == "雷阵雨") return thunderRightIcon;
     if (chineseWeather == "沙尘暴") return dustStormRightIcon;
-    return nullptr;  // 返回 nullptr，如果没有匹配的天气
+    
+    // 日语天气
+    if (chineseWeather == "晴れ") return sunnyRightIcon;
+    if (chineseWeather == "曇り") return cloudyRightIcon;
+    if (chineseWeather == "雨") return lightRainRightIcon;
+    if (chineseWeather == "雪") return snowRightIcon;
+    if (chineseWeather == "雷雨") return thunderRightIcon;
+    if (chineseWeather == "霧") return fogRightIcon;
+    
+    // 英文天气
+    if (chineseWeather == "Sunny" || chineseWeather == "Clear") return sunnyRightIcon;
+    if (chineseWeather == "Cloudy" || chineseWeather == "Partly Cloudy") return cloudyRightIcon;
+    if (chineseWeather == "Overcast") return overcastRightIcon;
+    if (chineseWeather == "Rain" || chineseWeather == "Light Rain") return lightRainRightIcon;
+    if (chineseWeather == "Heavy Rain") return heavyRainRightIcon;
+    if (chineseWeather == "Snow") return snowRightIcon;
+    if (chineseWeather == "Thunderstorm") return thunderRightIcon;
+    if (chineseWeather == "Fog") return fogRightIcon;
+    
+    return sunnyRightIcon;  // 返回默认的晴天图标
 }
 
 // 函数：将中文天气转换为英文
