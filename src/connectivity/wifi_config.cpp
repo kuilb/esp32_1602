@@ -1,6 +1,7 @@
 #include "wifi_config.h"
 #include <DNSServer.h>
 #include "clock.h"
+#include "utils/logger.h"
 
 // 配网模式使用的 Web 服务器（监听端口 80）
 WebServer AP_server(80);
@@ -22,20 +23,20 @@ bool inConfigMode = false;
 void saveWiFiCredentials(const String& ssid, const String& password) {
   File file = SPIFFS.open("/wifi.txt", "w");
   if (!file) {
-      Serial.println("保存WiFi信息失败, 无法打开文件");
+      LOG_WIFI_ERROR("保存WiFi信息失败, 无法打开文件");
       lcd_text("Save WiFi Fail", 1);
       lcd_text("Check FS/Retry", 2);
       return;
   }
   if (!file.println(ssid)) {
-      Serial.println("保存WiFi信息失败, 写入SSID失败");
+      LOG_WIFI_ERROR("保存WiFi信息失败, 写入SSID失败");
       lcd_text("Save WiFi Fail", 1);
       lcd_text("Write Err", 2);
       file.close();
       return;
   }
   if (!file.println(password)) {
-      Serial.println("保存WiFi信息失败, 写入密码失败");
+      LOG_WIFI_ERROR("保存WiFi信息失败, 写入密码失败");
       lcd_text("Save WiFi Fail", 1);
       lcd_text("Write Err", 2);
       file.close();
@@ -44,7 +45,7 @@ void saveWiFiCredentials(const String& ssid, const String& password) {
   file.flush();
   file.close();
 
-  Serial.println("WiFi 信息已保存");
+  LOG_WIFI_INFO("WiFi 信息已保存");
   lcd_text("Config Saved", 1);
   lcd_text("Restarting...", 2);
 }
@@ -59,7 +60,7 @@ void loadWiFiCredentials() {
     File file = SPIFFS.open("/wifi.txt", "r");
     if (file) {
         savedSSID = file.readStringUntil('\n');
-        Serial.println("Loaded SSID: " + savedSSID);
+        LOG_WIFI_DEBUG("Loaded SSID: %s", savedSSID.c_str());
         savedSSID.trim();
         savedPassword = file.readStringUntil('\n');
         savedPassword.trim();
@@ -149,8 +150,6 @@ void handleRoot() {
   )rawliteral");
 }
 
-
-
 // 保存按钮触发器
 void handleSet() {
     ssid_input = AP_server.arg("ssid");
@@ -164,14 +163,14 @@ void handleSet() {
 // 进入配网
 void enterConfigMode() {
   inConfigMode = true;
-  Serial.println("进入配网模式");
+  LOG_WIFI_INFO("进入配网模式");
   WiFi.softAP("1602A_Config");
-  Serial.println("配网网页开启于IP: " + WiFi.softAPIP().toString());
+  LOG_WIFI_INFO("配网网页开启于IP: %s", WiFi.softAPIP().toString().c_str());
 
-  // 启动DNS服务器，将所有域名请求重定向到ESP32的IP
+  // 启动DNS服务器，将所有域名请求劫持到ESP32的IP
   dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
 
-  // 强制门户：捕获所有DNS请求并重定向到配网页面
+  // 捕获所有DNS请求并重定向到配网页面
   AP_server.onNotFound([](){
     AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
     AP_server.send(302, "text/plain", "");
@@ -258,15 +257,14 @@ void connectToWiFi() {
     loadWiFiCredentials();
 
     if (savedSSID == "") {
-        Serial.println("无保存信息，进入配网");
+        LOG_WIFI_WARN("无保存信息，进入配网");
         updateColor(CRGB::Purple);  // 初次配网紫灯
         enterConfigMode();
         return;
     }
 
     updateColor(CRGB::Blue);  // 连接中蓝灯
-    Serial.print("正在连接: ");
-    Serial.println(savedSSID);
+    LOG_WIFI_INFO("正在连接: %s", savedSSID.c_str());
 
     // 在屏幕上显示状态
     lcd_text("WIFI connecting",1);
@@ -285,7 +283,7 @@ void connectToWiFi() {
         }
 
         if((millis() - startTime) % 1000 == 0){
-            Serial.print(".");
+            LOG_WIFI_DEBUG(".");
         }
         updateBrightness(brightness);
         delay(5);
@@ -294,15 +292,14 @@ void connectToWiFi() {
 
     if (WiFi.status() == WL_CONNECTED) {
         updateColor(CRGB::Green);  // 连接成功绿灯
-        Serial.println("\n已连接");
-        Serial.print("IP: ");
-        Serial.println(WiFi.localIP());
-        
-        // 联网成功后启动后台时间同步
-        Serial.println("启动后台时间同步...");
-        configTime(8 * 3600, 0, "ntp.aliyun.com", "ntp1.aliyun.com", "ntp.ntsc.ac.cn");
+        LOG_WIFI_INFO("已连接: %s", savedSSID.c_str());
+        LOG_WIFI_INFO("IP: %s", WiFi.localIP().toString().c_str());
+
+        // 联网成功后启动非阻塞时间同步
+        LOG_WIFI_INFO("启动后台时间同步...");
+        initTimeSync();
     } else {
-        Serial.println("\n连接失败, 进入配网");
+        LOG_WIFI_ERROR("连接失败, 进入配网");
         updateColor(CRGB::Red);  // 失败变红
         enterConfigMode();
     }

@@ -8,8 +8,11 @@
 #include "button.h"
 
 extern bool timeSynced;
+extern bool timeSyncInProgress;
 
 void setupTime();
+void initTimeSync();
+void updateTimeSync();
 
 void updateClockScreen();
 

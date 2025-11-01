@@ -1,4 +1,6 @@
 #include "menu.h"
+#include "about.h"
+#include "utils/logger.h"
 
 // 函数前置声明
 void displayMenu(const Menu* menu, int menuIndex, int scrollOffset);
@@ -136,8 +138,8 @@ const MenuItem wifiConfigMenuItems[] = {
 };
 
 const MenuItem aboutMenuItems[] = {
-    {"About me",        NULL, MENU_NONE},
-    {"About Project",   NULL, MENU_NONE},
+    {"About me",        aboutMe, MENU_NONE},
+    {"About Project",   aboutProject, MENU_NONE},
     {"Return",          NULL, MENU_MAIN}
 };
 
@@ -199,8 +201,11 @@ void displayMenu(const Menu* menu, int menuIndex, int scrollOffset) {
                 String statusLine = "";
                 if (WiFi.status() == WL_CONNECTED) {
                     statusLine = "W:OK ";
+                    if(timeSyncInProgress){
+                        statusLine += "T:Syncing...";
+                    }
                     if (timeSynced) {
-                        statusLine += "T:synced";
+                        statusLine += "T:OK";
                     } else {
                         statusLine += "T:--";
                     }
@@ -381,23 +386,7 @@ void menuTask(void* parameter) {
         // 一次性后台时间同步检查
         if (!hasTriedTimeSync && WiFi.status() == WL_CONNECTED && !timeSynced) {
             hasTriedTimeSync = true;
-            Serial.println("后台尝试时间同步...");
-            
-            // 等待NTP服务器响应，最多5秒
-            unsigned long syncStart = millis();
-            while (millis() - syncStart < 5000) {
-                struct tm timeinfo;
-                if (getLocalTime(&timeinfo)) {
-                    timeSynced = true;
-                    Serial.println("后台时间同步成功!");
-                    break;
-                }
-                vTaskDelay(100 / portTICK_PERIOD_MS);
-            }
-            
-            if (!timeSynced) {
-                Serial.println("后台时间同步失败");
-            }
+            initTimeSync();
         }
         
         if (inMenuMode) {

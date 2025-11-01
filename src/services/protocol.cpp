@@ -1,4 +1,5 @@
 #include "protocol.h"
+#include "esp_task_wdt.h"
 
 static unsigned int frameCount = 0;
 static unsigned int lastSecond = 0;
@@ -63,8 +64,18 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
     unsigned int i = 5;          // 从数据体开始
     uint8_t customCharIndex = 0; // 自定义字符编号（0~7）
     String charBuffer = "";      // 用于批量显示普通字符
+    
+    // 添加安全计数器，防止无限循环
+    unsigned int loopCounter = 0;
+    const unsigned int maxLoops = 1000; // 最大循环次数限制
 
-    while (i < bodyLen && lcdCursor < 32) {
+    while (i < bodyLen && lcdCursor < 32 && loopCounter < maxLoops) {
+        loopCounter++; // 增加循环计数
+        
+        // 每处理10个字符就喂一次狗
+        if (loopCounter % 10 == 0) {
+            esp_task_wdt_reset();
+        }
         uint8_t flag = raw[i++];
         if (flag == 0x00) {
             if (i >= bodyLen) break;
@@ -75,21 +86,31 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
             } 
             else if((uint8_t)c == 0xE3){
                 bool unknowKana = false;
-                if (i + 1 >= bodyLen) break;
-                char c1 = raw[++i];
-                char c2 = raw[i+=2];
+                // 添加边界检查
+                if (i + 2 >= bodyLen) {
+                    Serial.println("UTF-8数据不完整");
+                    break;
+                }
+                
+                char c1 = raw[i + 1];
+                char c2 = raw[i + 2];
+                i += 2; // 正确更新索引
+                
                 int key = _utf8ToUnicode(c, c1, c2) - 12000;
-                //Serial.println(key);
-                //Serial.println(kanaMap[key]);
-
-                if(kanaMap[key] == ""){   // 未定义假名，显示空格
+                
+                // 添加key范围检查
+                if (key < 0 || key >= kanaMapSize) {
+                    unknowKana = true;
+                    charBuffer += " ";
+                } else if(kanaMap[key] == ""){   // 未定义假名，显示空格
                     unknowKana = true;
                     charBuffer += " ";
                 }
+                
                 if(!unknowKana){
                     String kana = kanaMap[key];
                     charBuffer += kana[0];
-                    if ((uint8_t)kana[1] == 222) {
+                    if (kana.length() > 1 && (uint8_t)kana[1] == 222) {
                         charBuffer += kana[1];
                     }
                 }
@@ -111,7 +132,8 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
                 //Serial.println(millis() - t0_dis_char);
             }
 
-            if (i + 7 >= bodyLen) {
+            // 添加边界检查
+            if (i + 8 > bodyLen) {
                 Serial.println("自定义字符数据不足");
                 break;
             }
@@ -134,6 +156,11 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
             Serial.println(flag, HEX);
             break;
         }
+    }
+
+    // 检查是否因为安全限制退出循环
+    if (loopCounter >= maxLoops) {
+        Serial.println("警告: 处理循环达到安全限制，可能存在数据异常");
     }
 
     // 输出剩余字符

@@ -1,4 +1,6 @@
 #include "web_setting.h"
+#include "utils/memory_utils.h"
+#include "utils/logger.h"
 
 WebServer setting_server(80);
 volatile bool isConfigDone = false;
@@ -61,7 +63,10 @@ void web_setting_handleRoot() {
         "}"
         "function exitSettings(){"
         "  fetch('/exit').then(response => {"
-        "    window.location.href='/';"  // 返回主页或关闭页面
+        "    window.close();"  // 关闭当前窗口
+        "  }).catch(error => {"
+        "    console.log('退出请求失败:', error);"
+        "    window.close();"  // 即使请求失败也关闭窗口
         "  });"
         "}"
         "</script>";
@@ -80,14 +85,14 @@ void saveJWTConfig(const String& apiHost,
 
     File file = SPIFFS.open("/jwt_config.txt", "w");
     if (!file) {
-        Serial.println("保存JWT信息失败, 无法打开文件");
+        LOG_WEATHER_ERROR("Failed to save JWT config - cannot open file");
         lcd_text("Save JWT Fail", 1);
         lcd_text("Check FS/Retry", 2);
         return;
     }
 
     if (!file.println(apiHost)) {
-        Serial.println("保存JWT信息失败, 写入API Host失败");
+        LOG_WEATHER_ERROR("Failed to save JWT config - write API Host failed");
         lcd_text("Save JWT Fail", 1);
         lcd_text("Write Err", 2);
         file.close();
@@ -95,7 +100,7 @@ void saveJWTConfig(const String& apiHost,
     }
 
     if (!file.println(kid)) {
-        Serial.println("保存JWT信息失败, 写入kid失败");
+        LOG_WEATHER_ERROR("Failed to save JWT config - write kid failed");
         lcd_text("Save JWT Fail", 1);
         lcd_text("Write Err", 2);
         file.close();
@@ -103,7 +108,7 @@ void saveJWTConfig(const String& apiHost,
     }
 
     if (!file.println(project_id)) {
-        Serial.println("保存JWT信息失败, 写入project_id失败");
+        LOG_WEATHER_ERROR("Failed to save JWT config - write project_id failed");
         lcd_text("Save JWT Fail", 1);
         lcd_text("Write Err", 2);
         file.close();
@@ -111,7 +116,7 @@ void saveJWTConfig(const String& apiHost,
     }
 
     if (!file.println(privateKey)) {
-        Serial.println("保存JWT信息失败, 写入private key失败");
+        LOG_WEATHER_ERROR("Failed to save JWT config - write private key failed");
         lcd_text("Save JWT Fail", 1);
         lcd_text("Write Err", 2);
         file.close();
@@ -121,7 +126,7 @@ void saveJWTConfig(const String& apiHost,
     file.flush();
     file.close();
 
-    Serial.println("JWT 信息已保存");
+    LOG_WEATHER_INFO("JWT configuration saved successfully");
     lcd_text("JWT Saved", 1);
     lcd_text(" ", 2);
 }
@@ -139,11 +144,11 @@ void web_setting_handleSet() {
         String privateKey = setting_server.arg("key");
 
         // 打印到串口，调试用
-        Serial.println("==== 接收到配置 ====");
-        Serial.println("API Host: " + apiHost);
-        Serial.println("kid: " + kid);
-        Serial.println("project_id: " + project);
-        Serial.println("private key: " + privateKey);
+        LOG_WEATHER_DEBUG("==== Configuration received ====");
+        LOG_WEATHER_DEBUG("API Host: " + apiHost);
+        LOG_WEATHER_DEBUG("kid: " + kid);
+        LOG_WEATHER_DEBUG("project_id: " + project);
+        LOG_WEATHER_DEBUG("private key length: " + String(privateKey.length()));
 
         saveJWTConfig(apiHost, kid, project, privateKey);
 
@@ -196,41 +201,41 @@ void web_setting_setupWebServer() {
             File file = SPIFFS.open("/jwt_config.txt", "r");
             if (file) {
                 hostStr = file.readStringUntil('\n'); hostStr.trim();
-                Serial.println("[CITYSEARCH] hostStr: " + hostStr);
+                LOG_WEATHER_DEBUG("City search API host: " + hostStr);
                 String kid = file.readStringUntil('\n'); kid.trim();
-                Serial.println("[CITYSEARCH] kid: " + kid);
+                LOG_WEATHER_DEBUG("City search kid: " + kid);
                 String project = file.readStringUntil('\n'); project.trim();
-                Serial.println("[CITYSEARCH] project: " + project);
+                LOG_WEATHER_DEBUG("City search project: " + project);
                 String key = file.readStringUntil('\n'); key.trim();
-                Serial.println("[CITYSEARCH] key: " + key);
+                LOG_WEATHER_DEBUG("City search key length: " + String(key.length()));
                 file.close();
                 // 确保先生成seed32
                 generateSeed32();
                 // 生成JWT
                 jwtToken = generate_jwt(kid, project, seed32);
-                Serial.println("[CITYSEARCH] jwtToken: " + jwtToken);
+                LOG_WEATHER_DEBUG("City search JWT token generated, length: " + String(jwtToken.length()));
             } else {
-                Serial.println("[CITYSEARCH] jwt_config.txt文件打开失败");
+                LOG_WEATHER_ERROR("Failed to open jwt_config.txt for city search");
             }
         } else {
-            Serial.println("[CITYSEARCH] jwt_config.txt文件不存在");
+            LOG_WEATHER_ERROR("jwt_config.txt file not found for city search");
         }
         if (hostStr.length() == 0 || jwtToken.length() == 0) {
-            Serial.println("[CITYSEARCH] hostStr或jwtToken为空");
+            LOG_WEATHER_ERROR("API configuration missing for city search (host or token empty)");
             setting_server.send(200, "text/html; charset=utf-8", "API配置缺失，请先配置主页面参数");
             return;
         }
 
         // 请求城市搜索API
         String url = "https://" + hostStr + "/geo/v2/city/lookup?location=" + location + "&number=10";
-        Serial.println("[CITYSEARCH] 请求URL: " + url);
+        LOG_WEATHER_INFO("City search request URL: " + url);
         HTTPClient http;
         http.begin(url);
         http.addHeader("Accept-Encoding", "gzip");
         http.addHeader("Authorization", "Bearer " + jwtToken);
-        Serial.println("[CITYSEARCH] Authorization: Bearer " + jwtToken);
+        LOG_WEATHER_DEBUG("City search authorization header set");
         int httpCode = http.GET();
-        Serial.println("[CITYSEARCH] HTTP响应代码: " + String(httpCode));
+        LOG_WEATHER_INFO("City search HTTP response code: " + String(httpCode));
         String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>搜索结果</title></head><body>";
         html += "<h2>搜索结果</h2>";
         if (httpCode != 200) {
@@ -240,69 +245,95 @@ void web_setting_setupWebServer() {
             return;
         }
         int payloadSize = http.getSize();
-        uint8_t *pCompressed = (uint8_t *)malloc(payloadSize + 8);
-        if (!pCompressed) {
+        
+        // 使用RAII内存管理
+        MemoryManager::SafeBuffer compressedBuffer(payloadSize + 8, "CitySearch_Response");
+        if (!compressedBuffer.isValid()) {
             html += "<p>内存分配失败</p></body></html>";
             http.end();
             setting_server.send(200, "text/html; charset=utf-8", html);
             return;
         }
+        
         WiFiClient *stream = http.getStreamPtr();
         long startMillis = millis();
         int iCount = 0;
         while (iCount < payloadSize && (millis() - startMillis) < 4000) {
             if (stream->available()) {
-                pCompressed[iCount++] = stream->read();
+                compressedBuffer.get()[iCount++] = stream->read();
             } else {
                 vTaskDelay(5);
             }
         }
         http.end();
+        
         String jsonData;
         zlib_turbo zt;
-        if (iCount >= 2 && pCompressed[0] == 0x1f && pCompressed[1] == 0x8b) {
-            int uncompSize = zt.gzip_info(pCompressed, iCount);
+        if (iCount >= 2 && compressedBuffer.get()[0] == 0x1f && compressedBuffer.get()[1] == 0x8b) {
+            int uncompSize = zt.gzip_info(compressedBuffer.get(), iCount);
             if (uncompSize <= 0) {
                 html += "<p>Gzip解压失败</p></body></html>";
-                free(pCompressed);
                 setting_server.send(200, "text/html; charset=utf-8", html);
                 return;
             }
-            uint8_t *pUncompressed = (uint8_t *)malloc(uncompSize + 8);
-            if (!pUncompressed) {
+            
+            MemoryManager::SafeBuffer uncompressedBuffer(uncompSize + 8, "CitySearch_Decompressed");
+            if (!uncompressedBuffer.isValid()) {
                 html += "<p>内存分配失败</p></body></html>";
-                free(pCompressed);
                 setting_server.send(200, "text/html; charset=utf-8", html);
                 return;
             }
-            int rc = zt.gunzip(pCompressed, iCount, pUncompressed);
+            
+            int rc = zt.gunzip(compressedBuffer.get(), iCount, uncompressedBuffer.get());
             if (rc != ZT_SUCCESS) {
                 html += "<p>Gzip解压失败</p></body></html>";
-                free(pUncompressed);
-                free(pCompressed);
                 setting_server.send(200, "text/html; charset=utf-8", html);
                 return;
             }
-            jsonData = String((char *)pUncompressed, uncompSize);
-            free(pUncompressed);
+            jsonData = String((char *)uncompressedBuffer.get(), uncompSize);
+            // uncompressedBuffer 会在作用域结束时自动释放
         } else {
-            jsonData = String((char *)pCompressed, iCount);
+            jsonData = String((char *)compressedBuffer.get(), iCount);
         }
-        free(pCompressed);
+        // compressedBuffer 会在作用域结束时自动释放
 
-        DynamicJsonDocument doc(2048);
+        JsonDocument doc;
         DeserializationError error = deserializeJson(doc, jsonData);
         if (error) {
+            LOG_WEATHER_ERROR("City search JSON parse failed: " + String(error.c_str()));
             html += "<p>JSON解析失败</p></body></html>";
             setting_server.send(200, "text/html; charset=utf-8", html);
             return;
         }
-        if (!doc.containsKey("location")) {
+        
+        LOG_WEATHER_DEBUG("City search JSON parsed successfully");
+        LOG_WEATHER_DEBUG("JSON response: " + jsonData.substring(0, min(200, (int)jsonData.length())));
+        
+        // 检查API响应状态
+        if (doc["code"].as<String>() != "200") {
+            String code = doc["code"].as<String>();
+            LOG_WEATHER_WARN("City search API error code: " + code);
+            html += "<p>API错误，错误代码：" + code + "</p></body></html>";
+            setting_server.send(200, "text/html; charset=utf-8", html);
+            return;
+        }
+        
+        // 检查location字段是否存在且为数组
+        if (!doc["location"].is<JsonArray>()) {
+            LOG_WEATHER_WARN("City search response: location field missing or not array");
             html += "<p>未找到候选城市</p></body></html>";
             setting_server.send(200, "text/html; charset=utf-8", html);
             return;
         }
         JsonArray locArr = doc["location"].as<JsonArray>();
+        LOG_WEATHER_INFO("City search found " + String(locArr.size()) + " cities");
+        
+        if (locArr.size() == 0) {
+            html += "<p>未找到匹配的城市</p></body></html>";
+            setting_server.send(200, "text/html; charset=utf-8", html);
+            return;
+        }
+        
         html += "<ul style='list-style:none;padding:0;'>";
         for (JsonObject obj : locArr) {
             String name = obj["name"].as<String>();
@@ -403,7 +434,7 @@ void web_setting_setupWebServer() {
     });
     
     setting_server.begin();
-    Serial.println("Web 服务器已启动，访问 IP 地址以配置参数");
+    LOG_WEATHER_INFO("Web configuration server started, access via IP address");
     
     // 获取当前IP地址并显示
     String ipAddress = WiFi.localIP().toString();

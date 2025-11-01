@@ -1,4 +1,5 @@
 #include "lcd_driver.h"
+#include "kanamap.h"
 
 int lcdCursor = 0;  // 当前光标位置，全局变量 0~31
 
@@ -73,7 +74,65 @@ void lcd_init(){
     delay(5);
 }
 
-// 显示函数(用于简单显示/调试)
+// UTF-8假名字符转换到LCD字符编码
+String convertUTF8ToKana(const String& text) {
+    String result = "";
+    int i = 0;
+    
+    while (i < text.length()) {
+        // 检查是否为UTF-8多字节字符（日语假名）
+        if ((uint8_t)text[i] >= 0x80) {
+            // UTF-8多字节字符处理
+            if (i + 2 < text.length()) {
+                // 提取3字节的UTF-8字符（大部分日语假名是3字节）
+                uint8_t b1 = (uint8_t)text[i];
+                uint8_t b2 = (uint8_t)text[i+1];
+                uint8_t b3 = (uint8_t)text[i+2];
+                
+                // 计算Unicode码点（假设是3字节UTF-8）
+                if ((b1 & 0xF0) == 0xE0) {
+                    uint32_t codepoint = ((b1 & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
+                    
+                    // 映射到kanaMap索引
+                    // 平假名范围: U+3041-U+3096 (12353-12438)
+                    // 片假名范围: U+30A1-U+30F6 (12449-12534)
+                    int kanaIndex = -1;
+                    
+                    if (codepoint >= 12353 && codepoint <= 12438) {
+                        // 平假名
+                        kanaIndex = codepoint - 12353 + 353; // 从353开始映射
+                    } else if (codepoint >= 12449 && codepoint <= 12534) {
+                        // 片假名
+                        kanaIndex = codepoint - 12449 + 449; // 从449开始映射
+                    }
+                    
+                    // 查找假名映射
+                    if (kanaIndex >= 0 && kanaIndex < kanaMapSize && kanaMap[kanaIndex] != "") {
+                        result += kanaMap[kanaIndex];
+                    } else {
+                        result += "?"; // 未找到对应假名时显示问号
+                    }
+                    
+                    i += 3; // 跳过3字节
+                } else {
+                    result += "?";
+                    i++;
+                }
+            } else {
+                result += "?";
+                i++;
+            }
+        } else {
+            // ASCII字符直接添加
+            result += text[i];
+            i++;
+        }
+    }
+    
+    return result;
+}
+
+// 显示函数(用于简单显示/调试，支持日语假名)
 void lcd_text(String ltext,int line){
     // 设置行地址
     if (line == 1)
@@ -83,13 +142,16 @@ void lcd_text(String ltext,int line){
     else
         return;     // 非法行号，直接返回
 
-    int tsize=ltext.length();
-    for(int size=0;size<16;size++){     //逐字写入
-        if(size>tsize-1){
-            _gpio_write(0x20,CHR);       //若字符串长度小于16，则填充空格
+    // 转换UTF-8假名到LCD字符编码
+    String convertedText = convertUTF8ToKana(ltext);
+    
+    int tsize = convertedText.length();
+    for(int size = 0; size < 16; size++){     //逐字写入
+        if(size > tsize - 1){
+            _gpio_write(0x20, CHR);       //若字符串长度小于16，则填充空格
         }
         else{
-            _gpio_write(int(ltext[size]),CHR); //转换成RAW编码后写入
+            _gpio_write(int(convertedText[size]), CHR); //转换成RAW编码后写入
         }
     }
 }
