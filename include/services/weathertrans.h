@@ -1,7 +1,7 @@
 #ifndef WEATHER_TRANS_H
 #define WEATHER_TRANS_H
 
-#include "myhader.h"
+#include "../myhader.h"
 
 extern uint8_t tempIcon[];
 extern uint8_t celsius[];

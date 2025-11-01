@@ -69,18 +69,17 @@ void setup() {
 
     // 欢迎消息
     lcd_text("Wireless 1602A",1);
-    lcd_text("",2);
+    lcd_text("2025/11/01",2);
 
     Serial.begin(BaudRate);
     while(!Serial){}
     
-    Serial.println("Wireless 1602A V1.0 by Kulib");
-    Serial.println("2025/9/15");
+    Serial.println("Wireless 1602A by Kulib");
+    Serial.println("2025/11/01");
     Serial.println("开始初始化...");
 
-    delay(1000);
     // 挂载 SPIFFS
-    if (!SPIFFS.begin(true)) {  // true 表示失败时自动格式化
+    if (!SPIFFS.begin(true)) {      // 失败时自动格式化
         Serial.println("无法挂载SPIFFS, 正在格式化...");
         if (SPIFFS.format()) {
             Serial.println("SPIFFS已格式化!");
@@ -103,12 +102,13 @@ void setup() {
         }
     } else {
         Serial.println("SPIFFS已挂载");
-        listDir("/", 0);  // 打印根目录文件
+        listDir("/", 0);    // 打印根目录文件
     }
 
-    init_jwt();
-    wifiinit();
-    initMenu();
+    delay(500);
+    init_jwt();  // 初始化JWT
+    wifiinit();  // 初始化WiFi配置
+    initMenu();  // 初始化菜单系统
 }
 
 void loop(){
