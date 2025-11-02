@@ -70,7 +70,7 @@ void setup() {
 
     // 欢迎消息
     lcd_text("Wireless 1602A",1);
-    lcd_text("2025/11/01",2);
+    lcd_text("2025/11/02",2);
 
     LOG_SYSTEM_INFO("Wireless 1602A by Kulib");
     LOG_SYSTEM_INFO("2025/11/01");

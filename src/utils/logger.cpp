@@ -19,7 +19,8 @@ const char* Logger::modulePrefixes[LOG_MODULE_MAX] = {
     "WEB",
     "NETWORK",
     "MEMORY",
-    "RGB"
+    "RGB",
+    "DISPLAY"
 };
 
 // 日志级别前缀定义

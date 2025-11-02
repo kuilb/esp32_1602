@@ -6,8 +6,8 @@ char apiHost[128] = "";
 char kid[64] = "";
 char project_id[64] = "";
 char base64_key[256] = "";
-char* location = "";    // LocationID
-char* city_name = "";   // 地名
+char location[32] = "";    // LocationID (改为固定数组,避免内存泄漏)
+char city_name[64] = "";   // 地名 (改为固定数组,避免内存泄漏)
 
 //Ed25519 seed，32字节
 uint8_t seed32[32] = {}; 
@@ -35,18 +35,24 @@ void init_jwt() {
     file.readBytesUntil('\n', project_id, sizeof(project_id));
     file.readBytesUntil('\n', base64_key, sizeof(base64_key));
 
-    // 读取locationID（第五行）
-    char location_buf[32] = "";
-    file.readBytesUntil('\n', location_buf, sizeof(location_buf));
-    if (strlen(location_buf) > 0) {
-        location = strdup(location_buf);
+    // 读取locationID（第五行）- 直接读入固定数组,避免内存泄漏
+    file.readBytesUntil('\n', location, sizeof(location));
+    // 移除换行符和空白字符
+    for (int i = 0; i < sizeof(location); i++) {
+        if (location[i] == '\n' || location[i] == '\r') {
+            location[i] = '\0';
+            break;
+        }
     }
 
-    // 读取地名（第六行）
-    char city_buf[64] = "";
-    file.readBytesUntil('\n', city_buf, sizeof(city_buf));
-    if (strlen(city_buf) > 0) {
-        city_name = strdup(city_buf);
+    // 读取地名（第六行）- 直接读入固定数组,避免内存泄漏
+    file.readBytesUntil('\n', city_name, sizeof(city_name));
+    // 移除换行符和空白字符
+    for (int i = 0; i < sizeof(city_name); i++) {
+        if (city_name[i] == '\n' || city_name[i] == '\r') {
+            city_name[i] = '\0';
+            break;
+        }
     }
     file.close();
 

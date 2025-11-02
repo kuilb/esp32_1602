@@ -5,23 +5,15 @@ static unsigned int frameCount = 0;
 static unsigned int lastSecond = 0;
 static float currentFPS = 0.0f;
 
-// 假名unicode转换
-int _utf8ToUnicode(uint8_t c0, uint8_t c1, uint8_t c2) {
-  return ((c0 & 0x0F) << 12) | ((c1 & 0x3F) << 6) | (c2 & 0x3F);
-}
-
 // 解码函数
 void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
-    // Serial.print("\nProcess start:");
-    // Serial.println(millis());
+    LOG_DISPLAY_VERBOSE("Processing incoming data frame of length " + String(bodyLen) + " bytes");
 
-    // Serial.print("Raw bytes: ");
+    // LOG_DISPLAY_VERBOSE("Raw bytes: ");
     // for (unsigned int i = 0; i < bodyLen; i++) {
-    //     Serial.print("0x");
-    //     Serial.print(raw[i], HEX);
-    //     Serial.print(" ");
+    //     LOG_DISPLAY_VERBOSE("0x" + String(raw[i], HEX));
+    //     LOG_DISPLAY_VERBOSE(" ");
     // }
-    // Serial.println();
 
     if (inMenuMode) {
         return;
@@ -96,7 +88,7 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
                 char c2 = raw[i + 2];
                 i += 2; // 正确更新索引
                 
-                int key = _utf8ToUnicode(c, c1, c2) - 12000;
+                int key = ((c & 0x0F) << 12) | ((c1 & 0x3F) << 6) | (c2 & 0x3F) - 12000;
                 
                 // 添加key范围检查
                 if (key < 0 || key >= kanaMapSize) {

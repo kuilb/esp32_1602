@@ -39,17 +39,15 @@ void aboutMe(){
         // 等待按键，添加防抖延迟
         bool keyPressed = false;
         while(!keyPressed) {
-            if(buttonJustPressed[LEFT] && currentPage > 0) {
+            if(isButtonReadyToRespond(LEFT,150) && currentPage > 0) {
                 currentPage--;
                 keyPressed = true;
-                delay(150); // 防止翻页过快
             }
-            else if(buttonJustPressed[RIGHT] && currentPage < totalPages - 1) {
+            else if(isButtonReadyToRespond(RIGHT,150) && currentPage < totalPages - 1) {
                 currentPage++;
                 keyPressed = true;
-                delay(150); // 防止翻页过快
             }
-            else if(buttonJustPressed[CENTER]) {
+            else if(isButtonReadyToRespond(CENTER,150)) {
                 currentState = STATE_MENU;
                 inMenuMode = true;
                 return;
@@ -65,7 +63,7 @@ void aboutProject(){
     const int totalPages = 5;
     
     // 初始延迟，防止一进入就退出
-    delay(300);
+    globalButtonDelay(300);
     
     while(true) {
         switch(currentPage) {
@@ -94,15 +92,13 @@ void aboutProject(){
         // 等待按键，添加防抖延迟
         bool keyPressed = false;
         while(!keyPressed) {
-            if(buttonJustPressed[LEFT] && currentPage > 0) {
+            if(isButtonReadyToRespond(LEFT,150) && currentPage > 0) {
                 currentPage--;
                 keyPressed = true;
-                delay(300); // 防止翻页过快
             }
-            else if(buttonJustPressed[RIGHT] && currentPage < totalPages - 1) {
+            else if(isButtonReadyToRespond(RIGHT,150) && currentPage < totalPages - 1) {
                 currentPage++;
                 keyPressed = true;
-                delay(300); // 防止翻页过快
             }
             else if(buttonJustPressed[CENTER]) {
                 currentState = STATE_MENU;

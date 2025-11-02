@@ -12,6 +12,7 @@ void updateColor(CRGB newColor) {
     currentColor = newColor;
     xSemaphoreGive(ledMutex);
   }
+  LOG_RGB_DEBUG("Updated color to R:" + String(newColor.r) + " G:" + String(newColor.g) + " B:" + String(newColor.b));
 }
 
 // 设置亮度
@@ -42,7 +43,7 @@ void initrgb(){
   // 初始化互斥锁
   ledMutex = xSemaphoreCreateMutex();
   if (ledMutex == NULL) {
-    Serial.println("创建互斥锁失败！");
+    LOG_RGB_ERROR("RGB LED cannot create mutex!");
     while (1){
       updateColor(CRGB::Red);  // 失败变红
           int fadeStep = 2;
@@ -57,6 +58,8 @@ void initrgb(){
               delay(5);
           };
     };
+
+    LOG_RGB_INFO("RGB LED initialized successfully.");
   }
 
   // 初始化颜色

@@ -3,6 +3,8 @@
 
 #include "myhader.h"
 #include "mydefine.h"
+#include "kanamap.h"
+#include "logger.h"
 
 // ==============================
 // LCD 显示命令定义

@@ -1,5 +1,4 @@
 #include "lcd_driver.h"
-#include "kanamap.h"
 
 int lcdCursor = 0;  // 当前光标位置，全局变量 0~31
 
@@ -72,6 +71,8 @@ void lcd_init(){
     delay(5);
     _gpio_write(0x01,CMD);               // 清屏并将地址指针归位
     delay(5);
+
+    LOG_LCD_INFO("LCD initialized");
 }
 
 // UTF-8假名字符转换到LCD字符编码
@@ -84,42 +85,35 @@ String convertUTF8ToKana(const String& text) {
         if ((uint8_t)text[i] >= 0x80) {
             // UTF-8多字节字符处理
             if (i + 2 < text.length()) {
-                // 提取3字节的UTF-8字符（大部分日语假名是3字节）
+                // 提取3字节的UTF-8字符
                 uint8_t b1 = (uint8_t)text[i];
                 uint8_t b2 = (uint8_t)text[i+1];
                 uint8_t b3 = (uint8_t)text[i+2];
                 
-                // 计算Unicode码点（假设是3字节UTF-8）
+                // 计算Unicode码点
                 if ((b1 & 0xF0) == 0xE0) {
-                    uint32_t codepoint = ((b1 & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
-                    
-                    // 映射到kanaMap索引
-                    // 平假名范围: U+3041-U+3096 (12353-12438)
-                    // 片假名范围: U+30A1-U+30F6 (12449-12534)
                     int kanaIndex = -1;
-                    
-                    if (codepoint >= 12353 && codepoint <= 12438) {
-                        // 平假名
-                        kanaIndex = codepoint - 12353 + 353; // 从353开始映射
-                    } else if (codepoint >= 12449 && codepoint <= 12534) {
-                        // 片假名
-                        kanaIndex = codepoint - 12449 + 449; // 从449开始映射
-                    }
+
+                    uint32_t codepoint = ((b1 & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
+                    if ((codepoint >= 12353 && codepoint <= 12438) || (codepoint >= 12449 && codepoint <= 12534))
+                        kanaIndex = codepoint - 12000;
                     
                     // 查找假名映射
                     if (kanaIndex >= 0 && kanaIndex < kanaMapSize && kanaMap[kanaIndex] != "") {
                         result += kanaMap[kanaIndex];
                     } else {
-                        result += "?"; // 未找到对应假名时显示问号
+                        LOG_LCD_WARN("Unknown kana Unicode: " + String(codepoint));
+                        result += " "; // 未找到对应假名时显示空格
                     }
                     
                     i += 3; // 跳过3字节
                 } else {
-                    result += "?";
+                    LOG_LCD_WARN("Invalid UTF-8 sequence");
+                    result += " ";
                     i++;
                 }
             } else {
-                result += "?";
+                result += " ";
                 i++;
             }
         } else {
@@ -158,7 +152,7 @@ void lcd_text(String ltext,int line){
 
 // 设置光标位置
 void lcdSetCursor(int changecursor){
-    //Serial.print("set cursor in "+String(col)+","+String(row) + " ");
+    // LOG_LCD_VERBOSE("set cursor in " + String(changecursor));
     lcdCursor=changecursor;
     int row = (lcdCursor < 16) ? 0 : 1;
     int col = lcdCursor % 16;
@@ -171,6 +165,7 @@ void lcdSetCursor(int changecursor){
         addr = 0x40 + col;
     } 
     else {
+        LOG_LCD_WARN("Invalid LCD row: " + String(row));
         return; // 无效行
     }
 
@@ -179,12 +174,14 @@ void lcdSetCursor(int changecursor){
 }
 
 void lcdResetCursor(){
+    // LOG_LCD_VERBOSE("Reset LCD cursor");
     lcdSetCursor(0);    // 回到屏幕起点
 }
 
 // 光标向后移动一格
 void _nextCursor(){
     if (lcdCursor >= 32) {
+        LOG_LCD_WARN("LCD cursor out of bounds: " + String(lcdCursor));
         lcdSetCursor(33);   //将光标设置为显示区域外
     }
     lcdSetCursor(lcdCursor+1);
@@ -220,7 +217,7 @@ void lcdDisChar(char text){             //显示函数
         _nextCursor();
 }
 
-// 显示整段的普通字符
+// 连续显示整段的普通字符，不清除其他的内容，注意越界
 void lcdPrint(String s) {
     for (unsigned int i = 0; i < s.length(); i++) {
         lcdDisChar(s[i]);

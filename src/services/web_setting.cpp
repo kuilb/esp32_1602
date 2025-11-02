@@ -1,10 +1,181 @@
 #include "web_setting.h"
-#include "utils/memory_utils.h"
-#include "utils/logger.h"
 
 WebServer setting_server(80);
 volatile bool isConfigDone = false;
 volatile bool isKeyDone = false;
+
+// OTA页面处理
+void web_setting_handleOTA() {
+    String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>OTA升级</title>";
+    html += "<style>"
+            "body{font-family:Arial; text-align:center; padding:20px; background:#f0f2f5;}"
+            ".container{background:#fff; padding:30px; border-radius:8px; display:inline-block; box-shadow:0 0 10px rgba(0,0,0,0.1);}"
+            "input[type=text], input[type=file]{width:400px; padding:10px; margin:10px 0; border:1px solid #ccc; border-radius:4px;}"
+            "button{padding:12px 30px; margin:10px 5px; border:none; border-radius:4px; cursor:pointer; font-size:16px;}"
+            ".btn-primary{background-color:#4CAF50; color:white;}"
+            ".btn-primary:hover{background-color:#45a049;}"
+            ".btn-secondary{background-color:#2196F3; color:white;}"
+            ".btn-secondary:hover{background-color:#1976D2;}"
+            ".progress{width:400px; height:30px; background:#e0e0e0; border-radius:15px; margin:20px auto; overflow:hidden;}"
+            ".progress-bar{height:100%; background:#4CAF50; width:0%; transition:width 0.3s; text-align:center; line-height:30px; color:white;}"
+            ".info{margin:15px 0; color:#666;}"
+            "</style></head><body>";
+    
+    html += "<div class='container'>";
+    html += "<h1>🔄 OTA固件升级</h1>";
+    
+    // 显示当前版本信息
+    html += "<div class='info'>";
+    html += "<p><strong>当前版本:</strong> v1.0.0</p>";
+    html += "<p><strong>分区方案:</strong> OTA双分区</p>";
+    html += "<p><strong>当前分区:</strong> " + String(esp_ota_get_running_partition()->label) + "</p>";
+    html += "</div>";
+    
+    // URL升级
+    html += "<h3>方式1: 从URL升级</h3>";
+    html += "<input type='text' id='otaUrl' placeholder='http://yourserver.com/firmware.bin'>";
+    html += "<br><button class='btn-primary' onclick='startOTAFromURL()'>开始URL升级</button>";
+    
+    // 文件上传升级
+    html += "<h3>方式2: 上传固件文件</h3>";
+    html += "<input type='file' id='otaFile' accept='.bin'>";
+    html += "<br><button class='btn-secondary' onclick='startOTAFromFile()'>开始文件升级</button>";
+    
+    // 进度条
+    html += "<div class='progress' id='progressBar' style='display:none;'>";
+    html += "<div class='progress-bar' id='progress'>0%</div></div>";
+    html += "<p id='status'></p>";
+    
+    html += "</div>";
+    
+    // JavaScript
+    html += "<script>"
+        "function startOTAFromURL(){"
+        "  var url = document.getElementById('otaUrl').value;"
+        "  if(!url){alert('请输入URL');return;}"
+        "  document.getElementById('progressBar').style.display='block';"
+        "  document.getElementById('status').innerText='正在下载固件...';"
+        "  fetch('/ota/url?url='+encodeURIComponent(url))"
+        "    .then(r=>r.json())"
+        "    .then(data=>{"
+        "      if(data.success){"
+        "        document.getElementById('status').innerText='升级成功!设备将重启...';"
+        "        document.getElementById('progress').style.width='100%';"
+        "        document.getElementById('progress').innerText='100%';"
+        "      }else{"
+        "        document.getElementById('status').innerText='升级失败: '+data.error;"
+        "      }"
+        "    });"
+        "  pollProgress();"
+        "}"
+        ""
+        "function startOTAFromFile(){"
+        "  var file = document.getElementById('otaFile').files[0];"
+        "  if(!file){alert('请选择文件');return;}"
+        "  document.getElementById('progressBar').style.display='block';"
+        "  document.getElementById('status').innerText='正在上传固件...';"
+        "  var formData = new FormData();"
+        "  formData.append('firmware', file);"
+        "  var xhr = new XMLHttpRequest();"
+        "  xhr.upload.onprogress = function(e){"
+        "    if(e.lengthComputable){"
+        "      var pct = Math.round((e.loaded/e.total)*100);"
+        "      document.getElementById('progress').style.width=pct+'%';"
+        "      document.getElementById('progress').innerText=pct+'%';"
+        "    }"
+        "  };"
+        "  xhr.onload = function(){"
+        "    if(xhr.status==200){"
+        "      var resp = JSON.parse(xhr.responseText);"
+        "      if(resp.success){"
+        "        document.getElementById('status').innerText='升级成功!设备将重启...';"
+        "      }else{"
+        "        document.getElementById('status').innerText='升级失败: '+resp.error;"
+        "      }"
+        "    }"
+        "  };"
+        "  xhr.open('POST', '/ota/upload');"
+        "  xhr.send(formData);"
+        "}"
+        ""
+        "function pollProgress(){"
+        "  var interval = setInterval(function(){"
+        "    fetch('/ota/progress')"
+        "      .then(r=>r.json())"
+        "      .then(data=>{"
+        "        var pct = data.progress;"
+        "        document.getElementById('progress').style.width=pct+'%';"
+        "        document.getElementById('progress').innerText=pct+'%';"
+        "        if(pct>=100)clearInterval(interval);"
+        "      });"
+        "  }, 500);"
+        "}"
+        "</script>";
+    
+    html += "</body></html>";
+    setting_server.send(200, "text/html; charset=utf-8", html);
+}
+
+// OTA URL处理
+void web_setting_handleOTAURL() {
+    if (!setting_server.hasArg("url")) {
+        setting_server.send(400, "application/json", "{\"success\":false,\"error\":\"No URL\"}");
+        return;
+    }
+    
+    String url = setting_server.arg("url");
+    LOG_SYSTEM_INFO("OTA from URL: %s", url.c_str());
+    
+    // 异步执行OTA (避免阻塞Web响应)
+    setting_server.send(200, "application/json", "{\"success\":true}");
+    
+    delay(500); // 让响应发送出去
+    OTAResult result = OTAManager::updateFromURL(url);
+    
+    if (result != OTA_SUCCESS) {
+        LOG_SYSTEM_ERROR("OTA failed: %s", OTAManager::getErrorString().c_str());
+    }
+}
+
+// OTA进度查询
+void web_setting_handleOTAProgress() {
+    int progress = OTAManager::getProgress();
+    String json = "{\"progress\":" + String(progress) + "}";
+    setting_server.send(200, "application/json", json);
+}
+
+// OTA文件上传处理
+void web_setting_handleOTAUpload() {
+    HTTPUpload& upload = setting_server.upload();
+    
+    if (upload.status == UPLOAD_FILE_START) {
+        LOG_SYSTEM_INFO("OTA Upload Start: %s", upload.filename.c_str());
+        lcd_text("Uploading...", 1);
+        updateColor(CRGB::Orange);
+        
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+            LOG_SYSTEM_ERROR("OTA begin failed");
+        }
+    } 
+    else if (upload.status == UPLOAD_FILE_WRITE) {
+        if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+            LOG_SYSTEM_ERROR("OTA write failed");
+        }
+    } 
+    else if (upload.status == UPLOAD_FILE_END) {
+        if (Update.end(true)) {
+            LOG_SYSTEM_INFO("OTA Success! Size: %u", upload.totalSize);
+            lcd_text("OTA Success!", 1);
+            updateColor(CRGB::Green);
+            setting_server.send(200, "application/json", "{\"success\":true}");
+            delay(1000);
+            ESP.restart();
+        } else {
+            setting_server.send(500, "application/json", 
+                "{\"success\":false,\"error\":\"" + String(Update.errorString()) + "\"}");
+        }
+    }
+}
 
 // 主页处理函数
 void web_setting_handleRoot() {
@@ -55,6 +226,11 @@ void web_setting_handleRoot() {
     html += "</div>";
 
     html += "</form>";
+
+    // OTA
+    html += "<div class='button-row'>";
+    html += "<button type='button' onclick='location.href=\"/ota\"'>🔄 OTA升级</button>";
+    html += "</div>";
 
     // JavaScript
     html += "<script>"
@@ -166,6 +342,16 @@ void web_setting_setupWebServer() {
 
     setting_server.on("/", web_setting_handleRoot);       // 主页
     setting_server.on("/set", web_setting_handleSet);      // 设置参数
+
+    // OTA相关路由
+    setting_server.on("/ota", web_setting_handleOTA);
+    setting_server.on("/ota/url", web_setting_handleOTAURL);
+    setting_server.on("/ota/progress", web_setting_handleOTAProgress);
+    setting_server.on("/ota/upload", HTTP_POST, 
+        []() { /* 上传完成后的响应 */ },
+        web_setting_handleOTAUpload  // 上传处理函数
+    );
+
     setting_server.on("/exit", [](){
         isConfigDone = true;
         setting_server.send(200, "text/plain", "Exiting configuration...");
@@ -390,8 +576,8 @@ void web_setting_setupWebServer() {
             }
         }
         // 重新读入地名和ID，并重置weatherSynced
-        extern char* location;
-        extern char* city_name;
+        extern char location[32];
+        extern char city_name[64];
         extern bool weatherSynced;
         if (SPIFFS.exists("/jwt_config.txt")) {
             File file = SPIFFS.open("/jwt_config.txt", "r");
@@ -402,10 +588,10 @@ void web_setting_setupWebServer() {
                 file.readStringUntil('\n'); // key
                 String newLoc = file.readStringUntil('\n'); newLoc.trim();
                 String newCity = file.readStringUntil('\n'); newCity.trim();
-                if (location) free(location);
-                if (city_name) free(city_name);
-                location = strdup(newLoc.c_str());
-                city_name = strdup(newCity.c_str());
+                strncpy(location, newLoc.c_str(), sizeof(location) - 1);
+                location[sizeof(location) - 1] = '\0';  // 确保null结尾
+                strncpy(city_name, newCity.c_str(), sizeof(city_name) - 1);
+                city_name[sizeof(city_name) - 1] = '\0';  // 确保null结尾
                 file.close();
             }
         }

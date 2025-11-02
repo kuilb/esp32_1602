@@ -2,9 +2,15 @@
 #define WEB_SETTING_H
 
 #include "myhader.h"
-#include "../hardware/lcd_driver.h"
-#include "../connectivity/jwt_auth.h"
-#include "../applications/menu.h"
+#include "lcd_driver.h"
+#include "jwt_auth.h"
+#include "menu.h"
+#include "logger.h"
+#include "ota_manager.h"
+#include "memory_utils.h"
+#include "logger.h"
+
+#include <esp_ota_ops.h>
 
 void web_setting_setupWebServer();
 

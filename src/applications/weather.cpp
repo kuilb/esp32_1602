@@ -21,8 +21,8 @@ unsigned int interface_num = 0; // 当前显示的界面编号
 void updateWeatherScreen() {
     if(interface_num == 0){
         lcdResetCursor();
-        extern char* city_name;
-        if (city_name && strlen(city_name) > 0) {
+        extern char city_name[64];
+        if (city_name[0] != '\0' && strlen(city_name) > 0) {
             lcd_text(city_name, 1); // 第一行显示配置地名
         } else {
             lcd_text("N/A", 1);

@@ -6,37 +6,67 @@
 #include "network.h"
 #include "button.h"
 #include "menu.h"
+#include "logger.h"
 
 /**
  * @brief 按钮状态结构体
  * 
- * 用于记录单个按钮的硬件引脚、标签、上一次状态、
- * 按下开始时间和是否已触发事件的状态信息。
+ * 用于记录单个按钮的状态信息
  */
 struct ButtonState {
     uint8_t pin;                  ///< GPIO 引脚编号
-    const char* label;            ///< 按钮标识符字符串（如 "UP", "CENTER"）
+    const char* label;            ///< 按钮标识符字符串
     bool lastState;               ///< 上一次读取的电平状态（LOW 或 HIGH）
-    unsigned long pressStartTime; ///< 按钮按下时的时间戳（用于判断按下时长）
-    bool triggered;               ///< 是否已触发按下事件（防止重复触发）
+    unsigned long pressStartTime; ///< 按钮按下时的时间戳
+    bool triggered;               ///< 是否已触发按下事件
 };
 
 /**
  * @brief 按钮状态数组，存储所有按钮的状态信息
  * 
  * 数组元素类型为 ButtonState，包含引脚、标签、状态等信息。
- * 实际定义在 button.cpp 文件中。
+ * 实际定义在 button.cpp 文件中
  */
 extern ButtonState buttons[];
 
 /**
  * @brief 按钮数量
  * 
- * 表示 buttons 数组中按钮的总个数。
+ * 表示 buttons 数组中按钮的总个数
  */
 extern const int buttonCount;
 
 extern volatile bool buttonJustPressed[];
+
+/**
+ * @brief 全局按钮防抖和节流控制
+ * 
+ * 提供全局的按钮防抖机制，防止按键响应过快和误触问题
+ */
+
+/**
+ * @brief 检查按钮是否可以响应（防抖和节流控制）
+ * 
+ * @param buttonIndex 按钮索引
+ * @param minInterval 最小间隔时间（毫秒），默认200ms
+ * @return true 如果按钮可以响应，false 如果应该被忽略
+ */
+bool isButtonReadyToRespond(int buttonIndex, unsigned long minInterval = 200);
+
+/**
+ * @brief 重置所有按钮的防抖计时器
+ * 
+ * 在进入新界面或模式时调用，防止界面切换时的误触
+ */
+void resetButtonDebounce();
+
+/**
+ * @brief 在原来的按钮防抖等待上添加全局延迟
+ * 
+ * @param delayMs 延迟时间（毫秒），默认200ms
+ * 在界面切换后调用，防止立即响应按键
+ */
+void globalButtonDelay(unsigned long delayMs = 200);
 
 /**
  * @brief WiFi 客户端对象，用于发送按钮信息

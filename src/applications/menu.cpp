@@ -1,6 +1,7 @@
 #include "menu.h"
 #include "about.h"
 #include "utils/logger.h"
+#include "hardware/button.h"
 
 // 函数前置声明
 void displayMenu(const Menu* menu, int menuIndex, int scrollOffset);
@@ -30,32 +31,26 @@ void enterBrightnessScreen() {
     snprintf(buf, sizeof(buf), "%d%%", (brightness * 100 + 127) / 255);
     lcd_text(buf, 2);
 
-    u32_t now = millis();
-    while (!hasElapsed(now, 200)) {}
-
-    static unsigned long lastAdjustTime = 0;
+    globalButtonDelay(200);  // 进入时防抖
     uint8_t lastBrightness = brightness;
 
-    while (!buttonJustPressed[CENTER]) {
-        now = millis();
-        if (hasElapsed(lastAdjustTime, 5)) {
-            if (buttonJustPressed[LEFT]) {
-                changeBrightness(-1);
-                lastAdjustTime = now;
-            }
-            if (buttonJustPressed[RIGHT]) {
-                changeBrightness(1);
-                lastAdjustTime = now;
-            }
-
-            // 只有亮度变化才重绘文字
-            if (brightness != lastBrightness) {
-                snprintf(buf, sizeof(buf), "%d%%", (brightness * 100 + 127) / 255);
-                lcd_text("Brightness:", 1);
-                lcd_text(buf, 2);
-                lastBrightness = brightness;
-            }
+    while (!isButtonReadyToRespond(CENTER)) {
+        if (isButtonReadyToRespond(LEFT, 100)) {  // 更快的调节速度
+            changeBrightness(-1);
         }
+        if (isButtonReadyToRespond(RIGHT, 100)) {  // 更快的调节速度
+            changeBrightness(1);
+        }
+
+        // 只有亮度变化才重绘文字
+        if (brightness != lastBrightness) {
+            snprintf(buf, sizeof(buf), "%d%%", (brightness * 100 + 127) / 255);
+            lcd_text("Brightness:", 1);
+            lcd_text(buf, 2);
+            lastBrightness = brightness;
+        }
+        
+        vTaskDelay(10 / portTICK_PERIOD_MS);  // 小延迟防止CPU占用过高
     }
 
     lcd_text("saved", 1);
@@ -91,24 +86,28 @@ void connectInfo(){
         lcd_text("Not Connected", 1);
         lcd_text("", 2);
     }
-    delay(300);
+    
+    globalButtonDelay(300);  // 防止立即退出
 
     for(;;){
-        if(buttonJustPressed[CENTER]){
+        if(isButtonReadyToRespond(CENTER)){
             currentState = STATE_MENU;
             return;
         }
+        vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
 
 void setClockInterface(){
     isNewInterface = true;
     currentState = STATE_CLOCK;
+    globalButtonDelay(300);  // 防止立即退出
 }
 
 void setWeatherInterface(){
     isNewInterface = true;
     currentState = STATE_WEATHER;
+    globalButtonDelay(300);  // 防止立即退出
 }
 
 void playBadAppleWrapper() {
@@ -252,36 +251,25 @@ const Menu* getMenuByState(MenuState state) {
             return &allMenus[MENU_WIFI_CONFIG];
         case MENU_ABOUT:
             return &allMenus[MENU_ABOUT];
-        // 其他菜单...
+
         default:
             return NULL;
     }
 }
 
 void handleMenuInterface() {
-    // const Menu* menu = &allMenus[currentMenu];
-    
     // 显示菜单项（基于 menuCursor）
     displayMenu(currentMenu, menuCursor, scrollOffset);
 
-    static unsigned long menuEnterTime = 0;
     static bool firstEntry = true;
     if (firstEntry) {
-        menuEnterTime = millis();
+        globalButtonDelay(200);  // 使用新的防抖功能
         firstEntry = false;
     }
 
-    // 等待200ms后才允许按键生效，防止误触
-    // if (millis() - menuEnterTime < 200) {
-    //     // 只显示菜单，不处理按键
-    //     return;
-    // }
-
-    while (!hasElapsed(menuEnterTime, 200)){}
-
     int lastPressedButton = -1;
     for (int i = 0; i < 5; i++) {
-        if (buttonJustPressed[i]) {
+        if (isButtonReadyToRespond(i, 150)) {  // 使用防抖功能，150ms间隔
             lastPressedButton = i;
             break;  // 只处理一个键
         }
@@ -412,9 +400,10 @@ void menuTask(void* parameter) {
                     }
 
                     // 始终检查是否需要退出
-                    if(buttonJustPressed[CENTER]){
+                    if(isButtonReadyToRespond(CENTER, 200)){
                         Serial.println("exit to main menu");
                         currentState = STATE_MENU;
+                        resetButtonDebounce();  // 重置防抖，防止立即再次响应
                         break;
                     }
 
@@ -434,7 +423,7 @@ void menuTask(void* parameter) {
                     if (!isReadyToDisplay || millis() - lastWeatherUpdate > 10*60*1000) {
                         if (millis() - lastWeatherFail > 15*1000) { // 失败后15秒再试
                             init_jwt();
-                            Serial.println("Fetching weather data...");
+                            LOG_MENU_INFO("Fetching weather data...");
                             if(fetchWeatherData()) {
                                 isReadyToDisplay = true;
                                 lastWeatherUpdate = millis();
@@ -454,23 +443,23 @@ void menuTask(void* parameter) {
                     }
 
                     // 始终检查是否需要退出
-                    if(buttonJustPressed[CENTER]){
-                        Serial.println("exit to main menu");
+                    if(isButtonReadyToRespond(CENTER, 200)){
+                        LOG_MENU_INFO("exit to main menu");
                         currentState = STATE_MENU;
+                        resetButtonDebounce();  // 重置防抖，防止立即再次响应
                         break;
                     }
                     if(isReadyToDisplay == false){
-                        // lcdResetCursor();
-                        // lcd_text("No Data", 1);
-                        // lcd_text(" ", 2);
+                        lcd_text("No Data", 1);
+                        lcd_text(" ", 2);
                     }
                     else{
-                        if(buttonJustPressed[LEFT] && millis() - lastDisplayUpdate > 200){
+                        if(isButtonReadyToRespond(LEFT, 200)){
                             lastDisplayUpdate = millis();
                             interface_num = (interface_num + 2) % 3; // 切换到上一个界面
                             updateWeatherScreen();
                         }
-                        if(buttonJustPressed[RIGHT] && millis() - lastDisplayUpdate > 200){
+                        if(isButtonReadyToRespond(RIGHT, 200)){
                             lastDisplayUpdate = millis();
                             interface_num = (interface_num + 1) % 3; // 切换到下一个界面
                             updateWeatherScreen();
@@ -478,7 +467,6 @@ void menuTask(void* parameter) {
                     }
                     
                     break;
-                // 更多界面...
             }
         }
         vTaskDelay(10 / portTICK_PERIOD_MS);  // 稳定刷新

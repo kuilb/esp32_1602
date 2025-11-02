@@ -28,7 +28,7 @@ uint8_t* MemoryManager::safeMalloc(size_t size, const char* name) {
         LOG_MEMORY_ERROR("Failed to allocate %u bytes for %s", size, name);
         LOG_MEMORY_ERROR("Available: Free=%u, MaxAlloc=%u", freeHeap, maxAlloc);
     } else {
-        LOG_MEMORY_DEBUG("Allocated %u bytes for %s (Free: %u -> %u)", 
+        LOG_MEMORY_VERBOSE("Allocated %u bytes for %s (Free: %u -> %u)", 
                      size, name, freeHeap, ESP.getFreeHeap());
     }
     
@@ -41,7 +41,7 @@ void MemoryManager::safeFree(uint8_t*& ptr) {
         size_t freeBefore = ESP.getFreeHeap();
         free(ptr);
         ptr = nullptr;
-        LOG_MEMORY_DEBUG("Memory freed (Free: %u -> %u)", 
+        LOG_MEMORY_VERBOSE("Memory freed (Free: %u -> %u)", 
                      freeBefore, ESP.getFreeHeap());
     }
 }
@@ -54,7 +54,7 @@ MemoryManager::SafeBuffer::SafeBuffer(size_t size, const char* name)
 
 MemoryManager::SafeBuffer::~SafeBuffer() {
     if (buffer_) {
-        LOG_MEMORY_DEBUG("SafeBuffer '%s' destructor - freeing %u bytes", name_, size_);
+        LOG_MEMORY_VERBOSE("SafeBuffer '%s' destructor - freeing %u bytes", name_, size_);
         MemoryManager::safeFree(buffer_);
     }
 }

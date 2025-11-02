@@ -5,6 +5,7 @@
 #include "lcd_driver.h"
 #include "kanamap.h"
 #include "menu.h"
+#include "logger.h"
 
 /**
  * @brief 解析并显示接收到的数据帧内容

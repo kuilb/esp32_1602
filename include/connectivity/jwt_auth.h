@@ -6,8 +6,9 @@
 
 
 
-// 默认 LocationID
-extern char* location;
+// LocationID 和城市名称 (改为固定数组,避免内存泄漏)
+extern char location[32];
+extern char city_name[64];
 
 extern char apiHost[128];
 extern char kid[64];

@@ -7,7 +7,6 @@ bool isDisplayingCache = false;      // 当前是否正在播放缓存
 void tryDisplayCachedFrames() {
     if (frameCache.empty()) {
         isDisplayingCache = false;
-        //Serial.println("播放完毕，停止缓存播放");
         return;
     }
 
@@ -18,7 +17,7 @@ void tryDisplayCachedFrames() {
         isDisplayingCache = true;
         lastDisplayTime = now;
         processIncoming(frameCache.front().data.data(), frameCache.front().data.size());
-        // Serial.println("display buffer (first)");
+        LOG_DISPLAY_VERBOSE("display buffer (first)");
         frameCache.pop_front();
         return;
     }
@@ -27,11 +26,11 @@ void tryDisplayCachedFrames() {
     if (now - lastDisplayTime >= frameCache.front().frameIntervalMs) {
         lastDisplayTime = now;
         processIncoming(frameCache.front().data.data(), frameCache.front().data.size());
-        // Serial.println("display buffer (interval)");
+        LOG_DISPLAY_VERBOSE("display buffer (interval)");
         frameCache.pop_front();
     }
 
-    // 如果播放完了要清除播放状态
+    // 如果播放完了,清除播放状态
     if (frameCache.empty()) {
         isDisplayingCache = false;
     }
