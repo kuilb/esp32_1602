@@ -1,0 +1,18 @@
+html += "<div style='max-width:420px;margin:40px auto;padding:28px 24px;background:#fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.08);'>";
+html += "<h2 style='text-align:center;color:#0067b6;font-weight:600;margin-bottom:24px;'>搜索结果</h2>";
+html += "<ul style='list-style:none;padding:0;margin:0;'>";
+for (JsonObject obj : locArr) {
+    String name = obj["name"].as<String>();
+    String adm1 = obj["adm1"].as<String>();
+    String country = obj["country"].as<String>();
+    String locid = obj["id"].as<String>();
+    String fxlink = obj["fxLink"].as<String>();
+    html += "<li style='margin:16px 0;display:flex;justify-content:center;'>";
+    html += "<form action='/set_location' method='POST' style='display:inline;'>";
+    html += "<input type='hidden' name='locid' value='" + locid + "'>";
+    html += "<input type='hidden' name='fxlink' value='" + fxlink + "'>";
+    html += "<button type='submit' style='padding:12px 28px;border-radius:6px;background:#0067b6;color:#fff;border:none;cursor:pointer;font-size:16px;font-weight:500;box-shadow:0 2px 8px rgba(0,103,182,0.10);transition:background 0.2s;min-width:180px;'>" + name + " (" + adm1 + ", " + country + ")</button>";
+    html += "</form></li>";
+}
+html += "</ul>";
+html += "</div>";

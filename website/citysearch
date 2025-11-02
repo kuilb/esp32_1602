@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>城市搜索</title>
+    <style>
+        :root {
+            --blue: #0067b6;
+            --blue-dark: #0045a4;
+            --gray-dark: #6a7690;
+            --gray: #6c757d;
+            --gray-light: #f8f9fa;
+            --gray-lighter: #343a40;
+            --white: #fff;
+            --border: #dee2e6;
+            --shadow: 0 4px 12px rgba(0,0,0,0.08);
+            --border-radius: 8px;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: linear-gradient(
+                90deg,
+                rgba(179,255,253,0.5) 0%,
+                rgba(227,230,255,0.5) 50%,
+                rgba(253,229,245,0.5) 100%
+            );
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--gray-light);
+            color: var(--gray-lighter);
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 420px;
+            margin: 40px auto;
+            padding: 28px 24px;
+            background: var(--white);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 24px;
+            color: var(--blue);
+            font-weight: 600;
+        }
+        .search-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .search-form input[type=text] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .search-form input[type=text]:focus {
+            outline: none;
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+        }
+        .search-form input[type=submit] {
+            background-color: var(--blue);
+            color: var(--white);
+            padding: 12px;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .search-form input[type=submit]:hover {
+            background-color: var(--blue-dark);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header" style="position:relative;margin-bottom:18px;">
+            <button class="btn-back" onclick="goBack()">返回</button>
+            <h2 style="margin:0;">城市搜索</h2>
+        </div>
+    <style>
+        .btn-back {
+            position: absolute;
+            left: 0px;
+            top: 0;
+            background-color: var(--red-dark, #d35f5f);
+            color: var(--white);
+            border: none;
+            border-radius: var(--border-radius);
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .btn-back:hover {
+            background-color: var(--red-dark, #d35f5f);
+        }
+    </style>
+        <form class="search-form" action="/citysearch_result" method="GET">
+            <input type="text" name="location" placeholder="请输入城市名或拼音" required>
+            <input type="submit" value="搜索">
+        </form>
+    </div>
+</body>
+<script>
+    function goBack() {
+        window.location.href = '../';
+    }
+</script>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 配置页面</title>
+</head>
+<body>
+    <div class="container">
+        <h2>ESP32 设置</h2>
+        <div class="main-buttons">
+            <button type="button" class="btn search-btn" onclick="openCitySearch()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <span>搜索城市</span>
+            </button>
+            <button type="button" class="btn ota-btn" onclick="location.href='/ota'">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span>OTA升级</span>
+            </button>
+            <button type="button" id="toggle-key-btn" class="btn key-btn" onclick="toggleKeySettings()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+                <span>和风天气密钥</span>
+            </button>
+            <button type="button" class="btn exit-btn" onclick="exitSettings()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                <span>退出设置</span>
+            </button>
+        </div>
+        <form id="key-settings-form" action="/set" method="GET" style="display:none;">
+            <div class="key-fields">
+                <label for="host">和风天气 API Host:</label><input id="host" type="text" name="host" value="">
+                <label for="kid">凭据ID:</label><input id="kid" type="text" name="kid" value="">
+                <label for="project">项目ID:</label><input id="project" type="text" name="project" value="">
+                <label for="key">私钥:</label><input id="key" type="text" name="key" value="">
+            </div>
+            <div class="button-row">
+                <input type="submit" value="提交" class="btn submit-btn">
+            </div>
+        </form>
+    </div>
+    <style>
+        :root {
+            --blue: #0067b6;
+            --blue-dark: #0045a4;
+            --red: #e57373;
+            --red-dark: #d35f5f;
+            --cyan: #77eedd;
+            --cyan-dark: #55ccbb;
+            --gray-dark: #6a7690;
+            --gray: #6c757d;
+            --gray-light: #f8f9fa;
+            --gray-lighter: #343a40;
+            --white: #fff;
+            --border: #dee2e6;
+            --shadow: 0 4px 12px rgba(0,0,0,0.08);
+            --border-radius: 8px;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: linear-gradient(
+                90deg,
+                rgba(179,255,253,0.5) 0%,
+                rgba(227,230,255,0.5) 50%,
+                rgba(253,229,245,0.5) 100%
+            );
+
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--gray-light);
+            color: var(--gray-lighter);
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 500px;
+            margin: 32px auto;
+            padding: 24px;
+            background: var(--white);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 24px;
+            color: var(--blue);
+            font-weight: 600;
+        }
+        .main-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            color: var(--white);
+            text-decoration: none;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .btn svg {
+            vertical-align: middle;
+        }
+        .search-btn { background-color: var(--blue); }
+        .search-btn:hover { background-color: var(--blue-dark); }
+        .ota-btn { background-color: var(--cyan); color: var(--gray-lighter); }
+        .ota-btn:hover { background-color: var(--cyan-dark); }
+        .key-btn { background-color: var(--gray-dark); }
+        .key-btn:hover { background-color: var(--gray-dark); }
+        .exit-btn { background-color: var(--red); }
+        .exit-btn:hover { background-color: var(--red-dark); }
+        
+        #key-settings-form {
+            margin-top: 24px;
+            padding: 20px;
+            background-color: #fdfdff;
+            border: 1px solid var(--border);
+            border-radius: var(--border-radius);
+        }
+        .key-fields {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .key-fields label {
+            font-weight: 500;
+            color: var(--gray);
+        }
+        .key-fields input[type=text] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .key-fields input[type=text]:focus {
+            outline: none;
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+        }
+        .button-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+        .submit-btn {
+            background-color: var(--blue);
+        }
+        .submit-btn:hover {
+            background-color: var(--blue-dark);
+        }
+    </style>
+
+    <script>
+        function openCitySearch() {
+            window.location.href = '/citysearch';
+        }
+        function exitSettings() {
+            fetch('/exit').finally(() => {
+                showManualCloseMsg();
+            });
+        }
+
+        function showManualCloseMsg() {
+            document.body.innerHTML = `
+            <div class="container" style="max-width: 420px; margin: 60px auto; padding: 36px 28px; background: var(--white); border-radius: var(--border-radius); box-shadow: var(--shadow); display: flex; flex-direction: column; align-items: center;">
+                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#0067b6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 18px;"><circle cx="12" cy="12" r="10" fill="#eaf6ff"/><polyline points="8 12.5 11 15.5 16 10.5" stroke="#2ecc71" stroke-width="2.2" fill="none"/><circle cx="12" cy="12" r="10" stroke="#0067b6" stroke-width="2.2" fill="none"/></svg>
+                <h2 style="color: var(--primary-color); font-weight: 600; margin-bottom: 12px;">设置已完成</h2>
+                <p style="font-size: 1.18em; color: var(--dark-gray); margin-bottom: 18px;">请手动关闭此页面</p>
+            </div>
+            <style>
+            body { background: linear-gradient(90deg, rgba(179,255,253,0.5) 0%, rgba(227,230,255,0.5) 50%, rgba(253,229,245,0.5) 100%); }
+            </style>
+            `;
+        }
+        // 检查OTA升级后跳转
+        window.addEventListener('DOMContentLoaded', function() {
+            if (window.location.search.indexOf('ota=success') !== -1) {
+                showManualCloseMsg();
+            }
+        });
+        function toggleKeySettings() {
+            var form = document.getElementById('key-settings-form');
+            var btn = document.getElementById('toggle-key-btn').querySelector('span');
+            if (form.style.display === 'none') {
+                form.style.display = 'block';
+                btn.textContent = '收起密钥设置';
+            } else {
+                form.style.display = 'none';
+                btn.textContent = '和风天气密钥';
+            }
+        }
+    </script>
+    
+</body>
+</html>
