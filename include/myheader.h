@@ -1,5 +1,5 @@
-#ifndef MYHADER_H
-#define MYHADER_H
+#ifndef MYHEADER_H
+#define MYHEADER_H
 
 // ==============================
 // 标准库 / 系统功能头文件

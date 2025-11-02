@@ -1,7 +1,7 @@
 #ifndef BADAPPLEPLAYER_H
 #define BADAPPLEPLAYER_H
 
-#include "myhader.h"
+#include "myheader.h"
 #include "menu.h"
 #include "button.h"
 #include "kanamap.h"

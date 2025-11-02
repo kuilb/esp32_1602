@@ -1,7 +1,7 @@
 #ifndef MENU_H
 #define MENU_H
 
-#include "myhader.h"
+#include "myheader.h"
 #include "lcd_driver.h"
 #include "network.h"
 #include "wifi_config.h"
@@ -10,6 +10,10 @@
 #include "badappleplayer.h"
 #include "weather.h"
 #include "web_setting.h"
+#include "about.h"
+#include "logger.h"
+#include "button.h"
+#include "wifi_config.h"
 
 extern volatile bool isReadyToDisplay;
 
@@ -59,16 +63,6 @@ typedef struct Menu {
 
 // 初始化菜单系统
 void initMenu();
-
-/**
- * @brief 判断是否经过了指定的时间间隔
- * 
- * @param startTime 起始时间，通常是 millis() 记录的时间戳
- * @param intervalMs 延迟时间（毫秒）
- * @return true 时间间隔已过
- * @return false 时间间隔未过
- */
-bool hasElapsed(unsigned long startTime, unsigned long intervalMs);
 
 // 在主 loop() 中调用：如果 inMenuMode 为 true，执行菜单处理逻辑
 void handleMenuInterface();

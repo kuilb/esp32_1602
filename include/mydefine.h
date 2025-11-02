@@ -1,7 +1,7 @@
 #ifndef MYDEFINE_H
 #define MYDEFINE_H
 
-#include "myhader.h"
+#include "myheader.h"
 
 /**
  * @brief 将指定 GPIO 引脚配置为输出模式
@@ -77,5 +77,7 @@ inline void setInput(int pin) {
 #define MAX_LATENCY_MS      1500    ///< 最大缓存延迟（单位：毫秒）
 #define CONNECT_PORT        13000   ///< TCP/UDP 通信端口号
 #define DEBOUNCE_TIME       30      ///< 按钮扫描消抖时间（单位：毫秒）
+#define BUTTON_DEBOUNCE_DELAY 150   ///< 按钮软件消抖延迟（单位：毫秒）
+#define FIRST_TIME_DELAY    300     ///< 首次启动延迟时间（单位：毫秒）
 
 #endif

@@ -1,7 +1,4 @@
 #include "menu.h"
-#include "about.h"
-#include "utils/logger.h"
-#include "hardware/button.h"
 
 // 函数前置声明
 void displayMenu(const Menu* menu, int menuIndex, int scrollOffset);
@@ -10,16 +7,19 @@ void displayMenu(const Menu* menu, int menuIndex, int scrollOffset);
 volatile bool isNewInterface = false;
 volatile bool inMenuMode = true;
 volatile bool isReadyToDisplay = false;
+static bool displayNeedsUpdate = true;
 long lastWeatherFail = -15000;
 InterfaceState currentState = STATE_MENU;
 
 void enterWirelessScreen(){
     inMenuMode = false;
     if (WiFi.status() != WL_CONNECTED) {
-        lcd_text("Connect to AP",1);
-        lcd_text("IP:" + WiFi.softAPIP().toString(),2);
+        // WiFi 未连接时，启动 AP 配网模式
+        LOG_MENU_INFO("Starting AP config mode from menu");
+        enterConfigMode();
     }
     else{
+        // WiFi 已连接时，显示连接信息
         lcd_text("SSID:" + savedSSID ,1);
         lcd_text("IP:" + WiFi.localIP().toString(),2);
     }
@@ -31,14 +31,14 @@ void enterBrightnessScreen() {
     snprintf(buf, sizeof(buf), "%d%%", (brightness * 100 + 127) / 255);
     lcd_text(buf, 2);
 
-    globalButtonDelay(200);  // 进入时防抖
+    globalButtonDelay(FIRST_TIME_DELAY);  // 进入时防抖
     uint8_t lastBrightness = brightness;
 
     while (!isButtonReadyToRespond(CENTER)) {
-        if (isButtonReadyToRespond(LEFT, 100)) {  // 更快的调节速度
+        if (isButtonReadyToRespond(LEFT, 100)) {
             changeBrightness(-1);
         }
-        if (isButtonReadyToRespond(RIGHT, 100)) {  // 更快的调节速度
+        if (isButtonReadyToRespond(RIGHT, 100)) {
             changeBrightness(1);
         }
 
@@ -55,6 +55,7 @@ void enterBrightnessScreen() {
 
     lcd_text("saved", 1);
     lcd_text("Back to Menu", 2);
+    LOG_SYSTEM_INFO("Brightness set to %d%%", (brightness * 100 + 127) / 255);
     delay(500);
 }
 
@@ -63,6 +64,7 @@ void resetWifi(){
     lcd_text("Clearing WiFi", 1);
     lcd_text("Rebooting...", 2);
     SPIFFS.remove("/wifi.txt");
+    LOG_SYSTEM_INFO("WiFi config cleared, restarting...");
     delay(1000);
     ESP.restart();
 }
@@ -73,11 +75,11 @@ void setupWebSetting(){
     }
 
     web_setting_setupWebServer();
-    Serial.println("配置完成");
+    LOG_WEB_INFO("Web seted");
 }
 
 void connectInfo(){
-    Serial.println("Status Info");
+    LOG_SYSTEM_DEBUG("call connect Info");
     if (WiFi.status() == WL_CONNECTED) {
         lcd_text("SSID:" + savedSSID, 1);
         lcd_text("IP:" + WiFi.localIP().toString(), 2);
@@ -87,7 +89,7 @@ void connectInfo(){
         lcd_text("", 2);
     }
     
-    globalButtonDelay(300);  // 防止立即退出
+    globalButtonDelay(FIRST_TIME_DELAY);  // 防止立即退出
 
     for(;;){
         if(isButtonReadyToRespond(CENTER)){
@@ -101,13 +103,13 @@ void connectInfo(){
 void setClockInterface(){
     isNewInterface = true;
     currentState = STATE_CLOCK;
-    globalButtonDelay(300);  // 防止立即退出
+    globalButtonDelay(FIRST_TIME_DELAY);  // 防止立即退出
 }
 
 void setWeatherInterface(){
     isNewInterface = true;
     currentState = STATE_WEATHER;
-    globalButtonDelay(300);  // 防止立即退出
+    globalButtonDelay(FIRST_TIME_DELAY);  // 防止立即退出
 }
 
 void playBadAppleWrapper() {
@@ -178,15 +180,9 @@ void initMenu() {
     xTaskCreate(menuTask, "MenuTask", 16384, NULL, 1, &menuTaskHandle);
 }
 
-// 判断是否经过了指定的时间间隔
-bool hasElapsed(unsigned long startTime, unsigned long intervalMs) {
-    return (millis() - startTime) >= intervalMs;
-}
-
 
 void displayMenu(const Menu* menu, int menuIndex, int scrollOffset) {
-    // Serial.print((String)menuIndex + " ");
-    // Serial.print((String)scrollOffset + "\n");
+    LOG_MENU_VERBOSE("menu cursor at index " + String(menuIndex) + " scroll offset " + String(scrollOffset));
     lcdResetCursor();
     
     // 检查是否为主菜单，如果是则包含状态栏参与滚动
@@ -198,27 +194,49 @@ void displayMenu(const Menu* menu, int menuIndex, int scrollOffset) {
             if (displayIndex == -1) {
                 // 显示状态栏（虚拟项-1）
                 String statusLine = "";
-                if (WiFi.status() == WL_CONNECTED) {
-                    statusLine = "W:OK ";
-                    if(timeSyncInProgress){
-                        statusLine += "T:Syncing...";
-                    }
-                    if (timeSynced) {
-                        statusLine += "T:OK";
-                    } else {
-                        statusLine += "T:--";
-                    }
-                } else {
-                    statusLine = "offline mode";
+                
+                // 根据WiFi连接状态显示不同内容
+                switch (wifiConnectionState) {
+                    case WIFI_CONNECTING:
+                        statusLine = "W:connecting";
+                        break;
+                    case WIFI_CONNECTED:
+                        statusLine = "W:OK ";
+                        if(timeSyncInProgress){
+                            statusLine += "T:Syncing...";
+                        } else if (timeSynced) {
+                            statusLine += "T:OK";
+                        } else {
+                            statusLine += "T:--";
+                        }
+                        break;
+                    case WIFI_FAILED:
+                        statusLine = "W:can't connect";
+                        break;
+                    case WIFI_IDLE:
+                    default:
+                        statusLine = "offline mode";
+                        break;
                 }
                 
                 lcd_text(statusLine, i + 1);  // 状态栏始终没有光标
             } else if (displayIndex >= 0 && displayIndex < menu->itemCount) {
                 // 显示正常菜单项
+                String itemName = menu->items[displayIndex].name;
+                
+                // 如果是第一个菜单项（Wireless Screen），根据 WiFi 状态动态修改名称
+                if (displayIndex == 0) {
+                    if (wifiConnectionState == WIFI_CONNECTED || wifiConnectionState == WIFI_CONNECTING) {
+                        itemName = "Wireless Screen";
+                    } else {
+                        itemName = "Config WiFi";
+                    }
+                }
+                
                 if (menuCursor == displayIndex)
-                    lcd_text(">" + (String)menu->items[displayIndex].name, i + 1);
+                    lcd_text(">" + itemName, i + 1);
                 else
-                    lcd_text(" " + (String)menu->items[displayIndex].name, i + 1);
+                    lcd_text(" " + itemName, i + 1);
             } else {
                 lcd_text(" ", i + 1);  // 清空无效行
             }
@@ -241,6 +259,7 @@ void displayMenu(const Menu* menu, int menuIndex, int scrollOffset) {
     }
 }
 
+// 根据菜单枚举获取对应菜单结构体指针
 const Menu* getMenuByState(MenuState state) {
     switch (state) {
         case MENU_MAIN:
@@ -258,18 +277,21 @@ const Menu* getMenuByState(MenuState state) {
 }
 
 void handleMenuInterface() {
-    // 显示菜单项（基于 menuCursor）
-    displayMenu(currentMenu, menuCursor, scrollOffset);
+    // 显示菜单项
+    if (displayNeedsUpdate) {
+        displayMenu(currentMenu, menuCursor, scrollOffset);
+        displayNeedsUpdate = false;
+    }
 
     static bool firstEntry = true;
     if (firstEntry) {
-        globalButtonDelay(200);  // 使用新的防抖功能
+        globalButtonDelay(FIRST_TIME_DELAY);
         firstEntry = false;
     }
 
     int lastPressedButton = -1;
     for (int i = 0; i < 5; i++) {
-        if (isButtonReadyToRespond(i, 150)) {  // 使用防抖功能，150ms间隔
+        if (isButtonReadyToRespond(i, BUTTON_DEBOUNCE_DELAY)) { 
             lastPressedButton = i;
             break;  // 只处理一个键
         }
@@ -277,6 +299,7 @@ void handleMenuInterface() {
 
     switch (lastPressedButton) {
         case LEFT:
+        displayNeedsUpdate = true;
             if (currentMenu == &allMenus[MENU_MAIN]) {
                 // 主菜单特殊处理：允许滚动到状态栏
                 if (menuCursor > 0) {
@@ -290,7 +313,9 @@ void handleMenuInterface() {
                 if (menuCursor > 0) menuCursor--;
             }
             break;
+
         case RIGHT:
+            displayNeedsUpdate = true;
             if (currentMenu == &allMenus[MENU_MAIN]) {
                 // 主菜单特殊处理
                 if (scrollOffset == -1 && menuCursor == 0) {
@@ -301,11 +326,14 @@ void handleMenuInterface() {
                 }
             } else {
                 // 其他菜单正常处理
-                if (menuCursor < currentMenu->itemCount - 1) menuCursor++;
+                menuCursor = constrain(menuCursor + 1, 0, currentMenu->itemCount - 1);
             }
             break;
+
         case CENTER:
-        // 如果有下一菜单，跳转
+            displayNeedsUpdate = true;
+
+            // 菜单选项
             firstEntry = true;     // 重置防误触
             if (currentMenu->items[menuCursor].nextState != MENU_NONE) {
                 const Menu* nextMenu = getMenuByState(currentMenu->items[menuCursor].nextState);
@@ -321,6 +349,7 @@ void handleMenuInterface() {
                     }
                 }
             }
+            // 动作选项
             else if (currentMenu->items[menuCursor].action) {
                 currentMenu->items[menuCursor].action();  // 触发动作
             } 
@@ -343,25 +372,43 @@ void handleMenuInterface() {
         
         // 确保scrollOffset在合理范围内
         if (scrollOffset < -1) {
+            LOG_MENU_WARN("Adjusting scrollOffset from " + String(scrollOffset) + " to -1");
             scrollOffset = -1;
         }
         
         int maxScrollOffset = currentMenu->itemCount - visibleLines;
-        if (maxScrollOffset < -1) maxScrollOffset = -1;
+        if (maxScrollOffset < -1) {
+            LOG_MENU_WARN("Adjusting maxScrollOffset from " + String(maxScrollOffset) + " to -1");
+            maxScrollOffset = -1;
+        }
         if (scrollOffset > maxScrollOffset) {
+            LOG_MENU_WARN("Adjusting scrollOffset from " + String(scrollOffset) + " to " + String(maxScrollOffset));
             scrollOffset = maxScrollOffset;
         }
     } else {
-        // 其他菜单的正常滚动逻辑
+        // 当光标在可视区域上方时，向上滚动显示窗口
         if (menuCursor < scrollOffset) {
             scrollOffset = menuCursor;
         } 
+        // 当光标在可视区域下方时，向下滚动显示窗口
         else if (menuCursor >= scrollOffset + visibleLines) {
             scrollOffset = menuCursor - visibleLines + 1;
         }
     }
 
-    delay(120);  // 节流
+    delay(100);  // 节流
+}
+
+bool ensureTimeSynced() {
+    if (!timeSynced) {
+        setupTime();
+        if (!timeSynced) {
+            LOG_MENU_WARN("Time not synced yet, cannot display");
+            delay(1000);
+            return false;
+        }
+    }
+    return true;
 }
 
 TaskHandle_t menuTaskHandle = NULL;
@@ -382,15 +429,10 @@ void menuTask(void* parameter) {
                 case STATE_MENU:
                     handleMenuInterface();
                     break;
+
                 case STATE_CLOCK:
-                    if(!timeSynced){
-                        setupTime();
-                        if(!timeSynced){
-                            delay(1000);
-                            currentState = STATE_MENU;
-                            break;
-                        }
-                    }
+                    if(!ensureTimeSynced())
+                        break;
 
                     // 每隔1秒刷新一次时间显示（非阻塞）
                     if (millis() - lastDisplayUpdate > 1000 || isNewInterface) {
@@ -400,8 +442,8 @@ void menuTask(void* parameter) {
                     }
 
                     // 始终检查是否需要退出
-                    if(isButtonReadyToRespond(CENTER, 200)){
-                        Serial.println("exit to main menu");
+                    if(isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)){
+                        LOG_MENU_INFO("exit to main menu");
                         currentState = STATE_MENU;
                         resetButtonDebounce();  // 重置防抖，防止立即再次响应
                         break;
@@ -410,13 +452,9 @@ void menuTask(void* parameter) {
                     break;
 
                 case STATE_WEATHER: 
-                    if(!timeSynced){
-                        setupTime();
-                        if(!timeSynced){
-                            delay(1000);
-                            currentState = STATE_MENU;
-                            break;
-                        }
+                    if(!ensureTimeSynced()){
+                        currentState = STATE_MENU;
+                        break;
                     }
 
                     // 每隔10分钟更新一次天气数据（非阻塞）
@@ -428,6 +466,7 @@ void menuTask(void* parameter) {
                                 isReadyToDisplay = true;
                                 lastWeatherUpdate = millis();
                             } else {
+                                LOG_WEATHER_WARN("Failed to fetch weather data");
                                 isReadyToDisplay = false;
                                 lastWeatherFail = millis();
                             }
@@ -443,7 +482,7 @@ void menuTask(void* parameter) {
                     }
 
                     // 始终检查是否需要退出
-                    if(isButtonReadyToRespond(CENTER, 200)){
+                    if(isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)){
                         LOG_MENU_INFO("exit to main menu");
                         currentState = STATE_MENU;
                         resetButtonDebounce();  // 重置防抖，防止立即再次响应
@@ -454,18 +493,17 @@ void menuTask(void* parameter) {
                         lcd_text(" ", 2);
                     }
                     else{
-                        if(isButtonReadyToRespond(LEFT, 200)){
+                        if(isButtonReadyToRespond(LEFT, BUTTON_DEBOUNCE_DELAY)){
                             lastDisplayUpdate = millis();
                             interface_num = (interface_num + 2) % 3; // 切换到上一个界面
                             updateWeatherScreen();
                         }
-                        if(isButtonReadyToRespond(RIGHT, 200)){
+                        if(isButtonReadyToRespond(RIGHT, BUTTON_DEBOUNCE_DELAY)){
                             lastDisplayUpdate = millis();
                             interface_num = (interface_num + 1) % 3; // 切换到下一个界面
                             updateWeatherScreen();
                         }
                     }
-                    
                     break;
             }
         }

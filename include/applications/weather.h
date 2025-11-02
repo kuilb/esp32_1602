@@ -1,7 +1,7 @@
 #ifndef WEATHER_H
 #define WEATHER_H
 
-#include "myhader.h"
+#include "myheader.h"
 #include "lcd_driver.h"
 #include "menu.h"
 #include "button.h"

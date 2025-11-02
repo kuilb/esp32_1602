@@ -19,6 +19,9 @@ String savedSSID = "", savedPassword = "";
 // 当前是否处于配网模式的标志位
 bool inConfigMode = false;
 
+// WiFi连接状态
+WiFiConnectionState wifiConnectionState = WIFI_IDLE;
+
 // 保存WiFi信息
 void saveWiFiCredentials(const String& ssid, const String& password) {
   File file = SPIFFS.open("/wifi.txt", "w");
@@ -253,28 +256,23 @@ void enterConfigMode() {
   lcd_text("IP:" + WiFi.softAPIP().toString(),2);
 }
 
-void connectToWiFi() {
-    loadWiFiCredentials();
-
-    if (savedSSID == "") {
-        LOG_WIFI_WARN("config not found, entering config mode");
-        updateColor(CRGB::Purple);  // 初次配网紫灯
-        enterConfigMode();
-        return;
-    }
-
+// WiFi连接后台任务
+void wifiConnectTask(void* parameter) {
+    LOG_WIFI_INFO("WiFi connection task started");
+    
+    // 等待一小段时间，确保网络栈完全初始化
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    
+    // 设置连接中状态
+    wifiConnectionState = WIFI_CONNECTING;
     updateColor(CRGB::Blue);  // 连接中蓝灯
-    LOG_WIFI_INFO("connecting: %s", savedSSID.c_str());
-
-    // 在屏幕上显示状态
-    lcd_text("WIFI connecting",1);
-    lcd_text(" ",2);
-
+    
     WiFi.begin(savedSSID.c_str(), savedPassword.c_str());
-
+    
     unsigned long startTime = millis();
     int fadeStep = 2;
     uint8_t brightness = 64;
+    
     while (WiFi.status() != WL_CONNECTED && millis() - startTime < 15000) {
         brightness += fadeStep;
 
@@ -286,11 +284,12 @@ void connectToWiFi() {
             LOG_WIFI_DEBUG(".");
         }
         updateBrightness(brightness);
-        delay(5);
+        vTaskDelay(5 / portTICK_PERIOD_MS);
     }
     updateBrightness(128);
 
     if (WiFi.status() == WL_CONNECTED) {
+        wifiConnectionState = WIFI_CONNECTED;
         updateColor(CRGB::Green);  // 连接成功绿灯
         LOG_WIFI_INFO("connected: %s", savedSSID.c_str());
         LOG_WIFI_INFO("IP: %s", WiFi.localIP().toString().c_str());
@@ -299,10 +298,34 @@ void connectToWiFi() {
         LOG_WIFI_INFO("starting background time sync...");
         initTimeSync();
     } else {
-        LOG_WIFI_ERROR("can't connect, entering config mode");
+        wifiConnectionState = WIFI_FAILED;
+        LOG_WIFI_ERROR("can't connect to WiFi");
         updateColor(CRGB::Red);  // 失败变红
-        enterConfigMode();
     }
+    
+    // 任务完成，删除自己
+    vTaskDelete(NULL);
+}
+
+void connectToWiFi() {
+    loadWiFiCredentials();
+
+    if (savedSSID == "") {
+        LOG_WIFI_WARN("config not found, entering config mode");
+        wifiConnectionState = WIFI_FAILED;
+        updateColor(CRGB::Purple);  // 初次配网紫灯
+        enterConfigMode();
+        return;
+    }
+
+    LOG_WIFI_INFO("will connect to: %s", savedSSID.c_str());
+    
+    // 先设置WiFi模式，确保网络栈已初始化
+    WiFi.mode(WIFI_STA);
+    vTaskDelay(50 / portTICK_PERIOD_MS);  // 给WiFi栈一点时间初始化
+    
+    // 创建后台任务进行WiFi连接，不阻塞主线程
+    xTaskCreate(wifiConnectTask, "WiFiConnectTask", 4096, NULL, 1, NULL);
 }
 
 // 初始化wifi

@@ -1,7 +1,7 @@
 #ifndef KANAMAP_H
 #define KANAMAP_H
 
-#include "myhader.h"
+#include "myheader.h"
 
 /**
  * @brief 假名映射表大小

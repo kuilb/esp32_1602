@@ -5,14 +5,20 @@
 
 int OTAManager::progress = 0;
 String OTAManager::lastError = "";
+volatile OTAStatus OTAManager::currentStatus = OTA_IDLE;
+volatile OTAResult OTAManager::currentResult = OTA_IN_PROGRESS;
 
 void OTAManager::init() {
     LOG_SYSTEM_INFO("OTA Manager initialized");
+    currentStatus = OTA_IDLE;
+    currentResult = OTA_IN_PROGRESS;
 }
 
 OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
     progress = 0;
     lastError = "";
+    currentStatus = OTA_RUNNING;
+    currentResult = OTA_IN_PROGRESS;
     
     WiFiClient* client;
     WiFiClientSecure secureClient;
@@ -38,6 +44,11 @@ OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
         lastError = "HTTP Error: " + String(httpCode);
         LOG_SYSTEM_ERROR("OTA HTTP failed: %d", httpCode);
         http.end();
+        lcd_text("OTA Failed!", 1);
+        lcd_text("HTTP Error", 2);
+        updateColor(CRGB::Red);
+        currentStatus = OTA_COMPLETED_FAILED;
+        currentResult = OTA_FAIL_DOWNLOAD;
         return OTA_FAIL_DOWNLOAD;
     }
     
@@ -46,6 +57,8 @@ OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
         lastError = "Content-Length is 0";
         LOG_SYSTEM_ERROR("OTA: Invalid content length");
         http.end();
+        currentStatus = OTA_COMPLETED_FAILED;
+        currentResult = OTA_FAIL_DOWNLOAD;
         return OTA_FAIL_DOWNLOAD;
     }
     
@@ -55,6 +68,8 @@ OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
         lastError = "Not enough space: " + String(Update.errorString());
         LOG_SYSTEM_ERROR("OTA begin failed: %s", lastError.c_str());
         http.end();
+        currentStatus = OTA_COMPLETED_FAILED;
+        currentResult = OTA_FAIL_WRITE;
         return OTA_FAIL_WRITE;
     }
     
@@ -63,34 +78,64 @@ OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
     http.end();
     
     if (!result) {
+        LOG_SYSTEM_ERROR("OTA firmware download failed: %s", lastError.c_str());
         Update.abort();
+        lcd_text("OTA Failed!", 1);
+        lcd_text("Download Error", 2);
+        updateColor(CRGB::Red);
+        currentStatus = OTA_COMPLETED_FAILED;
+        currentResult = OTA_FAIL_WRITE;
         return OTA_FAIL_WRITE;
     }
     
-    if (Update.end(true)) {
+    if (Update.end(false)) {  // false = 不立即重启,先返回状态
         LOG_SYSTEM_INFO("OTA Update Success! Rebooting...");
         lcd_text("OTA Success!", 1);
         lcd_text("Rebooting...", 2);
         updateColor(CRGB::Green);
+        progress = 100;
+        currentStatus = OTA_COMPLETED_SUCCESS;
+        currentResult = OTA_SUCCESS;
         delay(2000);
         ESP.restart();
         return OTA_SUCCESS;
     } else {
         lastError = Update.errorString();
         LOG_SYSTEM_ERROR("OTA Update failed: %s", lastError.c_str());
+        Update.abort();
+        lcd_text("OTA Verify Failed!", 1);
+        lcd_text(lastError.substring(0, 16), 2);
+        updateColor(CRGB::Red);
+        currentStatus = OTA_COMPLETED_FAILED;
+        currentResult = OTA_FAIL_VERIFY;
         return OTA_FAIL_VERIFY;
     }
 }
 
 bool OTAManager::downloadFirmware(HTTPClient& http, size_t contentLength) {
     WiFiClient* stream = http.getStreamPtr();
+    
+    if (!stream) {
+        lastError = "Stream pointer is null";
+        LOG_SYSTEM_ERROR("OTA: %s", lastError.c_str());
+        return false;
+    }
+    
     uint8_t buff[512];
     size_t written = 0;
+    int lastDisplayedProgress = -1;
+    uint32_t lastProgressTime = millis();
+    const uint32_t PROGRESS_UPDATE_INTERVAL = 100; // 100ms
     
     while (http.connected() && written < contentLength) {
         size_t available = stream->available();
         if (available) {
             int c = stream->readBytes(buff, min(available, sizeof(buff)));
+            
+            if (c <= 0) {
+                delay(1);
+                continue;
+            }
             
             if (Update.write(buff, c) != c) {
                 lastError = "Write failed at " + String(written);
@@ -99,26 +144,51 @@ bool OTAManager::downloadFirmware(HTTPClient& http, size_t contentLength) {
             }
             
             written += c;
-            progress = (written * 100) / contentLength;
             
-            // 每10%更新一次显示
-            if (progress % 10 == 0) {
-                LOG_SYSTEM_DEBUG("OTA Progress: %d%%", progress);
-                lcd_text("Updating: " + String(progress) + "%", 2);
+            // 定期更新进度显示
+            uint32_t now = millis();
+            if (now - lastProgressTime >= PROGRESS_UPDATE_INTERVAL) {
+                progress = (written * 100) / contentLength;
+                if (progress != lastDisplayedProgress) {
+                    LOG_SYSTEM_DEBUG("OTA Progress: %d%% (%d/%d bytes)", 
+                                    progress, written, contentLength);
+                    lcd_text("Updating: " + String(progress) + "%", 1);
+                    lastDisplayedProgress = progress;
+                }
+                lastProgressTime = now;
             }
+        } else {
+            delay(1);  // 让出 CPU 时间
         }
-        delay(1);
     }
     
-    return (written == contentLength);
+    // 验证下载完整性
+    if (written != contentLength) {
+        lastError = "Download incomplete: " + String(written) + "/" + String(contentLength);
+        LOG_SYSTEM_ERROR("OTA: %s", lastError.c_str());
+        return false;
+    }
+    
+    LOG_SYSTEM_INFO("OTA firmware download complete: %d bytes", written);
+    progress = 100;
+    return true;
 }
 
 int OTAManager::getProgress() {
+    LOG_SYSTEM_DEBUG("Got OTA Progress: %d%%", progress);
     return progress;
 }
 
 String OTAManager::getErrorString() {
     return lastError;
+}
+
+OTAStatus OTAManager::getStatus() {
+    return currentStatus;
+}
+
+bool OTAManager::isInProgress() {
+    return currentStatus == OTA_RUNNING;
 }
 
 void OTAManager::checkForUpdate(const String& versionCheckURL) {

@@ -1,7 +1,7 @@
 #ifndef BUTTON_H
 #define BUTTON_H
 
-#include "myhader.h"
+#include "myheader.h"
 #include "mydefine.h"
 #include "network.h"
 #include "button.h"
@@ -48,10 +48,10 @@ extern volatile bool buttonJustPressed[];
  * @brief 检查按钮是否可以响应（防抖和节流控制）
  * 
  * @param buttonIndex 按钮索引
- * @param minInterval 最小间隔时间（毫秒），默认200ms
+ * @param minInterval 最小间隔时间（毫秒），默认150ms
  * @return true 如果按钮可以响应，false 如果应该被忽略
  */
-bool isButtonReadyToRespond(int buttonIndex, unsigned long minInterval = 200);
+bool isButtonReadyToRespond(int buttonIndex, unsigned long minInterval = 150);
 
 /**
  * @brief 重置所有按钮的防抖计时器

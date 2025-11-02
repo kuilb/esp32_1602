@@ -1,4 +1,4 @@
-#include "myhader.h"
+#include "myheader.h"
 #include "mydefine.h"
 #include "kanamap.h"
 #include "lcd_driver.h"
@@ -103,10 +103,10 @@ void setup() {
         listDir("/", 0);    // 打印根目录文件
     }
 
-    delay(500);
+    delay(300);  // 缩短延迟，快速进入主界面
     init_jwt();  // 初始化JWT
-    wifiinit();  // 初始化WiFi配置
-    initMenu();  // 初始化菜单系统
+    wifiinit();  // 初始化WiFi配置（非阻塞，后台连接）
+    initMenu();  // 初始化菜单系统（立即进入主界面）
 }
 
 void loop(){

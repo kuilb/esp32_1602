@@ -1,6 +1,6 @@
 #include "weather.h"
-#include "utils/memory_utils.h"
-#include "utils/logger.h"
+#include "memory_utils.h"
+#include "logger.h"
 
 // 天气服务，API接口通过ESP32向云端获取JSON数据
 bool weatherSynced = false;

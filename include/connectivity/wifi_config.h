@@ -4,7 +4,7 @@
 #include "lcd_driver.h"
 #include "mydefine.h"
 #include "rgb_led.h"
-#include "myhader.h"
+#include "myheader.h"
 #include "network.h"
 
 /**
@@ -29,6 +29,21 @@ extern String ssid_input, password_input;
  * @brief 已保存的 WiFi SSID 和密码（由文件系统读取）
  */
 extern String savedSSID, savedPassword;
+
+/**
+ * @brief WiFi连接状态枚举
+ */
+enum WiFiConnectionState {
+    WIFI_IDLE,         // 初始状态，未开始连接
+    WIFI_CONNECTING,   // 正在连接中
+    WIFI_CONNECTED,    // 已连接
+    WIFI_FAILED        // 连接失败
+};
+
+/**
+ * @brief 当前WiFi连接状态
+ */
+extern WiFiConnectionState wifiConnectionState;
 
 /**
  * @brief 配网模式状态标志，true 表示当前处于配网模式

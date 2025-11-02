@@ -9,10 +9,17 @@
 enum OTAResult {
     OTA_SUCCESS,
     OTA_FAIL_DOWNLOAD,
-    OTA_FAIL_VERIFY,
+    OTA_FAIL_VERIFY,    // 待实现
     OTA_FAIL_WRITE,
     OTA_FAIL_NETWORK,
     OTA_IN_PROGRESS
+};
+
+enum OTAStatus {
+    OTA_IDLE,
+    OTA_RUNNING,
+    OTA_COMPLETED_SUCCESS,
+    OTA_COMPLETED_FAILED
 };
 
 class OTAManager {
@@ -23,12 +30,16 @@ public:
     static int getProgress();
     static String getErrorString();
     static void checkForUpdate(const String& versionCheckURL);
+    static OTAStatus getStatus();
+    static bool isInProgress();
     
 private:
     static bool downloadFirmware(HTTPClient& http, size_t contentLength);
     static bool verifyChecksum(const String& expectedMD5);
     static int progress;
     static String lastError;
+    static volatile OTAStatus currentStatus;
+    static volatile OTAResult currentResult;
 };
 
 #endif
