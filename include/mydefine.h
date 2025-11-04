@@ -71,13 +71,19 @@ inline void setInput(int pin) {
 // ==============================
 // 系统参数设置
 // ==============================
+#define VISIBLE_LINES       2           ///< LCD 行数
 
-#define BaudRate            115200  ///< 串口通信波特率
-#define MAX_CACHE_SIZE      200     ///< 最大缓存帧数量
-#define MAX_LATENCY_MS      1500    ///< 最大缓存延迟（单位：毫秒）
-#define CONNECT_PORT        13000   ///< TCP/UDP 通信端口号
-#define DEBOUNCE_TIME       30      ///< 按钮扫描消抖时间（单位：毫秒）
-#define BUTTON_DEBOUNCE_DELAY 150   ///< 按钮软件消抖延迟（单位：毫秒）
-#define FIRST_TIME_DELAY    300     ///< 首次启动延迟时间（单位：毫秒）
+#define BaudRate            115200      ///< 串口通信波特率
+#define MAX_CACHE_SIZE      200         ///< 最大缓存帧数量
+#define MAX_LATENCY_MS      1500        ///< 最大缓存延迟（单位：毫秒）
+#define CONNECT_PORT        13000       ///< TCP/UDP 通信端口号
+
+#define DEBOUNCE_TIME       30          ///< 按钮扫描消抖时间（单位：毫秒）
+#define BUTTON_DEBOUNCE_DELAY 150       ///< 按钮软件消抖延迟（单位：毫秒）
+#define FIRST_TIME_DELAY    300         ///< 首次启动延迟时间（单位：毫秒）
+
+#define TIME_SYNC_TIMEOUT   10000       ///< 时间同步超时时间（单位：毫秒）
+#define TIME_SYNC_RETRY_INTERVAL 1000   ///< 时间同步重试间隔（单位：毫秒）
+#define GMT_OFFSET_HOUR     8           ///< GMT 偏移（时间），北京时间为 UTC+8
 
 #endif

@@ -1,6 +1,6 @@
 #include "badappleplayer.h"
 
-const LyricLine* getLyricForFrame(int currentFrame) {
+const LyricLine* _getLyricForFrame(int currentFrame) {
     const LyricLine* last = NULL;
     for (int i = 0; i < lyricCount; i++) {
         if (lyrics[i].frameIndex <= currentFrame) {
@@ -18,7 +18,7 @@ int _utf8ToUnicode(char c0, char c1, char c2) {
 }
 
 // 转换UTF-8字符串到假名字符串
-String convertUtf8ToKana(const char* utf8Str) {
+String _convertUtf8ToKana(const char* utf8Str) {
     String result = "";
     int i = 0;
     int len = strlen(utf8Str);
@@ -55,14 +55,8 @@ String convertUtf8ToKana(const char* utf8Str) {
     return result;
 }
 
-
-void processBadapple(const uint8_t* raw, int currentFrame) {
-    uint8_t customCharIndex = 0;
-    const LyricLine* lyric = getLyricForFrame(currentFrame);
-    lcdResetCursor();
-
-    // 上半屏：块0~3 -> 显示在 LCD 第一行前4列
-    for (int block = 0; block < 4; block++) {
+void _processBlock(int startBlock, const uint8_t* raw){
+    for (int block = startBlock; block < startBlock + 4; block++) {
         uint8_t charMap[8];
         for (int row = 0; row < 8; row++) {
             charMap[row] = raw[block * 8 + row] & 0x1F;  // 5bit像素
@@ -70,44 +64,49 @@ void processBadapple(const uint8_t* raw, int currentFrame) {
         lcdCreateChar(block, charMap);
         lcdDisCustom(block);
     }
+}
 
+void _lyricDisplay(const LyricLine* lyric,int lineNumber){
     if (lyric != NULL) {
-        String line1Converted = convertUtf8ToKana(lyric->text_line1);
+        String lineConverted;
+        if (lineNumber == 1) {
+            lineConverted = _convertUtf8ToKana(lyric->text_line1);
+        }
+        else if (lineNumber == 2) {
+            lineConverted = _convertUtf8ToKana(lyric->text_line2);
+        }
+        else{
+            LOG_DISPLAY_WARN("lyricDisplay: Invalid line number %d", lineNumber);
+            lcdPrint("           "); // 显示空行
+            return;
+        }
 
-        int len = line1Converted.length();
+        int len = lineConverted.length();
         lcdDisChar(' ');
         for (int i = 0; i < 11; i++) {
             if (i < len) {
-                lcdDisChar(line1Converted[i]);
+                lcdDisChar(lineConverted[i]);
             } else {
                 lcdDisChar(' '); // 自动补空格
             }
         }
     }
+}
+
+
+void _processBadapple(const uint8_t* raw, int currentFrame) {
+    uint8_t customCharIndex = 0;
+    const LyricLine* lyric = _getLyricForFrame(currentFrame);
+    lcdResetCursor();
+
+    // 上半屏：块0~3 -> 显示在 LCD 第一行前4列
+    _processBlock(0, raw);
+    _lyricDisplay(lyric,1);
+    
 
     // 下半屏：块4~7 -> 显示在 LCD 第二行前4列
-    for (int block = 4; block < 8; block++) {
-        uint8_t charMap[8];
-        for (int row = 0; row < 8; row++) {
-            charMap[row] = raw[block * 8 + row] & 0x1F;
-        }
-        lcdCreateChar(block, charMap);
-        lcdDisCustom(block);
-    }
-
-    if (lyric != NULL) {
-        String line2Converted = convertUtf8ToKana(lyric->text_line2);
-
-        int len = line2Converted.length();
-        lcdDisChar(' ');
-        for (int i = 0; i < 11; i++) {
-            if (i < len) {
-                lcdDisChar(line2Converted[i]);
-            } else {
-                lcdDisChar(' '); // 自动补空格
-            }
-        }
-    }
+    _processBlock(4, raw);
+    _lyricDisplay(lyric,2);
 }
 
 
@@ -118,7 +117,7 @@ void playBadAppleFromFileRaw(const char* path) {
     
     // 检查文件是否存在
     if (!SPIFFS.exists(path)) {
-        Serial.println("文件不存在");
+        LOG_SYSTEM_WARN("Bad Apple file not found: %s", path);
         lcd_text("File Not Found",1);
         lcd_text(" ",2);
         delay(1000);
@@ -127,14 +126,14 @@ void playBadAppleFromFileRaw(const char* path) {
     
     File file = SPIFFS.open(path, "r");
     if (!file) {
-        Serial.println("无法打开文件");
+        LOG_SYSTEM_WARN("Failed to open Bad Apple file: %s", path);
         lcd_text("Err Open File",1);
         lcd_text(" ",2);
         delay(1000);
         return;
     }
 
-    Serial.println("文件大小: " + String(file.size()) + " 字节");
+    LOG_SYSTEM_INFO("Playing Bad Apple from file: %s, size: %d bytes", path, file.size());
 
     const size_t frameSize = 64;
     uint8_t frame[frameSize];
@@ -155,7 +154,7 @@ void playBadAppleFromFileRaw(const char* path) {
             currentFrame = max(0, currentFrame - 20);
             file.seek(currentFrame * frameSize, SeekSet);
             file.read(frame, frameSize);
-            processBadapple(frame, currentFrame);
+            _processBadapple(frame, currentFrame);
             lastFrameTime = now;
         }
         // 快进：每次快进10帧
@@ -163,12 +162,12 @@ void playBadAppleFromFileRaw(const char* path) {
             currentFrame = min((int)(file.size() / frameSize) - 1, currentFrame + 10);
             file.seek(currentFrame * frameSize, SeekSet);
             file.read(frame, frameSize);
-            processBadapple(frame, currentFrame);
+            _processBadapple(frame, currentFrame);
             lastFrameTime = now;
         }
         else if (now - lastFrameTime >= 33) {
             file.read(frame, frameSize);
-            processBadapple(frame, currentFrame);
+            _processBadapple(frame, currentFrame);
 
             lastFrameTime += 33;  // 累加，不用now避免抖动误差
             currentFrame++;
@@ -176,5 +175,5 @@ void playBadAppleFromFileRaw(const char* path) {
     }
 
     file.close();
-    Serial.println("播放完成");
+    LOG_DISPLAY_INFO("Bad Apple playback finished");
 }

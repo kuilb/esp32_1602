@@ -1,3 +1,15 @@
+
+/**
+ * @file badappleplayer.h
+ * @brief Bad Apple播放器相关函数与歌词结构体定义
+ *
+ * 提供Bad Apple动画播放、歌词显示等功能的接口声明。
+ * 适用于ESP32 1602 LCD项目。
+ *
+ * @author kulib
+ * @date 2025-11-04
+ */
+
 #ifndef BADAPPLEPLAYER_H
 #define BADAPPLEPLAYER_H
 
@@ -5,14 +17,22 @@
 #include "menu.h"
 #include "button.h"
 #include "kanamap.h"
+#include "logger.h"
 
+
+/**
+ * @struct LyricLine
+ * @brief 歌词行结构体，描述每一帧对应的歌词内容。
+ */
 struct LyricLine {
-    int frameIndex;             // 起始帧号
-    const char* text_line1;     // 歌词文本
-    const char* text_line2;     // 歌词文本
+    int frameIndex;             /**< 歌词出现的起始帧号 */
+    const char* text_line1;     /**< 歌词第一行 */
+    const char* text_line2;     /**< 歌词第二行 */
 };
 
-// 可根据实际歌词与视频节奏手动调整 frameIndex
+/**
+ * @brief 歌词数组，存储所有歌词及其对应帧号。
+ */
 const LyricLine lyrics[] = {
     {0,     "Bad Apple!!",          "in 1602A"},
     {60,    "Code by",              "Kulib"},
@@ -71,8 +91,16 @@ const LyricLine lyrics[] = {
     {6192,  "すべてこわすの",       "ならくろになれ"},
 };
 
+
+/**
+ * @brief 歌词数组元素数量
+ */
 const int lyricCount = sizeof(lyrics) / sizeof(lyrics[0]);
 
+/**
+ * @brief 播放Bad Apple原始帧数据文件（每帧64字节）
+ * @param path SPIFFS文件系统中的文件路径
+ */
 void playBadAppleFromFileRaw(const char* path);
 
 

@@ -60,7 +60,7 @@ void listDir(const char* dirname, uint8_t levels) {
 
 void setup() {
     // 首先初始化日志系统
-    Logger::init(LOG_LEVEL_VERBOSE);  // 可以通过此处调整全局日志级别
+    Logger::init(LOG_LEVEL_DEBUG);  // 可以通过此处调整全局日志级别
     
     init();
     initrgb();

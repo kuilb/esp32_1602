@@ -1,56 +1,81 @@
 #include "about.h"
 
+enum NavigationResult {
+    NAV_NONE,      // 无按键
+    NAV_PAGE_CHANGE, // 页面改变
+    NAV_EXIT       // 退出
+};
+
+struct AboutPage {
+    const char* line1;
+    const char* line2;
+};
+
+const AboutPage aboutMePages[] = {
+    {"Created: kulib", "kulib88.com"},
+    {"だいがくせいかつが", "まもなくおわるけど"},
+    {"これからも", "がんばります"},
+    {"Thanks!", "Please report"},
+    {"Contact:    john", "kulib@icloud.com"},
+    {"License:", "GPL3.0"},
+};
+
+const AboutPage aboutProjectPages[] = {
+    {"ESP32 1602A", "Ver.2025/11/3"},
+    {"ESP32-S3-N8R8", "8MB FLASH+PSRAM"},
+    {"Features:", "Wireless LCD"},
+    {"WiFi Config", "AP + Web UI"},
+    {"JWT Auth", "Ed25519 Crypto"},
+    {"Gzip Support", "Multi-language"},
+    {"Libraries:", "FastLED"},
+    {"ArduinoJson", "libsodium"},
+    {"zlib_turbo", "etc..."},
+    {"Usage Tips:", "Hold CENTER cfg"},
+    {"Changelog:", "updated About"},
+};
+
+void showAboutPage(const char* line1, const char* line2) {
+    lcd_text(line1, 1);
+    lcd_text(line2, 2);
+}
+
+NavigationResult _handleAboutNavigation(int& currentPage, int totalPages) {
+    if (isButtonReadyToRespond(LEFT, BUTTON_DEBOUNCE_DELAY) && currentPage > 0) {
+        currentPage--;
+        return NAV_PAGE_CHANGE;
+    }
+    else if (isButtonReadyToRespond(RIGHT, BUTTON_DEBOUNCE_DELAY) && currentPage < totalPages - 1) {
+        currentPage++;
+        return NAV_PAGE_CHANGE;
+    }
+    else if (isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)) {
+        currentState = STATE_MENU;
+        inMenuMode = true;
+        return NAV_EXIT;
+    }
+    return NAV_NONE; // 没有按键按下
+}
+
 void aboutMe(){
     inMenuMode = false;
     int currentPage = 0;
-    const int totalPages = 7;
+    const int totalPages = 6; // 页面数量
     
     // 初始延迟，防止一进入就退出
-    delay(300);
+    globalButtonDelay(FIRST_TIME_DELAY);
     
     while(true) {
-        switch(currentPage) {
-            case 0:
-                lcd_text("Created: kulib", 1);
-                lcd_text("kulib88.com", 2);
-                break;
-            case 2:
-                lcd_text("だいがくせいかつが", 1);
-                lcd_text("まもなくおわるけど", 2);
-                break;
-            case 3:
-                lcd_text("これからも", 1);
-                lcd_text("がんばります", 2);
-                break;
-            case 4:
-                lcd_text("Thanks!", 1);
-                lcd_text("Please report", 2);
-                break;
-            case 5:
-                lcd_text("Contact:    john", 1);
-                lcd_text("kulib@icloud.com", 2);
-                break;
-            case 6:
-                lcd_text("License:", 1);
-                lcd_text("GPL3.0", 2);
-                break;    
-        }
+        showAboutPage(aboutMePages[currentPage].line1, aboutMePages[currentPage].line2);
         
-        bool keyPressed = false;
-        while(!keyPressed) {
-            if(isButtonReadyToRespond(LEFT, BUTTON_DEBOUNCE_DELAY) && currentPage > 0) {
-                currentPage--;
-                keyPressed = true;
+        // 等待按键输入
+        while(true) {
+            NavigationResult result = _handleAboutNavigation(currentPage, totalPages);
+            if (result == NAV_PAGE_CHANGE) {
+                break; // 页面改变，跳出内层循环，重新显示
+            } else if (result == NAV_EXIT) {
+                return; // 退出关于界面
             }
-            else if(isButtonReadyToRespond(RIGHT, BUTTON_DEBOUNCE_DELAY) && currentPage < totalPages - 1) {
-                currentPage++;
-                keyPressed = true;
-            }
-            else if(isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)) {
-                currentState = STATE_MENU;
-                inMenuMode = true;
-                return;
-            }
+            // NAV_NONE: 继续等待
             delay(50);
         }
     }
@@ -59,75 +84,23 @@ void aboutMe(){
 void aboutProject(){
     inMenuMode = false;
     int currentPage = 0;
-    const int totalPages = 11;
+    const int totalPages = 11; // 页面数量
     
     // 初始延迟，防止一进入就退出
-    delay(300);
+    globalButtonDelay(FIRST_TIME_DELAY);
     
     while(true) {
-        switch(currentPage) {
-            case 0:
-                lcd_text("ESP32 1602A", 1);
-                lcd_text("Ver.2025/11/3", 2);
-                break;
-            case 1:
-                lcd_text("ESP32-S3-N8R8", 1);
-                lcd_text("8MB FLASH+PSRAM", 2);
-                break;
-            case 2:
-                lcd_text("Features:", 1);
-                lcd_text("Wireless LCD", 2);
-                break;
-            case 3:
-                lcd_text("WiFi Config", 1);
-                lcd_text("AP + Web UI", 2);
-                break;
-            case 4:
-                lcd_text("JWT Auth", 1);
-                lcd_text("Ed25519 Crypto", 2);
-                break;
-            case 5:
-                lcd_text("Gzip Support", 1);
-                lcd_text("Multi-language", 2);
-                break;
-            case 6:
-                lcd_text("Libraries:", 1);
-                lcd_text("FastLED", 2);
-                break;
-            case 7:
-                lcd_text("ArduinoJson", 1);
-                lcd_text("libsodium", 2);
-                break;
-            case 8:
-                lcd_text("zlib_turbo", 1);
-                lcd_text("etc...", 2);
-                break;
-            case 9:
-                lcd_text("Usage Tips:", 1);
-                lcd_text("Hold CENTER cfg", 2);
-                break;
-            case 10:
-                lcd_text("Changelog:", 1);
-                lcd_text("test OTA", 2);
-                break;
-        }
+        showAboutPage(aboutProjectPages[currentPage].line1, aboutProjectPages[currentPage].line2);
         
-        // 等待按键，添加防抖延迟
-        bool keyPressed = false;
-        while(!keyPressed) {
-            if(isButtonReadyToRespond(LEFT,BUTTON_DEBOUNCE_DELAY) && currentPage > 0) {
-                currentPage--;
-                keyPressed = true;
+        // 等待按键输入
+        while(true) {
+            NavigationResult result = _handleAboutNavigation(currentPage, totalPages);
+            if (result == NAV_PAGE_CHANGE) {
+                break; // 页面改变，跳出内层循环，重新显示
+            } else if (result == NAV_EXIT) {
+                return; // 退出关于界面
             }
-            else if(isButtonReadyToRespond(RIGHT,BUTTON_DEBOUNCE_DELAY) && currentPage < totalPages - 1) {
-                currentPage++;
-                keyPressed = true;
-            }
-            else if(isButtonReadyToRespond(CENTER,BUTTON_DEBOUNCE_DELAY)) {
-                currentState = STATE_MENU;
-                inMenuMode = true;
-                return;
-            }
+            // NAV_NONE: 继续等待
             delay(50);
         }
     }

@@ -297,6 +297,7 @@ void wifiConnectTask(void* parameter) {
         // 联网成功后启动非阻塞时间同步
         LOG_WIFI_INFO("starting background time sync...");
         initTimeSync();
+        updateTimeSync();
     } else {
         wifiConnectionState = WIFI_FAILED;
         LOG_WIFI_ERROR("can't connect to WiFi");

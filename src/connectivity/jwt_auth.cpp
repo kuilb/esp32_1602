@@ -177,7 +177,7 @@ String generate_jwt(const String& kid, const String& project_id, const uint8_t* 
     project_trimmed.trim();
 
     // Header（只含alg和kid）
-    StaticJsonDocument<128> header;
+    JsonDocument header;
     header["alg"] = "EdDSA";        // 必须是EdDSA
     header["kid"] = kid_trimmed;    // 凭据ID
     String header_json;
@@ -186,7 +186,7 @@ String generate_jwt(const String& kid, const String& project_id, const uint8_t* 
     String header_b64 = base64url_encode((const uint8_t*)header_json.c_str(), header_json.length());
 
     // Payload（只含sub、iat、exp）
-    StaticJsonDocument<128> payload;
+    JsonDocument payload;
     payload["sub"] = project_trimmed;  // 签发主体：项目ID
     unsigned long now = time(nullptr);
     

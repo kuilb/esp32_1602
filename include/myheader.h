@@ -18,7 +18,7 @@
 #include <freertos/task.h>       ///< FreeRTOS 任务管理
 #include <freertos/semphr.h>     ///< FreeRTOS 信号量/互斥锁（用于线程同步）
 
-#include "utils/memory_utils.h"        ///< 内存管理工具
+#include "memory_utils.h"        ///< 内存管理工具
 
 #include "driver/gpio.h"         ///< GPIO 驱动底层访问
 

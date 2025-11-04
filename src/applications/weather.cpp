@@ -83,6 +83,12 @@ void updateWeatherScreen() {
         lcdPrint("Pres:");
         lcdPrint(pressure);
         for(int i=lcdCursor;i<32;i++) lcdDisChar(' '); // 清除剩余部分
+        
+    } else if(interface_num == 3){
+        lcdResetCursor();
+        lcdPrint("Obs:");
+        lcdPrint(obsTime);
+        for(int i=lcdCursor;i<32;i++) lcdDisChar(' '); // 清除剩余部分
 
         lcdSetCursor(16); 
         lcdPrint("Upd:"); // 第二行显示观测时间
@@ -119,7 +125,7 @@ bool fetchWeatherData() {
         return false;
     }
 
-    generateSeed32(); // 生成随机种子
+    generateSeed32(); // 生成Seed32
 
     LOG_WEATHER_INFO("API config OK, fetching weather...");
 
@@ -134,11 +140,11 @@ bool fetchWeatherData() {
 
     // 生成 JWT
     String jwtToken = generate_jwt(kid, project_id, seed32);
-    // Serial.println("[DEBUG] JWT token: " + jwtToken);
+    LOG_WEATHER_DEBUG("JWT token: " + jwtToken);
 
     // 拼接 URL
     String url = "https://" + hostStr + "/v7/weather/now?location=" + locStr;
-    // LOG_WEATHER_DEBUG("Final Request URL: %s", url.c_str());
+    LOG_WEATHER_DEBUG("Final Request URL: %s", url.c_str());
 
     HTTPClient http;
     http.begin(url);
@@ -167,7 +173,7 @@ bool fetchWeatherData() {
         return false;
     }
 
-    // 使用RAII内存管理
+    // 使用RAII缓冲区
     MemoryManager::SafeBuffer compressedBuffer(payloadSize + 8, "HTTP_Response");
     if (!compressedBuffer.isValid()) {
         LOG_WEATHER_ERROR("malloc failed for compressed buffer");
@@ -180,7 +186,8 @@ bool fetchWeatherData() {
     // 读取数据到缓冲区
     WiFiClient *stream = http.getStreamPtr();
     long startMillis = millis();
-    int iCount = 0;
+    int iCount = 0;                 // 已读取字节数
+
     while (iCount < payloadSize && (millis() - startMillis) < 4000) {   // 最多等待4秒
         if (stream->available()) {
             compressedBuffer.get()[iCount++] = stream->read();
@@ -188,41 +195,48 @@ bool fetchWeatherData() {
             vTaskDelay(5);  // 延迟以避免占用过多资源
         }
     }
+    if((millis() - startMillis) >= 4000){
+        LOG_WEATHER_ERROR("Read timeout");
+        lcd_text("Read timeout", 1);
+        lcd_text("", 2);
+        http.end();
+        return false;
+    }
     http.end();
 
     if (iCount == 0) {
         LOG_WEATHER_ERROR("No data received");
-        lcd_text("No data", 1);
+        lcd_text("No data received", 1);
         lcd_text("", 2);
         return false;
     }
 
     String jsonData;
-    zlib_turbo zt;
+    zlib_turbo zturbo;      // zlib_turbo 实例
 
-    // 检查是否为 gzip 格式（检查前两个字节）
+    // 检查是否为 gzip 格式（检查前两个字节 0x1f 0x8b）
     if (iCount >= 2 && compressedBuffer.get()[0] == 0x1f && compressedBuffer.get()[1] == 0x8b) {
-        int uncompSize = zt.gzip_info(compressedBuffer.get(), iCount); // 获取解压后大小
+        int uncompSize = zturbo.gzip_info(compressedBuffer.get(), iCount); // 获取解压后大小
         if (uncompSize <= 0) {
-            Serial.println("[DEBUG] gzip_info failed");
+            LOG_WEATHER_ERROR("get gzip_info failed");
             lcd_text("Gzip info fail", 1);
             lcd_text("", 2);
             return false;
         }
 
-        // 使用RAII方式管理解压缓冲区
+        // 使用RAII解压缓冲区
         MemoryManager::SafeBuffer uncompressedBuffer(uncompSize + 8, "Gzip_Decompressed");
         if (!uncompressedBuffer.isValid()) {
-            Serial.println("[DEBUG] malloc failed for uncompressed buffer");
+            LOG_WEATHER_ERROR("malloc failed for uncompressed buffer");
             lcd_text("Mem fail", 1);
             lcd_text("", 2);
             return false;
         }
 
         // 执行解压
-        int rc = zt.gunzip(compressedBuffer.get(), iCount, uncompressedBuffer.get());
-        if (rc != ZT_SUCCESS) {
-            Serial.println("[DEBUG] Gzip decompress failed");
+        int unzipResult = zturbo.gunzip(compressedBuffer.get(), iCount, uncompressedBuffer.get());
+        if (unzipResult != ZT_SUCCESS) {
+            LOG_WEATHER_ERROR("Gzip decompress failed");
             lcd_text("Gzip failed", 1);
             lcd_text("", 2);
             return false;
@@ -235,42 +249,44 @@ bool fetchWeatherData() {
     // compressedBuffer 会在作用域结束时自动释放
 
     if (jsonData.length() == 0) {
-        Serial.println("[DEBUG] Empty response");
+        LOG_WEATHER_ERROR("Empty response");
         lcd_text("Empty response", 1);
         lcd_text("", 2);
         return false;
     }
 
     // 解析Json
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, jsonData);
+    JsonDocument doc;       // 自动选择合适的内存分配器
+    DeserializationError error = deserializeJson(doc, jsonData);    // 反序列化JSON
     if (error) {
-        Serial.print("[DEBUG] JSON parse failed: ");
-        Serial.println(error.c_str());
+        LOG_WEATHER_ERROR("JSON parse failed: %s", error.c_str());
         lcd_text("JSON failed", 1);
         lcd_text("", 2);
         return false;
     }
 
-    // 成功解析，赋值天气数据（添加安全检查）
+    // 成功解析，赋值天气数据
     currentCity = String(location);
     
     // 安全地获取天气数据，避免空值
     if (doc["now"]["text"].is<String>()) {
         currentWeather = doc["now"]["text"].as<String>();
         if (currentWeather.length() == 0) {
+            LOG_WEATHER_WARN("Empty weather text");
             currentWeather = "Unknown";
         }
     } else {
+        LOG_WEATHER_WARN("unknown weather text");
         currentWeather = "Unknown";
     }
     
-    currentTemp = (doc["now"]["temp"].is<String>() ? doc["now"]["temp"].as<String>() : "0") + "C";
-    feelsLike = (doc["now"]["feelsLike"].is<String>() ? doc["now"]["feelsLike"].as<String>() : "0") + "C";
+    // 安全地获取其他数据
+    currentTemp = (doc["now"]["temp"].is<String>() ? doc["now"]["temp"].as<String>() : "?") + "C";
+    feelsLike = (doc["now"]["feelsLike"].is<String>() ? doc["now"]["feelsLike"].as<String>() : "?") + "C";
     windDir = doc["now"]["windDir"].is<String>() ? doc["now"]["windDir"].as<String>() : "";
-    windScale = doc["now"]["windScale"].is<String>() ? doc["now"]["windScale"].as<String>() : "0";
-    humidity = (doc["now"]["humidity"].is<String>() ? doc["now"]["humidity"].as<String>() : "0") + "%";
-    pressure = (doc["now"]["pressure"].is<String>() ? doc["now"]["pressure"].as<String>() : "0") + "hPa";
+    windScale = doc["now"]["windScale"].is<String>() ? doc["now"]["windScale"].as<String>() : "?";
+    humidity = (doc["now"]["humidity"].is<String>() ? doc["now"]["humidity"].as<String>() : "?") + "%";
+    pressure = (doc["now"]["pressure"].is<String>() ? doc["now"]["pressure"].as<String>() : "?") + "hPa";
     
     // 格式化 obsTime 为 MM/DD HH:MM
     String rawObsTime = doc["now"]["obsTime"].is<String>() ? doc["now"]["obsTime"].as<String>() : "";
@@ -304,7 +320,7 @@ bool fetchWeatherData() {
     // 打印内存使用情况
     MemoryManager::printMemoryInfo("Weather fetch complete");
     
-    Serial.println("[DEBUG] Weather data parsed and ready to display.");
+    LOG_WEATHER_INFO("Weather updated: %s, %s", currentWeather.c_str(), currentTemp.c_str());
     updateWeatherScreen();
     return true;
 }
