@@ -2,10 +2,10 @@
 #include "utils/logger.h"
 
 // 时间同步相关变量
-bool isTimeSynced = false;
-bool isTimeSyncInProgress = false;
+volatile bool isTimeSyncInProgress = false;
 static unsigned long timeSyncStartTime = 0;
 static unsigned long lastTimeSyncAttempt = 0;
+TimeSyncState timeSyncState = TIME_SYNC_IDLE;
 
 // 初始化时间同步
 void initTimeSync() {
@@ -14,12 +14,12 @@ void initTimeSync() {
         return;
     }
     
-    if (isTimeSynced) {
+    if (timeSyncState == TIME_SYNC_SUCCESS) {
         LOG_TIME_WARN("Time already synced");
         return;
     }
     
-    if (isTimeSyncInProgress) {
+    if (timeSyncState == TIME_SYNC_IN_PROGRESS) {
         LOG_TIME_WARN("Time sync already in progress");
         return;
     }
@@ -34,7 +34,7 @@ void initTimeSync() {
 
 // 更新时间同步状态
 void updateTimeSync() {
-    if (!isTimeSyncInProgress || isTimeSynced) {
+    if (timeSyncState == TIME_SYNC_IN_PROGRESS || timeSyncState == TIME_SYNC_SUCCESS || WiFi.status() != WL_CONNECTED) {
         return;
     }
     
@@ -54,7 +54,7 @@ void updateTimeSync() {
         struct tm timeinfo;
         if (getLocalTime(&timeinfo)) {
             LOG_TIME_INFO("NTP Time Synced successfully!");
-            isTimeSynced = true;
+            timeSyncState = TIME_SYNC_SUCCESS;
             isTimeSyncInProgress = false;
             
             // 获取 UNIX 时间戳
@@ -73,7 +73,7 @@ void updateTimeSync() {
 }
 
 void updateClockScreen() {
-    if (isTimeSynced) {
+    if (timeSyncState == TIME_SYNC_SUCCESS) {
         struct tm timeinfo;
         if (getLocalTime(&timeinfo)) {
             char timeBuf[17];

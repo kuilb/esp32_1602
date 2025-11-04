@@ -8,7 +8,6 @@ std::deque<FramePacket> frameCache;     // 用双端队列方便插入删除
 
 // 连接用
 WiFiServer server(CONNECT_PORT);        //连接端口
-const long timeoutTime = 5000;          //连接超时时间5S
 bool clientConnected = false;
 
 // 网络用缓存
@@ -16,13 +15,12 @@ std::vector<uint8_t> recvBuffer;
 unsigned long lastClientActivity = 0;
 
 // 解析帧率
-uint16_t parseFrameInterval(const std::vector<uint8_t>& packet) {
-    // 帧率是第3和第4字节
-    return (uint16_t(packet[3]) << 8) | uint16_t(packet[4]);
+uint16_t _parseFrameInterval(const std::vector<uint8_t>& packet) {
+    return (uint16_t(packet[3]) << 8) | uint16_t(packet[4]);    // 帧率是第3和第4字节
 }
 
 // 判断心跳包
-bool isHeartbeatPacket(const std::vector<uint8_t>& packet) {
+bool _isHeartbeatPacket(const std::vector<uint8_t>& packet) {
     return packet.size() == 4 &&
            packet[0] == 0xAA &&
            packet[1] == 0x55 &&
@@ -33,16 +31,16 @@ bool isHeartbeatPacket(const std::vector<uint8_t>& packet) {
 // 连接客户端
 void acceptClientIfNew() {
     if (!clientConnected) {
-        WiFiClient newClient = server.accept();
-        if (newClient) {
-            client = newClient;
+        client = server.accept();
+        if (client) {
             clientConnected = true;
+            updateColor(CRGB::Orange);      // RGB灯=黄色
             lastClientActivity = millis();
             recvBuffer.clear();
 
-            Serial.print("Time:");
-            Serial.print(millis());
-            Serial.println(" Socket Client connected.");
+            LOG_NETWORK_INFO("Socket Client connected from %s:%d",
+                client.remoteIP().toString().c_str(),
+                client.remotePort());
         }
     }
 }
@@ -52,32 +50,30 @@ void receiveClientData() {
     if (!clientConnected) return;
 
     if (client.connected()) {
-        updateColor(CRGB::Orange);      // RGB灯=黄色
-        if (client.available() > 0) {
+        if (client.available() > 0) {   // 如果有数据可读
             uint8_t buf[256];
             int len = client.read(buf, sizeof(buf));
-            recvBuffer.insert(recvBuffer.end(), buf, buf + len);
+            recvBuffer.insert(recvBuffer.end(), buf, buf + len);    // 添加到接收缓存
             lastClientActivity = millis();
         }
 
         // 处理完整包
         while (recvBuffer.size() >= 3) {
-            if (recvBuffer[0] == 0xAA && recvBuffer[1] == 0x55) {
-                uint8_t bodyLen = recvBuffer[2];
-                unsigned int fullLen = bodyLen;
+            if (recvBuffer[0] == 0xAA && recvBuffer[1] == 0x55) {   // 协议头
+                uint8_t fullLen = recvBuffer[2];
 
                 if (recvBuffer.size() >= fullLen) {
-                    std::vector<uint8_t> fullPacket(recvBuffer.begin(), recvBuffer.begin() + fullLen);
-                    recvBuffer.erase(recvBuffer.begin(), recvBuffer.begin() + fullLen);
+                    std::vector<uint8_t> fullPacket(recvBuffer.begin(), recvBuffer.begin() + fullLen);  // 提取单个完整数据包
+                    recvBuffer.erase(recvBuffer.begin(), recvBuffer.begin() + fullLen);                 // 移除已处理数据
 
-                    if (isHeartbeatPacket(fullPacket)) {
+                    if (_isHeartbeatPacket(fullPacket)) {
                         lastClientActivity = millis();
-                        Serial.println("[Heartbeat] Received.");
+                        LOG_NETWORK_DEBUG("Heartbeat packet received.");
                     } 
                     else {
-                        uint16_t frameInterval = parseFrameInterval(fullPacket);
+                        uint16_t frameInterval = _parseFrameInterval(fullPacket);
 
-                        // 无缓存, 尝试播放当前帧
+                        // 帧率为0表示立即处理
                         if (frameInterval == 0) {
                             processIncoming(fullPacket.data(), fullPacket.size());
                         } 
@@ -88,7 +84,7 @@ void receiveClientData() {
                                 frameCache.push_back({fullPacket, frameInterval});
                             } 
                             else {
-                                Serial.println("缓存满，丢弃新帧");
+                                LOG_NETWORK_WARN("Frame cache full, dropping new frame.");
                             }
                         }
                     }
@@ -96,16 +92,16 @@ void receiveClientData() {
                 else { break; } // 跳出去继续等待完整包
             } 
             else {
-                recvBuffer.erase(recvBuffer.begin());       // 删除无法识别的头部，继续找包头
+                recvBuffer.erase(recvBuffer.begin());       // 删除无法识别的协议头，继续找下一个包
             }
         }
 
         // 超时断开连接
-        if (millis() - lastClientActivity > timeoutTime) {
+        if (millis() - lastClientActivity > CONNECT_TIMEOUT_MS) {
             updateColor(CRGB::Green);
             client.stop();
             clientConnected = false;
-            Serial.println("Timeout. Client disconnected.");
+            LOG_NETWORK_INFO("Client connection timed out.");
         }
 
     } 
@@ -114,6 +110,6 @@ void receiveClientData() {
         updateColor(CRGB::Green);
         client.stop();
         clientConnected = false;
-        Serial.println("Client disconnected.");
+        LOG_NETWORK_INFO("Client disconnected.");
     }
 }

@@ -10,9 +10,6 @@ WebServer AP_server(80);
 DNSServer dnsServer;
 const byte DNS_PORT = 53;
 
-// 用户通过网页输入的 SSID 与密码
-String ssid_input, password_input;
-
 // 保存的 WiFi SSID 和密码（初始化为空字符串）
 String savedSSID = "", savedPassword = "";
 
@@ -23,322 +20,247 @@ bool inConfigMode = false;
 WiFiConnectionState wifiConnectionState = WIFI_IDLE;
 
 // 保存WiFi信息
-void saveWiFiCredentials(const String& ssid, const String& password) {
-  File file = SPIFFS.open("/wifi.txt", "w");
-  if (!file) {
-      LOG_WIFI_ERROR("保存WiFi信息失败, 无法打开文件");
-      lcd_text("Save WiFi Fail", 1);
-      lcd_text("Check FS/Retry", 2);
-      return;
-  }
-  if (!file.println(ssid)) {
-      LOG_WIFI_ERROR("保存WiFi信息失败, 写入SSID失败");
-      lcd_text("Save WiFi Fail", 1);
-      lcd_text("Write Err", 2);
-      file.close();
-      return;
-  }
-  if (!file.println(password)) {
-      LOG_WIFI_ERROR("保存WiFi信息失败, 写入密码失败");
-      lcd_text("Save WiFi Fail", 1);
-      lcd_text("Write Err", 2);
-      file.close();
-      return;
-  }
-  file.flush();
-  file.close();
+void _saveWiFiCredentials(const String& ssid, const String& password) {
+	File file = SPIFFS.open("/wifi.txt", "w");
+	if (!file) {
+			LOG_WIFI_ERROR("保存WiFi信息失败, 无法打开文件");
+			lcd_text("Save WiFi Fail", 1);
+			lcd_text("Check FS/Retry", 2);
+			return;
+	}
+	if (!file.println(ssid)) {
+			LOG_WIFI_ERROR("保存WiFi信息失败, 写入SSID失败");
+			lcd_text("Save WiFi Fail", 1);
+			lcd_text("Write Err", 2);
+			file.close();
+			return;
+	}
+	if (!file.println(password)) {
+			LOG_WIFI_ERROR("保存WiFi信息失败, 写入密码失败");
+			lcd_text("Save WiFi Fail", 1);
+			lcd_text("Write Err", 2);
+			file.close();
+			return;
+	}
+	file.flush();
+	file.close();
 
-  LOG_WIFI_INFO("WiFi config saved, restarting...");
-  lcd_text("Config Saved", 1);
-  lcd_text("Restarting...", 2);
+	LOG_WIFI_INFO("WiFi config saved, restarting...");
+	lcd_text("Config Saved", 1);
+	lcd_text("Restarting...", 2);
 }
 
 // 加载WiFi信息
-void loadWiFiCredentials() {
-    if (!SPIFFS.exists("/wifi.txt")) {
-        savedSSID = "";
-        savedPassword = "";
-        return;
-    }
-    File file = SPIFFS.open("/wifi.txt", "r");
-    if (file) {
-        savedSSID = file.readStringUntil('\n');
-        LOG_WIFI_DEBUG("Loaded SSID: %s", savedSSID.c_str());
-        savedSSID.trim();
-        savedPassword = file.readStringUntil('\n');
-        savedPassword.trim();
-        file.close();
-    } else {
-        savedSSID = "";
-        savedPassword = "";
-    }
-}
-
-
-// 配网网页
-void handleRoot() {
-  AP_server.send(200, "text/html", R"rawliteral(
-    <!DOCTYPE html>
-    <html lang="zh-CN">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>WiFi 配置</title>
-      <style>
-        body {
-          font-family: "Segoe UI", sans-serif;
-          background-color: #f2f2f2;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          height: 100vh;
-          margin: 0;
-        }
-        .container {
-          background-color: #fff;
-          padding: 2em;
-          border-radius: 12px;
-          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-          max-width: 90%;
-          width: 400px;
-        }
-        h2 {
-          text-align: center;
-          color: #333;
-        }
-        label {
-          display: block;
-          margin: 1em 0 0.3em;
-          color: #555;
-        }
-        input[type="text"], input[type="password"] {
-          width: 100%;
-          padding: 0.6em;
-          font-size: 1em;
-          border: 1px solid #ccc;
-          border-radius: 8px;
-          box-sizing: border-box;
-        }
-        input[type="submit"] {
-          margin-top: 1.5em;
-          width: 100%;
-          padding: 0.7em;
-          font-size: 1em;
-          background-color: #4CAF50;
-          color: white;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-        }
-        input[type="submit"]:hover {
-          background-color: #45a049;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h2>连接到 WiFi</h2>
-        <form action="/set">
-          <label for="ssid">WiFi 名称 (SSID):</label>
-          <input type="text" id="ssid" name="ssid" required>
-
-          <label for="password">密码:</label>
-          <input type="password" id="password" name="password" required>
-
-          <input type="submit" value="保存并重启">
-        </form>
-      </div>
-    </body>
-    </html>
-  )rawliteral");
-}
-
-// 保存按钮触发器
-void handleSet() {
-    ssid_input = AP_server.arg("ssid");
-    password_input = AP_server.arg("password");
-    saveWiFiCredentials(ssid_input, password_input);
-    AP_server.send(200, "text/plain; charset=UTF-8", "保存成功，正在重启...");
-    delay(1000);
-    ESP.restart();
+void _loadWiFiCredentials() {
+		if (!SPIFFS.exists("/wifi.txt")) {
+				savedSSID = "";
+				savedPassword = "";
+				return;
+		}
+		File file = SPIFFS.open("/wifi.txt", "r");
+		if (file) {
+				savedSSID = file.readStringUntil('\n');
+				LOG_WIFI_DEBUG("Loaded SSID: %s", savedSSID.c_str());
+				savedSSID.trim();
+				savedPassword = file.readStringUntil('\n');
+				savedPassword.trim();
+				file.close();
+		} else {
+				LOG_WIFI_ERROR("Failed to open WiFi config file for reading");
+				savedSSID = "";
+				savedPassword = "";
+		}
 }
 
 // 进入配网
 void enterConfigMode() {
-  inConfigMode = true;
-  LOG_WIFI_INFO("Entering config mode");
-  WiFi.softAP("1602A_Config");
-  LOG_WIFI_INFO("Config webpage started at IP: %s", WiFi.softAPIP().toString().c_str());
+	inConfigMode = true;
+	WiFi.softAP("1602A_Config");
 
-  // 启动DNS服务器，将所有域名请求劫持到ESP32的IP
-  dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
+    LOG_WIFI_INFO("Entering config mode");
+	LOG_WIFI_INFO("Config webpage started at IP: %s", WiFi.softAPIP().toString().c_str());
 
-  // 捕获所有DNS请求并重定向到配网页面
-  AP_server.onNotFound([](){
-    AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-    AP_server.send(302, "text/plain", "");
-  });
+	// 启动DNS服务器，将所有域名请求劫持到ESP32的IP
+	dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
 
-  // 扫描WiFi并展示列表
-  AP_server.on("/", [](){
-  String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>WiFi 配置</title>";
-  html += "<meta name='viewport' content='width=device-width,initial-scale=1.0'>";
-  html += "<style>body{font-family:Segoe UI,sans-serif;background:#e9f0fa;margin:0;}";
-  html += ".container{background:#fff;padding:1.2em 1.2em;border-radius:14px;box-shadow:0 4px 16px rgba(0,0,0,0.10);max-width:92vw;width:320px;margin:1.2em auto;}h2{text-align:center;color:#1976D2;margin-bottom:0.8em;font-size:1.2em;}label{display:block;margin:0.8em 0 0.2em;color:#1976D2;font-weight:bold;font-size:0.98em;}input[type=password],input[type=text],select{width:100%;padding:0.5em;font-size:0.98em;border:1px solid #bcdffb;border-radius:8px;box-sizing:border-box;margin-bottom:0.8em;}input[type=submit]{margin-top:0.8em;width:100%;padding:0.6em;font-size:1em;background:linear-gradient(90deg,#2196F3,#4CAF50);color:white;border:none;border-radius:8px;cursor:pointer;transition:background 0.2s;}input[type=submit]:hover{background:linear-gradient(90deg,#1976D2,#388E3C);}ul{padding:0;}li{margin:0.4em 0;}select{background:#f6fbff;}form{margin-bottom:0;}@media(max-width:600px){.container{padding:0.7em;width:98vw;min-width:0;}}";
-  html += "</style></head><body><div class='container'><h2>WiFi配网</h2>";
-  html += "<form action='/wifi_scan' method='POST'><input type='submit' value='扫描附近WiFi'></form>";
-  html += "<form action='/wifi_set' method='POST' style='margin-top:1.5em;'><label for='manualssid'>手动输入WiFi名称:</label><input type='text' name='ssid' id='manualssid' placeholder='请输入SSID'><label for='password'>密码:</label><input type='password' name='password' id='password' required><input type='submit' value='连接WiFi'></form>";
-  html += "<p style='color:#888;font-size:0.95em;text-align:center;margin-top:1em;'>可扫描或手动输入WiFi名称</p>";
-  html += "</div></body></html>";
-    AP_server.send(200, "text/html; charset=utf-8", html);
-  });
+	// 捕获所有DNS请求并重定向到配网页面
+	AP_server.onNotFound([](){
+		AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+		AP_server.send(302, "text/plain", "");
+	});
 
-  AP_server.on("/wifi_scan", [](){
-    int n = WiFi.scanNetworks();
-    String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>WiFi选择</title>";
-    html += "<meta name='viewport' content='width=device-width,initial-scale=1.0'>";
-    html += "<style>body{font-family:Segoe UI,sans-serif;background:#e9f0fa;margin:0;}";
-  html += ".container{background:#fff;padding:1.2em 1.2em;border-radius:14px;box-shadow:0 4px 16px rgba(0,0,0,0.10);max-width:92vw;width:320px;margin:1.2em auto;}h2{text-align:center;color:#1976D2;margin-bottom:0.8em;font-size:1.2em;}label{display:block;margin:0.8em 0 0.2em;color:#1976D2;font-weight:bold;font-size:0.98em;}input[type=password],input[type=text],select{width:100%;padding:0.5em;font-size:0.98em;border:1px solid #bcdffb;border-radius:8px;box-sizing:border-box;margin-bottom:0.8em;}input[type=submit]{margin-top:0.8em;width:100%;padding:0.6em;font-size:1em;background:linear-gradient(90deg,#2196F3,#4CAF50);color:white;border:none;border-radius:8px;cursor:pointer;transition:background 0.2s;}input[type=submit]:hover{background:linear-gradient(90deg,#1976D2,#388E3C);}ul{padding:0;}li{margin:0.4em 0;}select{background:#f6fbff;}form{margin-bottom:0;}@media(max-width:600px){.container{padding:0.7em;width:98vw;min-width:0;}}";
-    html += "</style></head><body><div class='container'><h2>WiFi配网</h2>";
-    if (n == 0) {
-      html += "<p style='color:#d32f2f;text-align:center;'>未扫描到WiFi，请重试。</p>";
-    } else {
-      html += "<form action='/wifi_set' method='POST'><label for='ssid'>WiFi列表:</label><select name='ssid' id='ssid'>";
-      for (int i = 0; i < n; ++i) {
-        html += "<option value='" + WiFi.SSID(i) + "'>" + WiFi.SSID(i) + "</option>";
-      }
-      html += "</select><label for='password'>密码:</label><input type='password' name='password' id='password' required><input type='submit' value='连接WiFi'></form>";
-    }
-    html += "<form action='/wifi_set' method='POST' style='margin-top:1.5em;'><label for='manualssid'>手动输入WiFi名称:</label><input type='text' name='ssid' id='manualssid' placeholder='请输入SSID'><label for='password'>密码:</label><input type='password' name='password' id='password' required><input type='submit' value='连接WiFi'></form>";
-    html += "<p style='color:#888;font-size:0.95em;text-align:center;margin-top:1em;'>可扫描或手动输入WiFi名称</p>";
-    html += "</div></body></html>";
-    AP_server.send(200, "text/html; charset=utf-8", html);
-  });
+    // 配网页面
+	AP_server.on("/", [](){
+        String html = "";
+        html += "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+        html += "<title>WiFi 配置</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--red:#e57373;--red-dark:#d35f5f;--cyan:#77eedd;--cyan-dark:#55ccbb;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;text-align:center;}.container{max-width:400px;margin:40px auto;padding:28px 24px;background:var(--white);border-radius:var(--border-radius);box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;}h1{color:var(--blue);font-weight:600;margin:0 0 18px 0;font-size:1.5em;}h3{color:var(--gray-dark);margin:18px 0 10px 0;}label{display:block;margin:0.8em 0 0.2em;color:var(--blue);font-weight:bold;font-size:1em;text-align:left;}input[type=password],input[type=text],select{width:100%;max-width:340px;padding:10px;margin:10px 0;border:1px solid var(--border);border-radius:6px;font-size:16px;transition:border-color 0.2s,box-shadow 0.2s;}input[type=password]:focus,input[type=text]:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,123,255,0.15);}button,input[type=submit]{padding:12px 30px;margin:10px 5px;border:none;border-radius:var(--border-radius);cursor:pointer;font-size:16px;font-weight:500;transition:background-color 0.2s,transform 0.1s;color:var(--white);}.btn-primary,input[type=submit]{background-color:var(--blue);}.btn-primary:hover,input[type=submit]:hover{background-color:var(--blue-dark);}.btn-secondary{background-color:var(--cyan);color:var(--gray-lighter);}.btn-secondary:hover{background-color:var(--cyan-dark);}.info{margin:15px 0 22px 0;color:var(--gray);font-size:1.05em;}@media(max-width:600px){.container{padding:0.7em;width:98vw;min-width:0;}}</style></head>";
+        html += "<body><div class='container'><h1>WiFi 配网</h1><div class='info'><p>请扫描附近WiFi或手动输入WiFi名称进行连接</p></div>";
+        html += "<h3>方式1: 扫描附近WiFi</h3><form action='/wifi_scan' method='POST' style='margin-bottom: 18px;'><input type='submit' value='扫描附近WiFi' class='btn-primary'></form>";
+        html += "<h3>方式2: 手动输入WiFi</h3><form action='/wifi_set' method='POST' style='width:100%;max-width:340px;'><label for='manualssid'>WiFi名称(SSID):</label><input type='text' name='ssid' id='manualssid' placeholder='请输入SSID'><label for='password'>密码:</label><input type='password' name='password' id='password' required><input type='submit' value='连接WiFi' class='btn-secondary'></form></div></body></html>";
+		
+        AP_server.send(200, "text/html; charset=utf-8", html);
+	});
 
-  AP_server.on("/wifi_set", [](){
-    String ssid = AP_server.arg("ssid");
-    String password = AP_server.arg("password");
-    saveWiFiCredentials(ssid, password);
-  AP_server.send(200, "text/html; charset=utf-8", "<div style='font-family:Segoe UI,sans-serif;background:#e9f0fa;height:100vh;display:flex;justify-content:center;align-items:center;'><div style='background:#fff;padding:2em 2.5em;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);max-width:95%;width:420px;text-align:center;'><h2 style='color:#1976D2;'>WiFi信息已保存</h2><p style='color:#388E3C;'>设备正在重启，请稍候...</p></div></div>");
-    delay(1000);
-    ESP.restart();
-  });
+    // 扫描WiFi并展示列表
+	AP_server.on("/wifi_scan", [](){
+		int n = WiFi.scanNetworks();
+		String html = "";
+        html += "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+        html += "<title>WiFi选择</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--cyan:#77eedd;--cyan-dark:#55ccbb;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;text-align:center;}.container{max-width:400px;margin:40px auto;padding:28px 24px;background:var(--white);border-radius:var(--border-radius);box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;}h1{color:var(--blue);font-weight:600;margin:0 0 18px 0;font-size:1.5em;}h3{color:var(--gray-dark);margin:18px 0 10px 0;}label{display:block;margin:0.8em 0 0.2em;color:var(--blue);font-weight:bold;font-size:1em;text-align:left;}input[type=password],input[type=text],select{width:100%;max-width:340px;padding:10px;margin:10px 0;border:1px solid var(--border);border-radius:6px;font-size:16px;transition:border-color 0.2s,box-shadow 0.2s;}input[type=password]:focus,input[type=text]:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,123,255,0.15);}button,input[type=submit]{padding:12px 30px;margin:10px 5px;border:none;border-radius:var(--border-radius);cursor:pointer;font-size:16px;font-weight:500;transition:background-color 0.2s,transform 0.1s;color:var(--white);}.btn-primary,input[type=submit]{background-color:var(--blue);}.btn-primary:hover,input[type=submit]:hover{background-color:var(--blue-dark);}.btn-secondary{background-color:var(--cyan);color:var(--gray-lighter);}.btn-secondary:hover{background-color:var(--cyan-dark);}.info{margin:15px 0 22px 0;color:var(--gray);font-size:1.05em;}@media(max-width:600px){.container{padding:0.7em;width:98vw;min-width:0;}}</style></head>";
+        html += "<body><div class='container'><h1>WiFi配网</h1><div class='info'><p>请选择要连接的WiFi</p></div>";
 
-  // 常见的强制门户检测端点
-  // Android 设备检测
-  AP_server.on("/generate_204", [](){
-    AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-    AP_server.send(302, "text/plain", "");
-  });
-  
-  // iOS 设备检测
-  AP_server.on("/hotspot-detect.html", [](){
-    AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-    AP_server.send(302, "text/plain", "");
-  });
-  
-  // Windows 设备检测
-  AP_server.on("/ncsi.txt", [](){
-    AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-    AP_server.send(302, "text/plain", "");
-  });
-  
-  // 通用重定向端点
-  AP_server.on("/redirect", [](){
-    AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-    AP_server.send(302, "text/plain", "");
-  });
+        if (n == 0) {
+            html += "<p style='color:#d32f2f;text-align:center;'>未扫描到WiFi，请重试。</p>";
+            html += "<div style='text-align:center;margin-top:1.2em;'><button class='btn-primary' onclick='window.location.reload()'>重新扫描</button></div>";
+        } else {
+            html += "<form action='/wifi_set' method='POST' style='width:100%;max-width:340px;margin:0 auto;'>";
+            html += "<label for='ssid'>WiFi列表:</label><select name='ssid' id='ssid'>";
+        for (int i = 0; i < n; ++i) {
+            html += "<option value='" + WiFi.SSID(i) + "'>" + WiFi.SSID(i) + "</option>";
+        }
+        html += "</select><label for='password'>密码:</label>";
+        html += "<input type='password' name='password' id='password' required>";
+        html += "<input type='submit' value='连接WiFi' class='btn-secondary'></form>";
+        }
 
-  AP_server.begin();
+        html += "</div></body></html>";
 
-  // 在屏幕上显示ip
-  lcd_text("Connect to AP",1);
-  lcd_text("IP:" + WiFi.softAPIP().toString(),2);
+		AP_server.send(200, "text/html; charset=utf-8", html);
+	});
+
+	AP_server.on("/wifi_set", [](){
+		String ssid = AP_server.arg("ssid");
+		String password = AP_server.arg("password");
+		_saveWiFiCredentials(ssid, password);
+
+        // 显示保存成功页面并重启
+        String html = "";
+        html += "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+        html += "<title>WiFi信息已保存</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--green:#388E3C;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border-radius:8px;--shadow:0 4px 12px rgba(0,0,0,0.08);}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);min-height:100vh;margin:0;display:flex;align-items:center;justify-content:center;}.container{background:var(--white);padding:2.2em 2.2em 2em 2.2em;border-radius:var(--border-radius);box-shadow:var(--shadow);max-width:95vw;width:380px;text-align:center;display:flex;flex-direction:column;align-items:center;}h2{color:var(--blue);font-size:1.35em;margin-bottom:0.7em;font-weight:600;}p{color:var(--green);font-size:1.08em;margin:0;}@media(max-width:600px){.container{padding:1.2em 0.5em;width:98vw;}}</style></head>";
+        html += "<body><div class='container'><h2>WiFi信息已保存</h2><p>设备正在重启，请稍候...</p></div></body></html>";
+
+	    AP_server.send(200, "text/html; charset=utf-8", html);
+		delay(500);
+		ESP.restart();
+	});
+
+	// 常见的强制门户检测端点
+	// Android 设备检测
+	AP_server.on("/generate_204", [](){
+		AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+		AP_server.send(302, "text/plain", "");
+	});
+	
+	// iOS 设备检测
+	AP_server.on("/hotspot-detect.html", [](){
+		AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+		AP_server.send(302, "text/plain", "");
+	});
+	
+	// Windows 设备检测
+	AP_server.on("/ncsi.txt", [](){
+		AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+		AP_server.send(302, "text/plain", "");
+	});
+	
+	// 通用重定向端点
+	AP_server.on("/redirect", [](){
+		AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+		AP_server.send(302, "text/plain", "");
+	});
+
+	AP_server.begin();
+
+	// 在屏幕上显示ip
+	lcd_text("Connect to AP",1);
+	lcd_text("IP:" + WiFi.softAPIP().toString(),2);
 }
 
 // WiFi连接后台任务
 void wifiConnectTask(void* parameter) {
-    LOG_WIFI_INFO("WiFi connection task started");
-    
-    // 等待一小段时间，确保网络栈完全初始化
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-    
-    // 设置连接中状态
-    wifiConnectionState = WIFI_CONNECTING;
-    updateColor(CRGB::Blue);  // 连接中蓝灯
-    
-    WiFi.begin(savedSSID.c_str(), savedPassword.c_str());
-    
-    unsigned long startTime = millis();
-    int fadeStep = 2;
-    uint8_t brightness = 64;
-    
-    while (WiFi.status() != WL_CONNECTED && millis() - startTime < 15000) {
-        brightness += fadeStep;
+		LOG_WIFI_INFO("WiFi connection task started");
+		
+		// 等待一小段时间，确保网络栈完全初始化
+		vTaskDelay(100 / portTICK_PERIOD_MS);
+		
+		// 设置连接中状态
+		wifiConnectionState = WIFI_CONNECTING;
+		updateColor(CRGB::Blue);  // 连接中蓝灯
+		
+		WiFi.begin(savedSSID.c_str(), savedPassword.c_str());
+		
+		unsigned long startTime = millis();
+		int fadeStep = 2;
+		uint8_t brightness = 64;
+		
+        // 连接中蓝灯闪烁
+		while (WiFi.status() != WL_CONNECTED && millis() - startTime < 15000) {
+            brightness += fadeStep;
 
-        if (brightness == 0 || brightness == 192) {
-            fadeStep = -fadeStep;
-        }
+            if (brightness == 0 || brightness == 192) {
+                    fadeStep = -fadeStep;
+            }
 
-        if((millis() - startTime) % 1000 == 0){
-            LOG_WIFI_DEBUG(".");
-        }
-        updateBrightness(brightness);
-        vTaskDelay(5 / portTICK_PERIOD_MS);
-    }
-    updateBrightness(128);
+            if((millis() - startTime) % 500 == 0){
+                    LOG_WIFI_DEBUG(".");
+            }
+            updateBrightness(brightness);
+            vTaskDelay(5 / portTICK_PERIOD_MS);
+		}
+		updateBrightness(128);
 
-    if (WiFi.status() == WL_CONNECTED) {
-        wifiConnectionState = WIFI_CONNECTED;
-        updateColor(CRGB::Green);  // 连接成功绿灯
-        LOG_WIFI_INFO("connected: %s", savedSSID.c_str());
-        LOG_WIFI_INFO("IP: %s", WiFi.localIP().toString().c_str());
+		if (WiFi.status() == WL_CONNECTED) {
+				wifiConnectionState = WIFI_CONNECTED;
+				updateColor(CRGB::Green);  // 连接成功绿灯
+				LOG_WIFI_INFO("connected: %s", savedSSID.c_str());
+				LOG_WIFI_INFO("IP: %s", WiFi.localIP().toString().c_str());
 
-        // 联网成功后启动非阻塞时间同步
-        LOG_WIFI_INFO("starting background time sync...");
-        initTimeSync();
-        updateTimeSync();
-    } else {
-        wifiConnectionState = WIFI_FAILED;
-        LOG_WIFI_ERROR("can't connect to WiFi");
-        updateColor(CRGB::Red);  // 失败变红
-    }
-    
-    // 任务完成，删除自己
-    vTaskDelete(NULL);
+				// 联网成功后启动非阻塞时间同步
+				LOG_WIFI_INFO("starting background time sync...");
+				initTimeSync();
+				updateTimeSync();
+		} else {
+				wifiConnectionState = WIFI_FAILED;
+				LOG_WIFI_ERROR("can't connect to WiFi");
+				updateColor(CRGB::Red);  // 失败变红
+		}
+		
+		// 任务完成，删除任务自身
+		vTaskDelete(NULL);
 }
 
 void connectToWiFi() {
-    loadWiFiCredentials();
+		_loadWiFiCredentials();
 
-    if (savedSSID == "") {
-        LOG_WIFI_WARN("config not found, entering config mode");
-        wifiConnectionState = WIFI_FAILED;
-        updateColor(CRGB::Purple);  // 初次配网紫灯
-        enterConfigMode();
-        return;
-    }
+		if (savedSSID == "") {
+				LOG_WIFI_WARN("config not found, entering config mode");
+				wifiConnectionState = WIFI_FAILED;
+				updateColor(CRGB::Purple);  // 配网紫灯
+				enterConfigMode();
+				return;
+		}
 
-    LOG_WIFI_INFO("will connect to: %s", savedSSID.c_str());
-    
-    // 先设置WiFi模式，确保网络栈已初始化
-    WiFi.mode(WIFI_STA);
-    vTaskDelay(50 / portTICK_PERIOD_MS);  // 给WiFi栈一点时间初始化
-    
-    // 创建后台任务进行WiFi连接，不阻塞主线程
-    xTaskCreate(wifiConnectTask, "WiFiConnectTask", 4096, NULL, 1, NULL);
+		LOG_WIFI_INFO("will connect to: %s", savedSSID.c_str());
+		
+		// 先设置WiFi模式，确保网络栈已初始化
+		WiFi.mode(WIFI_STA);
+		vTaskDelay(50 / portTICK_PERIOD_MS);  // 给WiFi栈一点时间初始化
+		
+		// 创建后台任务进行WiFi连接，不阻塞主线程
+		xTaskCreate(wifiConnectTask, "WiFiConnectTask", 4096, NULL, 1, NULL);
 }
 
 // 初始化wifi
 void wifiinit(){
-  // 连接WiFi
-  if (digitalRead(BUTTEN_CENTER)) {
-      LOG_WIFI_INFO("Entering config mode by button");
-      updateColor(CRGB::Purple);  // 手动配网紫灯
-      enterConfigMode();
-  } else {
-      connectToWiFi();
-  }
-    
-  server.begin();
+	// 连接WiFi
+	if (digitalRead(BUTTEN_CENTER)) {
+			LOG_WIFI_INFO("Entering config mode by button");
+			updateColor(CRGB::Purple);  // 配网紫灯
+			enterConfigMode();
+	} else {
+			connectToWiFi();
+	}
+		
+    if(WiFi.status() == WL_CONNECTED)
+	    server.begin();
 }

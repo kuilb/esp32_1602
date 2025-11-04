@@ -11,7 +11,7 @@ static bool isNewInterface = false;
 volatile bool inMenuMode = true;
 volatile bool isReadyToDisplay = false;
 static bool isDisplayNeedsUpdate = true;
-static bool isCurrentisTimeSynced = false;
+static TimeSyncState lastTimeSyncState = TIME_SYNC_IDLE;
 
 long lastWeatherFail = -15000;
 InterfaceState currentState = STATE_MENU;
@@ -205,7 +205,7 @@ void _displayMenu(const Menu* menu, int menuIndex, int scrollOffset) {
                         statusLine = "W:OK ";
                         if(isTimeSyncInProgress){
                             statusLine += "T:Syncing...";
-                        } else if (isTimeSynced) {
+                        } else if (timeSyncState == TIME_SYNC_SUCCESS) {
                             statusLine += "T:OK";
                         } else {
                             statusLine += "T:--";
@@ -395,11 +395,11 @@ void _handleMenuInterface() {
 }
 
 bool _ensureisTimeSynced() {
-    if (!isTimeSynced) {
+    if (timeSyncState != TIME_SYNC_SUCCESS) {
         lcd_text("Try time sync", 1);
         lcd_text("Please wait", 2);
         updateTimeSync();
-        if (!isTimeSynced) {
+        if (timeSyncState != TIME_SYNC_SUCCESS) {
             LOG_MENU_WARN("Time not synced yet, cannot display");
             lcd_text("Time not synced", 1);
             lcd_text("", 2);
@@ -419,8 +419,8 @@ bool _checkStateChanges() {
     }
     
     // 检查时间同步状态变化
-    if (isCurrentisTimeSynced != isTimeSynced) {
-        isCurrentisTimeSynced = isTimeSynced;
+    if (lastTimeSyncState != timeSyncState) {
+        lastTimeSyncState = timeSyncState;
         return true;
     }
     
@@ -435,7 +435,7 @@ void _menuTask(void* parameter) {
 
     while (true) {
         // 一次性后台时间同步检查
-        if (!hasTriedTimeSync && WiFi.status() == WL_CONNECTED && !isTimeSynced) {
+        if (!hasTriedTimeSync && WiFi.status() == WL_CONNECTED && timeSyncState != TIME_SYNC_SUCCESS) {
             hasTriedTimeSync = true;
             updateTimeSync();
         }

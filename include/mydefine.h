@@ -77,6 +77,7 @@ inline void setInput(int pin) {
 #define MAX_CACHE_SIZE      200         ///< 最大缓存帧数量
 #define MAX_LATENCY_MS      1500        ///< 最大缓存延迟（单位：毫秒）
 #define CONNECT_PORT        13000       ///< TCP/UDP 通信端口号
+#define CONNECT_TIMEOUT_MS  5000        ///< 连接超时时间（单位：毫秒）
 
 #define DEBOUNCE_TIME       30          ///< 按钮扫描消抖时间（单位：毫秒）
 #define BUTTON_DEBOUNCE_DELAY 150       ///< 按钮软件消抖延迟（单位：毫秒）

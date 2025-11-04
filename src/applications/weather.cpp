@@ -21,9 +21,9 @@ unsigned int interface_num = 0; // 当前显示的界面编号
 void updateWeatherScreen() {
     if(interface_num == 0){
         lcdResetCursor();
-        extern char city_name[64];
-        if (city_name[0] != '\0' && strlen(city_name) > 0) {
-            lcd_text(city_name, 1); // 第一行显示配置地名
+        extern char cityName[64];
+        if (cityName[0] != '\0' && strlen(cityName) > 0) {
+            lcd_text(cityName, 1); // 第一行显示配置地名
         } else {
             lcd_text("N/A", 1);
         }
@@ -110,7 +110,7 @@ bool fetchWeatherData() {
     }
 
     // 检查 API 配置是否完整
-    if (strlen(apiHost) == 0 || strlen(base64_key) == 0 || strlen(kid) == 0 || strlen(project_id) == 0) {
+    if (strlen(apiHost) == 0 || strlen(base64Key) == 0 || strlen(kid) == 0 || strlen(projectID) == 0) {
         LOG_WEATHER_ERROR("Missing API configuration");
         lcd_text("No API config", 1);
         lcd_text("Use web config", 2);
@@ -139,7 +139,7 @@ bool fetchWeatherData() {
     locStr.trim();
 
     // 生成 JWT
-    String jwtToken = generate_jwt(kid, project_id, seed32);
+    String jwtToken = generate_jwt(kid, projectID, seed32);
     LOG_WEATHER_DEBUG("JWT token: " + jwtToken);
 
     // 拼接 URL

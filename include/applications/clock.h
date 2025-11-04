@@ -15,8 +15,15 @@
 #include "menu.h"
 #include "button.h"
 
-extern bool isTimeSynced;              /**< 时间是否已同步的标志 */
-extern bool isTimeSyncInProgress;      /**< 时间同步是否正在进行的标志 */
+enum TimeSyncState {
+    TIME_SYNC_IDLE = 0,        /**< 空闲状态 */
+    TIME_SYNC_IN_PROGRESS,     /**< 同步进行中 */
+    TIME_SYNC_SUCCESS,         /**< 同步成功 */
+    TIME_SYNC_FAILED           /**< 同步失败 */
+};
+
+extern TimeSyncState timeSyncState;          /**< 当前时间同步状态 */
+extern volatile bool isTimeSyncInProgress;   /**< 时间同步是否正在进行的标志 */
 
 void initTimeSync();                 /**< 初始化NTP时间同步 */
 void updateTimeSync();               /**< 更新时间同步状态 */

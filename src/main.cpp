@@ -116,7 +116,7 @@ void loop(){
     }
 
     // 更新非阻塞时间同步
-    updateTimeSync();
+    // updateTimeSync();
     
     acceptClientIfNew();
     receiveClientData();

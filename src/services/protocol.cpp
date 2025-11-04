@@ -6,11 +6,11 @@ static unsigned int lastSecond = 0;
 static float currentFPS = 0.0f;
 
 // 解码函数
-void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
-    LOG_DISPLAY_VERBOSE("Processing incoming data frame of length " + String(bodyLen) + " bytes");
+void processIncoming(const uint8_t* raw, unsigned int fullLen) {
+    LOG_DISPLAY_VERBOSE("Processing incoming data frame of length " + String(fullLen) + " bytes");
 
     // LOG_DISPLAY_VERBOSE("Raw bytes: ");
-    // for (unsigned int i = 0; i < bodyLen; i++) {
+    // for (unsigned int i = 0; i < fullLen; i++) {
     //     LOG_DISPLAY_VERBOSE("0x" + String(raw[i], HEX));
     //     LOG_DISPLAY_VERBOSE(" ");
     // }
@@ -34,7 +34,7 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
         Serial.println("FPS:"+ (String)currentFPS);
     }
 
-    if (bodyLen < 5) {  // 头(2) + 长度(1) + 帧率(2) + 最少1字节数据
+    if (fullLen < 5) {  // 头(2) + 长度(1) + 帧率(2) + 最少1字节数据
         Serial.println("数据包太短，无法解析");
         return;
     }
@@ -61,7 +61,7 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
     unsigned int loopCounter = 0;
     const unsigned int maxLoops = 1000; // 最大循环次数限制
 
-    while (i < bodyLen && lcdCursor < 32 && loopCounter < maxLoops) {
+    while (i < fullLen && lcdCursor < 32 && loopCounter < maxLoops) {
         loopCounter++; // 增加循环计数
         
         // 每处理10个字符就喂一次狗
@@ -70,7 +70,7 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
         }
         uint8_t flag = raw[i++];
         if (flag == 0x00) {
-            if (i >= bodyLen) break;
+            if (i >= fullLen) break;
             char c = raw[i++];
             if ((uint8_t)c != 0xE3) {
                 // 普通 ASCII 字符
@@ -79,7 +79,7 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
             else if((uint8_t)c == 0xE3){
                 bool unknowKana = false;
                 // 添加边界检查
-                if (i + 2 >= bodyLen) {
+                if (i + 2 >= fullLen) {
                     Serial.println("UTF-8数据不完整");
                     break;
                 }
@@ -125,7 +125,7 @@ void processIncoming(const uint8_t* raw, unsigned int bodyLen) {
             }
 
             // 添加边界检查
-            if (i + 8 > bodyLen) {
+            if (i + 8 > fullLen) {
                 Serial.println("自定义字符数据不足");
                 break;
             }

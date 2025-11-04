@@ -11,7 +11,7 @@
  * @brief 解析并显示接收到的数据帧内容
  * 
  * @param[in] raw    指向接收数据缓冲区的指针
- * @param[in] bodyLen 数据包长度（字节数）
+ * @param[in] fullLen 数据包长度（字节数）
  * 
  * @details
  *  1. 检查数据包长度和头部有效性

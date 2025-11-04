@@ -8,6 +8,7 @@
 #include <WiFi.h>             ///< ESP32 WiFi 功能支持（连接、热点、IP 获取等）
 #include <WiFiClientSecure.h> ///< 支持 HTTPS 的 WiFi 客户端
 #include <HTTPClient.h>       ///< HTTP 客户端（用于网络请求）
+#include <DNSServer.h>        ///< DNS 服务器（用于配网模式的门户重定向）
 #include <WebServer.h>        ///< 简易 HTTP Web Server（用于配网页面）
 #include <FFat.h>             ///< 使用 Flash Fat 文件系统（用于存储配置）
 #include <LittleFS.h>

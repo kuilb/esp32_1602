@@ -131,7 +131,7 @@ void web_setting_handleRoot() {
 // 保存 JWT 配置信息
 void saveJWTConfig(const String& apiHost,
                    const String& kid,
-                   const String& project_id,
+                   const String& projectID,
                    const String& privateKey) {
 
     File file = SPIFFS.open("/jwt_config.txt", "w");
@@ -158,8 +158,8 @@ void saveJWTConfig(const String& apiHost,
         return;
     }
 
-    if (!file.println(project_id)) {
-        LOG_WEATHER_ERROR("Failed to save JWT config - write project_id failed");
+    if (!file.println(projectID)) {
+        LOG_WEATHER_ERROR("Failed to save JWT config - write projectID failed");
         lcd_text("Save JWT Fail", 1);
         lcd_text("Write Err", 2);
         file.close();
@@ -198,7 +198,7 @@ void web_setting_handleSet() {
         LOG_WEATHER_DEBUG("==== Configuration received ====");
         LOG_WEATHER_DEBUG("API Host: " + apiHost);
         LOG_WEATHER_DEBUG("kid: " + kid);
-        LOG_WEATHER_DEBUG("project_id: " + project);
+        LOG_WEATHER_DEBUG("projectID: " + project);
         LOG_WEATHER_DEBUG("private key length: " + String(privateKey.length()));
 
         saveJWTConfig(apiHost, kid, project, privateKey);
@@ -451,7 +451,7 @@ void web_setting_setupWebServer() {
         }
         // 重新读入地名和ID，并重置weatherSynced
         extern char location[32];
-        extern char city_name[64];
+        extern char cityName[64];
         extern bool weatherSynced;
         if (SPIFFS.exists("/jwt_config.txt")) {
             File file = SPIFFS.open("/jwt_config.txt", "r");
@@ -464,8 +464,8 @@ void web_setting_setupWebServer() {
                 String newCity = file.readStringUntil('\n'); newCity.trim();
                 strncpy(location, newLoc.c_str(), sizeof(location) - 1);
                 location[sizeof(location) - 1] = '\0';  // 确保null结尾
-                strncpy(city_name, newCity.c_str(), sizeof(city_name) - 1);
-                city_name[sizeof(city_name) - 1] = '\0';  // 确保null结尾
+                strncpy(cityName, newCity.c_str(), sizeof(cityName) - 1);
+                cityName[sizeof(cityName) - 1] = '\0';  // 确保null结尾
                 file.close();
             }
         }
