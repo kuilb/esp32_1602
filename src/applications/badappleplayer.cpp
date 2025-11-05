@@ -118,8 +118,8 @@ void playBadAppleFromFileRaw(const char* path) {
     // 检查文件是否存在
     if (!SPIFFS.exists(path)) {
         LOG_SYSTEM_WARN("Bad Apple file not found: %s", path);
-        lcd_text("File Not Found",1);
-        lcd_text(" ",2);
+        lcdText("File Not Found",1);
+        lcdText(" ",2);
         delay(1000);
         return;
     }
@@ -127,8 +127,8 @@ void playBadAppleFromFileRaw(const char* path) {
     File file = SPIFFS.open(path, "r");
     if (!file) {
         LOG_SYSTEM_WARN("Failed to open Bad Apple file: %s", path);
-        lcd_text("Err Open File",1);
-        lcd_text(" ",2);
+        lcdText("Err Open File",1);
+        lcdText(" ",2);
         delay(1000);
         return;
     }
@@ -138,8 +138,8 @@ void playBadAppleFromFileRaw(const char* path) {
     const size_t frameSize = 64;
     uint8_t frame[frameSize];
     int currentFrame = 0;
-    lcd_text(" ",1);
-    lcd_text(" ",2);
+    lcdText(" ",1);
+    lcdText(" ",2);
 
     while (file.available() >= frameSize) {
         if(buttonJustPressed[CENTER] && currentFrame >= 15){

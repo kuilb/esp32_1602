@@ -1,37 +1,52 @@
 #include "lcd_driver.h"
+#include <esp_timer.h>
 
 int lcdCursor = 0;  // 当前光标位置，全局变量 0~31
 
 int brightness = 255;  // 默认亮度
 
+uint32_t mask, value;
+
 //触发E引脚
-void _trigger_E(){                     
-    delayMicroseconds(15);
-    gpio_set_level((gpio_num_t)(LCD_E), 1);
-    delayMicroseconds(15);
-    gpio_set_level((gpio_num_t)(LCD_E), 0);
-    delayMicroseconds(15);
+inline void _triggerE(){
+    uint64_t start = esp_timer_get_time();
+    while (esp_timer_get_time() - start < 15) {}
+
+    GPIO.out |= (1 << LCD_E);
+
+    start = esp_timer_get_time();
+    while (esp_timer_get_time() - start < 15) {}
+
+    GPIO.out &= ~(1 << LCD_E);
+
+    start = esp_timer_get_time();
+    while (esp_timer_get_time() - start < 15) {}
 }
 
 // 写入一个数据或指令
-void _gpio_write(int data,int mode){
+inline void _gpioWrite(int data,int mode){
 
     //设定模式(指令/字符)
     gpio_set_level((gpio_num_t)(LCD_RS), mode);
 
-     // 前四位
-    gpio_set_level((gpio_num_t)LCD_D7, data & 0x80);
-    gpio_set_level((gpio_num_t)LCD_D6, data & 0x40);
-    gpio_set_level((gpio_num_t)LCD_D5, data & 0x20);
-    gpio_set_level((gpio_num_t)LCD_D4, data & 0x10);
-    _trigger_E();
+    // 前四位
+    uint32_t mask = (1 << LCD_D7) | (1 << LCD_D6) | (1 << LCD_D5) | (1 << LCD_D4);
+    uint32_t value = 0;
+    if (data & 0x80) value |= (1 << LCD_D7);
+    if (data & 0x40) value |= (1 << LCD_D6);
+    if (data & 0x20) value |= (1 << LCD_D5);
+    if (data & 0x10) value |= (1 << LCD_D4);
+    GPIO.out = (GPIO.out & ~mask) | value;
+    _triggerE();
 
     // 后四位
-    gpio_set_level((gpio_num_t)LCD_D7, data & 0x08);
-    gpio_set_level((gpio_num_t)LCD_D6, data & 0x04);
-    gpio_set_level((gpio_num_t)LCD_D5, data & 0x02);
-    gpio_set_level((gpio_num_t)LCD_D4, data & 0x01);
-    _trigger_E();
+    value = 0;
+    if (data & 0x08) value |= (1 << LCD_D7);
+    if (data & 0x04) value |= (1 << LCD_D6);
+    if (data & 0x02) value |= (1 << LCD_D5);
+    if (data & 0x01) value |= (1 << LCD_D4);
+    GPIO.out = (GPIO.out & ~mask) | value;
+    _triggerE();
 }
 
 // 初始化 LCD 背光
@@ -56,20 +71,20 @@ inline void setLcdBrightness(uint8_t duty) {
 }
 
 // 初始化 LCD 显示模块
-void lcd_init(){
+void lcdInit(){
     _initLcdBacklightPwm(255);           // 默认亮度 255
 
-    _gpio_write(0x33,CMD);               // 设置LCD进入8位模式
+    _gpioWrite(0x33,CMD);               // 设置LCD进入8位模式
     delay(5);
-    _gpio_write(0x32,CMD);               // 设置LCD切换为4位模式
+    _gpioWrite(0x32,CMD);               // 设置LCD切换为4位模式
     delay(5);
-    _gpio_write(0x06,CMD);               // 设定向右写入字符，设置屏幕内容不滚动
+    _gpioWrite(0x06,CMD);               // 设定向右写入字符，设置屏幕内容不滚动
     delay(5);
-    _gpio_write(0x0C,CMD);               // 开启屏幕显示，关闭光标显示，关闭光标闪烁
+    _gpioWrite(0x0C,CMD);               // 开启屏幕显示，关闭光标显示，关闭光标闪烁
     delay(5);
-    _gpio_write(0x28,CMD);               // 设定数据总线为四位，显示2行字符，使用5*8字符点阵
+    _gpioWrite(0x28,CMD);               // 设定数据总线为四位，显示2行字符，使用5*8字符点阵
     delay(5);
-    _gpio_write(0x01,CMD);               // 清屏并将地址指针归位
+    _gpioWrite(0x01,CMD);               // 清屏并将地址指针归位
     delay(5);
 
     LOG_LCD_INFO("LCD initialized");
@@ -127,12 +142,12 @@ String convertUTF8ToKana(const String& text) {
 }
 
 // 显示函数(用于简单显示/调试，支持日语假名)
-void lcd_text(String ltext,int line){
+void lcdText(String ltext,int line){
     // 设置行地址
     if (line == 1)
-        _gpio_write(LCD_line1, CMD);
+        _gpioWrite(LCD_line1, CMD);
     else if (line == 2)
-        _gpio_write(LCD_line2, CMD);
+        _gpioWrite(LCD_line2, CMD);
     else
         return;     // 非法行号，直接返回
 
@@ -142,10 +157,10 @@ void lcd_text(String ltext,int line){
     int tsize = convertedText.length();
     for(int size = 0; size < 16; size++){     //逐字写入
         if(size > tsize - 1){
-            _gpio_write(0x20, CHR);       //若字符串长度小于16，则填充空格
+            _gpioWrite(0x20, CHR);       //若字符串长度小于16，则填充空格
         }
         else{
-            _gpio_write(int(convertedText[size]), CHR); //转换成RAW编码后写入
+            _gpioWrite(int(convertedText[size]), CHR); //转换成RAW编码后写入
         }
     }
 }
@@ -170,7 +185,7 @@ void lcdSetCursor(int changecursor){
     }
 
     int command = 0x80 | addr;  // 设置 DDRAM 地址命令
-    _gpio_write(command, CMD);
+    _gpioWrite(command, CMD);
 }
 
 void lcdResetCursor(){
@@ -192,11 +207,11 @@ void lcdCreateChar(int slot, uint8_t data[8]){
     if (slot < 0 || slot > 7) return;       // 限制 slot 范围
 
     int cgram_addr = 0x40 | (slot << 3);    // CGRAM 写入起始地址
-    _gpio_write(cgram_addr, CMD);           // 设置 CGRAM 地址（指令模式）
+    _gpioWrite(cgram_addr, CMD);           // 设置 CGRAM 地址（指令模式）
 
     // 连续写入 8 字节点阵数据
     for (int i = 0; i < 8; i++) {
-        _gpio_write(data[i], CHR);          // 字符数据（数据模式）
+        _gpioWrite(data[i], CHR);          // 字符数据（数据模式）
     }
 
     // 设置回 DDRAM 当前光标对应位置
@@ -206,14 +221,14 @@ void lcdCreateChar(int slot, uint8_t data[8]){
 // 显示自定义字符
 void lcdDisCustom(int index){
     if (index < 0 || index > 7) return;  // 只能是 0~7 槽
-        _gpio_write(index, CHR);         // 写入字符数据（模式 1 表示数据模式）
+        _gpioWrite(index, CHR);         // 写入字符数据（模式 1 表示数据模式）
 
     _nextCursor();
 }
 
 // 显示普通字符
 void lcdDisChar(char text){             //显示函数
-        _gpio_write(int(text),CHR);     //直接写入
+        _gpioWrite(int(text),CHR);     //直接写入
         _nextCursor();
 }
 
@@ -221,5 +236,19 @@ void lcdDisChar(char text){             //显示函数
 void lcdPrint(String s) {
     for (unsigned int i = 0; i < s.length(); i++) {
         lcdDisChar(s[i]);
+    }
+}
+
+// 清除光标后面单行的字符
+void clearOtherChar(){   
+    if(lcdCursor < 15){
+        for(int i = lcdCursor; i < 16; i++){
+            lcdDisChar(' ');
+        }
+    }
+    else if(lcdCursor < 31){
+        for(int i = lcdCursor; i < 32; i++){
+            lcdDisChar(' ');
+        }
     }
 }

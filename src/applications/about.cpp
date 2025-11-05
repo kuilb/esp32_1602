@@ -35,8 +35,8 @@ const AboutPage aboutProjectPages[] = {
 };
 
 void showAboutPage(const char* line1, const char* line2) {
-    lcd_text(line1, 1);
-    lcd_text(line2, 2);
+    lcdText(line1, 1);
+    lcdText(line2, 2);
 }
 
 NavigationResult _handleAboutNavigation(int& currentPage, int totalPages) {

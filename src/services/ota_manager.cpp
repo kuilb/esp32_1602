@@ -35,7 +35,7 @@ OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
     http.begin(*client, url);
     
     LOG_SYSTEM_INFO("Starting OTA from URL: %s", url.c_str());
-    lcd_text("OTA Starting...", 1);
+    lcdText("OTA Starting...", 1);
     updateColor(CRGB::Orange);
     
     int httpCode = http.GET();
@@ -44,8 +44,8 @@ OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
         lastError = "HTTP Error: " + String(httpCode);
         LOG_SYSTEM_ERROR("OTA HTTP failed: %d", httpCode);
         http.end();
-        lcd_text("OTA Failed!", 1);
-        lcd_text("HTTP Error", 2);
+        lcdText("OTA Failed!", 1);
+        lcdText("HTTP Error", 2);
         updateColor(CRGB::Red);
         currentStatus = OTA_COMPLETED_FAILED;
         currentResult = OTA_FAIL_DOWNLOAD;
@@ -80,8 +80,8 @@ OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
     if (!result) {
         LOG_SYSTEM_ERROR("OTA firmware download failed: %s", lastError.c_str());
         Update.abort();
-        lcd_text("OTA Failed!", 1);
-        lcd_text("Download Error", 2);
+        lcdText("OTA Failed!", 1);
+        lcdText("Download Error", 2);
         updateColor(CRGB::Red);
         currentStatus = OTA_COMPLETED_FAILED;
         currentResult = OTA_FAIL_WRITE;
@@ -90,8 +90,8 @@ OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
     
     if (Update.end(false)) {  // false = 不立即重启,先返回状态
         LOG_SYSTEM_INFO("OTA Update Success! Rebooting...");
-        lcd_text("OTA Success!", 1);
-        lcd_text("Rebooting...", 2);
+        lcdText("OTA Success!", 1);
+        lcdText("Rebooting...", 2);
         updateColor(CRGB::Green);
         progress = 100;
         currentStatus = OTA_COMPLETED_SUCCESS;
@@ -103,8 +103,8 @@ OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
         lastError = Update.errorString();
         LOG_SYSTEM_ERROR("OTA Update failed: %s", lastError.c_str());
         Update.abort();
-        lcd_text("OTA Verify Failed!", 1);
-        lcd_text(lastError.substring(0, 16), 2);
+        lcdText("OTA Verify Failed!", 1);
+        lcdText(lastError.substring(0, 16), 2);
         updateColor(CRGB::Red);
         currentStatus = OTA_COMPLETED_FAILED;
         currentResult = OTA_FAIL_VERIFY;
@@ -152,7 +152,7 @@ bool OTAManager::downloadFirmware(HTTPClient& http, size_t contentLength) {
                 if (progress != lastDisplayedProgress) {
                     LOG_SYSTEM_DEBUG("OTA Progress: %d%% (%d/%d bytes)", 
                                     progress, written, contentLength);
-                    lcd_text("Updating: " + String(progress) + "%", 1);
+                    lcdText("Updating: " + String(progress) + "%", 1);
                     lastDisplayedProgress = progress;
                 }
                 lastProgressTime = now;

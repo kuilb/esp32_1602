@@ -120,7 +120,7 @@ uint8_t* getWeatherLeftIcon(const String& chineseWeather) {
     // 日语天气
     if (chineseWeather == "晴れ") return sunnyLeftIcon;
     if (chineseWeather == "曇り") return cloudyLeftIcon;
-    if (chineseWeather == "雨") return lightRainLeftIcon;
+    if (chineseWeather == "驟雨") return lightRainLeftIcon;
     if (chineseWeather == "雪") return snowLeftIcon;
     if (chineseWeather == "雷雨") return thunderLeftIcon;
     if (chineseWeather == "霧") return fogLeftIcon;
@@ -156,7 +156,7 @@ uint8_t* getWeatherRightIcon(const String& chineseWeather) {
     // 日语天气
     if (chineseWeather == "晴れ") return sunnyRightIcon;
     if (chineseWeather == "曇り") return cloudyRightIcon;
-    if (chineseWeather == "雨") return lightRainRightIcon;
+    if (chineseWeather == "驟雨") return lightRainRightIcon;
     if (chineseWeather == "雪") return snowRightIcon;
     if (chineseWeather == "雷雨") return thunderRightIcon;
     if (chineseWeather == "霧") return fogRightIcon;

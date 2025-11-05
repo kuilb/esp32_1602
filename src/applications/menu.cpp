@@ -19,6 +19,8 @@ WiFiConnectionState currentWiFiState = WIFI_IDLE;
 
 void _enterWirelessScreen(){
     inMenuMode = false;
+    LOG_MENU_INFO("Entering Wireless Screen");
+
     if (WiFi.status() != WL_CONNECTED) {
         // WiFi 未连接时，启动配网
         LOG_MENU_INFO("Starting AP config mode from menu");
@@ -26,16 +28,16 @@ void _enterWirelessScreen(){
     }
     else{
         // WiFi 已连接时，显示连接信息
-        lcd_text("SSID:" + savedSSID ,1);
-        lcd_text("IP:" + WiFi.localIP().toString(),2);
+        lcdText("SSID:" + savedSSID ,1);
+        lcdText("IP:" + WiFi.localIP().toString(),2);
     }
 }
 
 void _enterBrightnessScreen() {
-    lcd_text("Brightness:", 1);
+    lcdText("Brightness:", 1);
     char buf[16];
     snprintf(buf, sizeof(buf), "%d%%", (brightness * 100 + 127) / 255);
-    lcd_text(buf, 2);
+    lcdText(buf, 2);
 
     globalButtonDelay(FIRST_TIME_DELAY);  // 进入时防抖
     int lastBrightness = brightness;
@@ -51,16 +53,16 @@ void _enterBrightnessScreen() {
         // 只有亮度变化才重绘文字
         if (brightness != lastBrightness) {
             snprintf(buf, sizeof(buf), "%d%%", (brightness * 100 + 127) / 255);
-            lcd_text("Brightness:", 1);
-            lcd_text(buf, 2);
+            lcdText("Brightness:", 1);
+            lcdText(buf, 2);
             lastBrightness = brightness;
         }
         
         vTaskDelay(10 / portTICK_PERIOD_MS);  // 节流
     }
 
-    lcd_text("Brightness saved", 1);
-    lcd_text("Back to Menu", 2);
+    lcdText("Brightness saved", 1);
+    lcdText("Back to Menu", 2);
     LOG_SYSTEM_INFO("Brightness set to %d%%", (brightness * 100 + 127) / 255);
     delay(500);
 }
@@ -68,8 +70,8 @@ void _enterBrightnessScreen() {
 void _resetWifi(){
     inMenuMode = false;
     SPIFFS.remove("/wifi.txt");
-    lcd_text("WiFi cleared", 1);
-    lcd_text("Rebooting...", 2);
+    lcdText("WiFi cleared", 1);
+    lcdText("Rebooting...", 2);
     LOG_SYSTEM_INFO("WiFi config cleared, restarting...");
     delay(800);
     ESP.restart();
@@ -82,12 +84,12 @@ void _setupWebSetting(){
 
 void _connectInfo(){
     if (WiFi.status() == WL_CONNECTED) {
-        lcd_text("SSID:" + savedSSID, 1);
-        lcd_text("IP:" + WiFi.localIP().toString(), 2);
+        lcdText("SSID:" + savedSSID, 1);
+        lcdText("IP:" + WiFi.localIP().toString(), 2);
     } 
     else {
-        lcd_text("Not Connected", 1);
-        lcd_text("", 2);
+        lcdText("Not Connected", 1);
+        lcdText("", 2);
     }
     
     globalButtonDelay(FIRST_TIME_DELAY);  // 防止立即退出
@@ -220,7 +222,7 @@ void _displayMenu(const Menu* menu, int menuIndex, int scrollOffset) {
                         break;
                 }
                 
-                lcd_text(statusLine, i + 1);  // 状态栏始终没有光标
+                lcdText(statusLine, i + 1);  // 状态栏始终没有光标
             } else if (displayIndex >= 0 && displayIndex < menu->itemCount) {
                 // 显示正常菜单项
                 String itemName = menu->items[displayIndex].name;
@@ -235,11 +237,11 @@ void _displayMenu(const Menu* menu, int menuIndex, int scrollOffset) {
                 }
                 
                 if (menuCursor == displayIndex)
-                    lcd_text(">" + itemName, i + 1);
+                    lcdText(">" + itemName, i + 1);
                 else
-                    lcd_text(" " + itemName, i + 1);
+                    lcdText(" " + itemName, i + 1);
             } else {
-                lcd_text(" ", i + 1);  // 清空无效行
+                lcdText(" ", i + 1);  // 清空无效行
             }
         }
     } else {
@@ -248,14 +250,14 @@ void _displayMenu(const Menu* menu, int menuIndex, int scrollOffset) {
             int menuItemIndex = scrollOffset + i;
 
             if (menuItemIndex >= menu->itemCount) {
-                lcd_text(" ", i + 1);  // 清空无效行
+                lcdText(" ", i + 1);  // 清空无效行
                 continue;
             }
 
             if (menuCursor == menuItemIndex)
-                lcd_text(">" + (String)menu->items[menuItemIndex].name, i + 1);
+                lcdText(">" + (String)menu->items[menuItemIndex].name, i + 1);
             else
-                lcd_text(" " + (String)menu->items[menuItemIndex].name, i + 1);
+                lcdText(" " + (String)menu->items[menuItemIndex].name, i + 1);
         }
     }
 }
@@ -396,13 +398,13 @@ void _handleMenuInterface() {
 
 bool _ensureisTimeSynced() {
     if (timeSyncState != TIME_SYNC_SUCCESS) {
-        lcd_text("Try time sync", 1);
-        lcd_text("Please wait", 2);
+        lcdText("Try time sync", 1);
+        lcdText("Please wait", 2);
         updateTimeSync();
         if (timeSyncState != TIME_SYNC_SUCCESS) {
             LOG_MENU_WARN("Time not synced yet, cannot display");
-            lcd_text("Time not synced", 1);
-            lcd_text("", 2);
+            lcdText("Time not synced", 1);
+            lcdText("", 2);
             delay(500);
             return false;
         }
@@ -505,8 +507,8 @@ void _menuTask(void* parameter) {
                         break;
                     }
                     if(isReadyToDisplay == false){
-                        lcd_text("No Data", 1);
-                        lcd_text(" ", 2);
+                        lcdText("No Data", 1);
+                        lcdText(" ", 2);
                     }
                     else{
                         if(isButtonReadyToRespond(LEFT, BUTTON_DEBOUNCE_DELAY)){

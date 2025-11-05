@@ -79,7 +79,7 @@ void web_setting_handleOTAUpload() {
     
     if (upload.status == UPLOAD_FILE_START) {
         LOG_SYSTEM_INFO("OTA Upload Start: %s", upload.filename.c_str());
-        lcd_text("Uploading...", 1);
+        lcdText("Uploading...", 1);
         updateColor(CRGB::Orange);
         
         if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
@@ -94,7 +94,7 @@ void web_setting_handleOTAUpload() {
     else if (upload.status == UPLOAD_FILE_END) {
         if (Update.end(true)) {
             LOG_SYSTEM_INFO("OTA Success! Size: %u", upload.totalSize);
-            lcd_text("OTA Success!", 1);
+            lcdText("OTA Success!", 1);
             updateColor(CRGB::Green);
             setting_server.send(200, "application/json", "{\"success\":true}");
             delay(1000);
@@ -137,39 +137,39 @@ void saveJWTConfig(const String& apiHost,
     File file = SPIFFS.open("/jwt_config.txt", "w");
     if (!file) {
         LOG_WEATHER_ERROR("Failed to save JWT config - cannot open file");
-        lcd_text("Save JWT Fail", 1);
-        lcd_text("Check FS/Retry", 2);
+        lcdText("Save JWT Fail", 1);
+        lcdText("Check FS/Retry", 2);
         return;
     }
 
     if (!file.println(apiHost)) {
         LOG_WEATHER_ERROR("Failed to save JWT config - write API Host failed");
-        lcd_text("Save JWT Fail", 1);
-        lcd_text("Write Err", 2);
+        lcdText("Save JWT Fail", 1);
+        lcdText("Write Err", 2);
         file.close();
         return;
     }
 
     if (!file.println(kid)) {
         LOG_WEATHER_ERROR("Failed to save JWT config - write kid failed");
-        lcd_text("Save JWT Fail", 1);
-        lcd_text("Write Err", 2);
+        lcdText("Save JWT Fail", 1);
+        lcdText("Write Err", 2);
         file.close();
         return;
     }
 
     if (!file.println(projectID)) {
         LOG_WEATHER_ERROR("Failed to save JWT config - write projectID failed");
-        lcd_text("Save JWT Fail", 1);
-        lcd_text("Write Err", 2);
+        lcdText("Save JWT Fail", 1);
+        lcdText("Write Err", 2);
         file.close();
         return;
     }
 
     if (!file.println(privateKey)) {
         LOG_WEATHER_ERROR("Failed to save JWT config - write private key failed");
-        lcd_text("Save JWT Fail", 1);
-        lcd_text("Write Err", 2);
+        lcdText("Save JWT Fail", 1);
+        lcdText("Write Err", 2);
         file.close();
         return;
     }
@@ -178,8 +178,8 @@ void saveJWTConfig(const String& apiHost,
     file.close();
 
     LOG_WEATHER_INFO("JWT configuration saved successfully");
-    lcd_text("JWT Saved", 1);
-    lcd_text(" ", 2);
+    lcdText("JWT Saved", 1);
+    lcdText(" ", 2);
 }
 
 // 处理设置
@@ -483,13 +483,13 @@ void web_setting_setupWebServer() {
     
     // 获取当前IP地址并显示
     String ipAddress = WiFi.localIP().toString();
-    lcd_text("Config Mode", 1);
-    lcd_text(ipAddress.c_str(), 2);
+    lcdText("Config Mode", 1);
+    lcdText(ipAddress.c_str(), 2);
     while(isConfigDone == false){
         setting_server.handleClient();
         delay(1);
     }
-    lcd_text("Config Done", 1);
-    lcd_text("Saved & Exit", 2);
+    lcdText("Config Done", 1);
+    lcdText("Saved & Exit", 2);
     delay(500);
 }

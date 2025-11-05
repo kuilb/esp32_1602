@@ -85,16 +85,16 @@ void updateClockScreen() {
             // 格式化日期和星期
             strftime(dateBuf, sizeof(dateBuf), "   %m/%d  %a", &timeinfo);
 
-            lcd_text(dateBuf, 2);   // 第1行显示日期 + 星期
-            lcd_text(timeBuf, 1);   // 第2行显示时间
+            lcdText(dateBuf, 2);   // 第1行显示日期 + 星期
+            lcdText(timeBuf, 1);   // 第2行显示时间
         } else {
-            lcd_text("Time Error", 1);
-            lcd_text(" ", 2);
+            lcdText("Time Error", 1);
+            lcdText(" ", 2);
             LOG_TIME_ERROR("Failed to get local time for clock display");
         }
     } else {
-        lcd_text("Can't get Time", 1);
-        lcd_text("Check network", 2);
+        lcdText("Can't get Time", 1);
+        lcdText("Check network", 2);
         LOG_TIME_WARN("Time not synced yet, cannot display clock");
         delay(800);
     }

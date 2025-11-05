@@ -24,21 +24,21 @@ void _saveWiFiCredentials(const String& ssid, const String& password) {
 	File file = SPIFFS.open("/wifi.txt", "w");
 	if (!file) {
 			LOG_WIFI_ERROR("保存WiFi信息失败, 无法打开文件");
-			lcd_text("Save WiFi Fail", 1);
-			lcd_text("Check FS/Retry", 2);
+			lcdText("Save WiFi Fail", 1);
+			lcdText("Check FS/Retry", 2);
 			return;
 	}
 	if (!file.println(ssid)) {
 			LOG_WIFI_ERROR("保存WiFi信息失败, 写入SSID失败");
-			lcd_text("Save WiFi Fail", 1);
-			lcd_text("Write Err", 2);
+			lcdText("Save WiFi Fail", 1);
+			lcdText("Write Err", 2);
 			file.close();
 			return;
 	}
 	if (!file.println(password)) {
 			LOG_WIFI_ERROR("保存WiFi信息失败, 写入密码失败");
-			lcd_text("Save WiFi Fail", 1);
-			lcd_text("Write Err", 2);
+			lcdText("Save WiFi Fail", 1);
+			lcdText("Write Err", 2);
 			file.close();
 			return;
 	}
@@ -46,8 +46,8 @@ void _saveWiFiCredentials(const String& ssid, const String& password) {
 	file.close();
 
 	LOG_WIFI_INFO("WiFi config saved, restarting...");
-	lcd_text("Config Saved", 1);
-	lcd_text("Restarting...", 2);
+	lcdText("Config Saved", 1);
+	lcdText("Restarting...", 2);
 }
 
 // 加载WiFi信息
@@ -172,8 +172,8 @@ void enterConfigMode() {
 	AP_server.begin();
 
 	// 在屏幕上显示ip
-	lcd_text("Connect to AP",1);
-	lcd_text("IP:" + WiFi.softAPIP().toString(),2);
+	lcdText("Connect to AP",1);
+	lcdText("IP:" + WiFi.softAPIP().toString(),2);
 }
 
 // WiFi连接后台任务
@@ -211,9 +211,12 @@ void wifiConnectTask(void* parameter) {
 
 		if (WiFi.status() == WL_CONNECTED) {
 				wifiConnectionState = WIFI_CONNECTED;
-				updateColor(CRGB::Green);  // 连接成功绿灯
+				updateColor(CRGB::Green);  	// 连接成功绿灯
+				server.begin();				// 启动TCP服务器
+
 				LOG_WIFI_INFO("connected: %s", savedSSID.c_str());
 				LOG_WIFI_INFO("IP: %s", WiFi.localIP().toString().c_str());
+				LOG_WIFI_INFO("TCP server started on port %d", CONNECT_PORT);
 
 				// 联网成功后启动非阻塞时间同步
 				LOG_WIFI_INFO("starting background time sync...");
@@ -253,14 +256,11 @@ void connectToWiFi() {
 // 初始化wifi
 void wifiinit(){
 	// 连接WiFi
-	if (digitalRead(BUTTEN_CENTER)) {
+	if (digitalRead(BUTTEN_CENTER_PIN)) {
 			LOG_WIFI_INFO("Entering config mode by button");
 			updateColor(CRGB::Purple);  // 配网紫灯
 			enterConfigMode();
 	} else {
 			connectToWiFi();
 	}
-		
-    if(WiFi.status() == WL_CONNECTED)
-	    server.begin();
 }

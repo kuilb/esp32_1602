@@ -23,9 +23,9 @@ void updateWeatherScreen() {
         lcdResetCursor();
         extern char cityName[64];
         if (cityName[0] != '\0' && strlen(cityName) > 0) {
-            lcd_text(cityName, 1); // 第一行显示配置地名
+            lcdText(cityName, 1); // 第一行显示配置地名
         } else {
-            lcd_text("N/A", 1);
+            lcdText("N/A", 1);
         }
 
         lcdSetCursor(16); 
@@ -71,29 +71,29 @@ void updateWeatherScreen() {
             lcdPrint(windScale);
         }
         
-        for(int i=lcdCursor;i<15;i++) lcdDisChar(' '); // 清除剩余部分
+        clearOtherChar();
 
         lcdSetCursor(16); 
         lcdPrint("Humi:"); // 第二行显示湿度
         lcdPrint(humidity);
-        for(int i=lcdCursor;i<32;i++) lcdDisChar(' '); // 清除剩余部分
+        clearOtherChar();
 
     } else if(interface_num == 2){
         lcdResetCursor();
         lcdPrint("Pres:");
         lcdPrint(pressure);
-        for(int i=lcdCursor;i<32;i++) lcdDisChar(' '); // 清除剩余部分
+        clearOtherChar();
         
     } else if(interface_num == 3){
         lcdResetCursor();
         lcdPrint("Obs:");
         lcdPrint(obsTime);
-        for(int i=lcdCursor;i<32;i++) lcdDisChar(' '); // 清除剩余部分
+        clearOtherChar();
 
         lcdSetCursor(16); 
         lcdPrint("Upd:"); // 第二行显示观测时间
         lcdPrint(weatherUpdateTime);
-        for(int i=lcdCursor;i<32;i++) lcdDisChar(' '); // 清除剩余部分
+        clearOtherChar();
     }
 }
 
@@ -104,24 +104,24 @@ bool fetchWeatherData() {
     
     if (WiFi.status() != WL_CONNECTED) {
         LOG_WEATHER_ERROR("WiFi not connected");
-        lcd_text("No WiFi", 1);
-        lcd_text(" ", 2);
+        lcdText("No WiFi", 1);
+        lcdText(" ", 2);
         return false;
     }
 
     // 检查 API 配置是否完整
     if (strlen(apiHost) == 0 || strlen(base64Key) == 0 || strlen(kid) == 0 || strlen(projectID) == 0) {
         LOG_WEATHER_ERROR("Missing API configuration");
-        lcd_text("No API config", 1);
-        lcd_text("Use web config", 2);
+        lcdText("No API config", 1);
+        lcdText("Use web config", 2);
         return false;
     }
 
     // 检查城市配置是否为空
     if (!location || strlen(location) == 0) {
         LOG_WEATHER_ERROR("Missing city/location configuration");
-        lcd_text("No City Set", 1);
-        lcd_text("Use Web Config", 2);
+        lcdText("No City Set", 1);
+        lcdText("Use Web Config", 2);
         return false;
     }
 
@@ -129,8 +129,8 @@ bool fetchWeatherData() {
 
     LOG_WEATHER_INFO("API config OK, fetching weather...");
 
-    lcd_text("Updating weather", 1);
-    lcd_text("Please wait...", 2);
+    lcdText("Updating weather", 1);
+    lcdText("Please wait...", 2);
 
     // 去掉 apiHost 和 location 前后空格
     String hostStr = String(apiHost);
@@ -157,8 +157,8 @@ bool fetchWeatherData() {
         LOG_WEATHER_DEBUG("HTTP code: %d", httpCode);
     else {
         LOG_WEATHER_ERROR("HTTP error: %d", httpCode);
-        lcd_text("HTTP error", 1);
-        lcd_text(String(httpCode), 2);
+        lcdText("HTTP error", 1);
+        lcdText(String(httpCode), 2);
         http.end();
         return false; // 直接返回，避免解析空数据
     } 
@@ -167,8 +167,8 @@ bool fetchWeatherData() {
     int payloadSize = http.getSize();
     if (payloadSize <= 0) {
         LOG_WEATHER_ERROR("Empty response");
-        lcd_text("Empty response", 1);
-        lcd_text("", 2);
+        lcdText("Empty response", 1);
+        lcdText("", 2);
         http.end();
         return false;
     }
@@ -177,8 +177,8 @@ bool fetchWeatherData() {
     MemoryManager::SafeBuffer compressedBuffer(payloadSize + 8, "HTTP_Response");
     if (!compressedBuffer.isValid()) {
         LOG_WEATHER_ERROR("malloc failed for compressed buffer");
-        lcd_text("Mem fail", 1);
-        lcd_text("", 2);
+        lcdText("Mem fail", 1);
+        lcdText("", 2);
         http.end();
         return false;
     }
@@ -197,8 +197,8 @@ bool fetchWeatherData() {
     }
     if((millis() - startMillis) >= 4000){
         LOG_WEATHER_ERROR("Read timeout");
-        lcd_text("Read timeout", 1);
-        lcd_text("", 2);
+        lcdText("Read timeout", 1);
+        lcdText("", 2);
         http.end();
         return false;
     }
@@ -206,8 +206,8 @@ bool fetchWeatherData() {
 
     if (iCount == 0) {
         LOG_WEATHER_ERROR("No data received");
-        lcd_text("No data received", 1);
-        lcd_text("", 2);
+        lcdText("No data received", 1);
+        lcdText("", 2);
         return false;
     }
 
@@ -219,8 +219,8 @@ bool fetchWeatherData() {
         int uncompSize = zturbo.gzip_info(compressedBuffer.get(), iCount); // 获取解压后大小
         if (uncompSize <= 0) {
             LOG_WEATHER_ERROR("get gzip_info failed");
-            lcd_text("Gzip info fail", 1);
-            lcd_text("", 2);
+            lcdText("Gzip info fail", 1);
+            lcdText("", 2);
             return false;
         }
 
@@ -228,8 +228,8 @@ bool fetchWeatherData() {
         MemoryManager::SafeBuffer uncompressedBuffer(uncompSize + 8, "Gzip_Decompressed");
         if (!uncompressedBuffer.isValid()) {
             LOG_WEATHER_ERROR("malloc failed for uncompressed buffer");
-            lcd_text("Mem fail", 1);
-            lcd_text("", 2);
+            lcdText("Mem fail", 1);
+            lcdText("", 2);
             return false;
         }
 
@@ -237,8 +237,8 @@ bool fetchWeatherData() {
         int unzipResult = zturbo.gunzip(compressedBuffer.get(), iCount, uncompressedBuffer.get());
         if (unzipResult != ZT_SUCCESS) {
             LOG_WEATHER_ERROR("Gzip decompress failed");
-            lcd_text("Gzip failed", 1);
-            lcd_text("", 2);
+            lcdText("Gzip failed", 1);
+            lcdText("", 2);
             return false;
         }
         jsonData = String((char *)uncompressedBuffer.get(), uncompSize);
@@ -250,8 +250,8 @@ bool fetchWeatherData() {
 
     if (jsonData.length() == 0) {
         LOG_WEATHER_ERROR("Empty response");
-        lcd_text("Empty response", 1);
-        lcd_text("", 2);
+        lcdText("Empty response", 1);
+        lcdText("", 2);
         return false;
     }
 
@@ -260,8 +260,8 @@ bool fetchWeatherData() {
     DeserializationError error = deserializeJson(doc, jsonData);    // 反序列化JSON
     if (error) {
         LOG_WEATHER_ERROR("JSON parse failed: %s", error.c_str());
-        lcd_text("JSON failed", 1);
-        lcd_text("", 2);
+        lcdText("JSON failed", 1);
+        lcdText("", 2);
         return false;
     }
 

@@ -56,11 +56,11 @@ inline void setInput(int pin) {
 // 按键引脚定义（带方向语义）
 // ==============================
 
-#define BUTTEN_UP           17  ///< 上按键
-#define BUTTEN_DOWN         18  ///< 下按键
-#define BUTTEN_LEFT         6   ///< 左按键
-#define BUTTEN_RIGHT        4   ///< 右按键
-#define BUTTEN_CENTER       5   ///< 中按键
+#define BUTTEN_UP_PIN           17  ///< 上按键
+#define BUTTEN_DOWN_PIN         18  ///< 下按键
+#define BUTTEN_LEFT_PIN         6   ///< 左按键
+#define BUTTEN_RIGHT_PIN        4   ///< 右按键
+#define BUTTEN_CENTER_PIN       5   ///< 中按键
 
 // ==============================
 // 板载外设
@@ -75,11 +75,12 @@ inline void setInput(int pin) {
 
 #define BaudRate            115200      ///< 串口通信波特率
 #define MAX_CACHE_SIZE      200         ///< 最大缓存帧数量
+#define MAX_RECV_BUFFER_SIZE 1024       ///< 最大接收缓冲区大小（字节）
 #define MAX_LATENCY_MS      1500        ///< 最大缓存延迟（单位：毫秒）
 #define CONNECT_PORT        13000       ///< TCP/UDP 通信端口号
 #define CONNECT_TIMEOUT_MS  5000        ///< 连接超时时间（单位：毫秒）
 
-#define DEBOUNCE_TIME       30          ///< 按钮扫描消抖时间（单位：毫秒）
+#define DEBOUNCE_TIME       20          ///< 按钮扫描消抖时间（单位：毫秒）
 #define BUTTON_DEBOUNCE_DELAY 150       ///< 按钮软件消抖延迟（单位：毫秒）
 #define FIRST_TIME_DELAY    300         ///< 首次启动延迟时间（单位：毫秒）
 

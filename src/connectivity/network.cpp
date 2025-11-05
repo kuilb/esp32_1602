@@ -1,5 +1,7 @@
 #include "network.h"
 
+WiFiClient client;  // 定义客户端对象
+
 struct FramePacket {
     std::vector<uint8_t> data;          // 完整包数据（含头长）
     uint16_t frameIntervalMs;           // 帧率，单位毫秒
@@ -57,6 +59,13 @@ void receiveClientData() {
             lastClientActivity = millis();
         }
 
+        // 检查接收缓冲区大小，防止内存耗尽
+        if (recvBuffer.size() > MAX_RECV_BUFFER_SIZE) {
+            LOG_NETWORK_ERROR("Receive buffer overflow, disconnecting client. Size: %d", recvBuffer.size());
+            recvBuffer.clear();
+            return;
+        }
+
         // 处理完整包
         while (recvBuffer.size() >= 3) {
             if (recvBuffer[0] == 0xAA && recvBuffer[1] == 0x55) {   // 协议头
@@ -92,7 +101,23 @@ void receiveClientData() {
                 else { break; } // 跳出去继续等待完整包
             } 
             else {
-                recvBuffer.erase(recvBuffer.begin());       // 删除无法识别的协议头，继续找下一个包
+                // 查找下一个协议头，如果找到则删除协议头之前的内容
+                size_t pos = 1; // 从第二个字节开始查找
+                bool found = false;
+                while (pos < recvBuffer.size() - 1) {
+                    if (recvBuffer[pos] == 0xAA && recvBuffer[pos + 1] == 0x55) {
+                        found = true;
+                        break;
+                    }
+                    pos++;
+                }
+                if (found) {
+                    // 删除协议头之前的内容
+                    recvBuffer.erase(recvBuffer.begin(), recvBuffer.begin() + pos);
+                } else {
+                    // 没有找到下一个协议头，删除第一个字节
+                    recvBuffer.erase(recvBuffer.begin());
+                }
             }
         }
 

@@ -24,11 +24,11 @@ void init(){                        //初始化引脚
     setOutput(LCD_D7);
     setOutput(LCD_BLA);
 
-    setInput(BUTTEN_UP);
-    setInput(BUTTEN_DOWN);
-    setInput(BUTTEN_LEFT);
-    setInput(BUTTEN_RIGHT);
-    setInput(BUTTEN_CENTER);
+    setInput(BUTTEN_UP_PIN);
+    setInput(BUTTEN_DOWN_PIN);
+    setInput(BUTTEN_LEFT_PIN);
+    setInput(BUTTEN_RIGHT_PIN);
+    setInput(BUTTEN_CENTER_PIN);
 }
 
 void listDir(const char* dirname, uint8_t levels) {
@@ -65,12 +65,12 @@ void setup() {
     init();
     initrgb();
     initKanaMap();  // 初始化假名表
-    lcd_init();
+    lcdInit();
     startButtonTask();
 
     // 欢迎消息
-    lcd_text("Wireless 1602A",1);
-    lcd_text("2025/11/02",2);
+    lcdText("Wireless 1602A",1);
+    lcdText("2025/11/02",2);
 
     LOG_SYSTEM_INFO("Wireless 1602A by Kulib");
     LOG_SYSTEM_INFO("2025/11/01");
@@ -83,8 +83,8 @@ void setup() {
             LOG_SYSTEM_INFO("SPIFFS已格式化!");
         }
         if (!SPIFFS.begin(true)) {
-            lcd_text("NO SPIFFS", 1);
-            lcd_text("Check Serial", 2);
+            lcdText("NO SPIFFS", 1);
+            lcdText("Check Serial", 2);
             LOG_SYSTEM_ERROR("仍然无法挂载SPIFFS, 请检查Flash分区设置");
             updateColor(CRGB::Red);  // 失败变红
             int fadeStep = 2;
