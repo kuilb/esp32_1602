@@ -1,7 +1,6 @@
 #include "wifi_config.h"
-#include <DNSServer.h>
 #include "clock.h"
-#include "utils/logger.h"
+#include "logger.h"
 
 // 配网模式使用的 Web 服务器（监听端口 80）
 WebServer AP_server(80);
@@ -103,7 +102,9 @@ void enterConfigMode() {
 
     // 扫描WiFi并展示列表
 	AP_server.on("/wifi_scan", [](){
+		// WiFi.begin();
 		int n = WiFi.scanNetworks();
+		LOG_NETWORK_INFO("Find %d WiFi!" ,n);
 		String html = "";
         html += "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
         html += "<title>WiFi选择</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--cyan:#77eedd;--cyan-dark:#55ccbb;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;text-align:center;}.container{max-width:400px;margin:40px auto;padding:28px 24px;background:var(--white);border-radius:var(--border-radius);box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;}h1{color:var(--blue);font-weight:600;margin:0 0 18px 0;font-size:1.5em;}h3{color:var(--gray-dark);margin:18px 0 10px 0;}label{display:block;margin:0.8em 0 0.2em;color:var(--blue);font-weight:bold;font-size:1em;text-align:left;}input[type=password],input[type=text],select{width:100%;max-width:340px;padding:10px;margin:10px 0;border:1px solid var(--border);border-radius:6px;font-size:16px;transition:border-color 0.2s,box-shadow 0.2s;}input[type=password]:focus,input[type=text]:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,123,255,0.15);}button,input[type=submit]{padding:12px 30px;margin:10px 5px;border:none;border-radius:var(--border-radius);cursor:pointer;font-size:16px;font-weight:500;transition:background-color 0.2s,transform 0.1s;color:var(--white);}.btn-primary,input[type=submit]{background-color:var(--blue);}.btn-primary:hover,input[type=submit]:hover{background-color:var(--blue-dark);}.btn-secondary{background-color:var(--cyan);color:var(--gray-lighter);}.btn-secondary:hover{background-color:var(--cyan-dark);}.info{margin:15px 0 22px 0;color:var(--gray);font-size:1.05em;}@media(max-width:600px){.container{padding:0.7em;width:98vw;min-width:0;}}</style></head>";
@@ -134,6 +135,7 @@ void enterConfigMode() {
 		_saveWiFiCredentials(ssid, password);
 
         // 显示保存成功页面并重启
+		// TODO: 美化页面
         String html = "";
         html += "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
         html += "<title>WiFi信息已保存</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--green:#388E3C;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border-radius:8px;--shadow:0 4px 12px rgba(0,0,0,0.08);}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);min-height:100vh;margin:0;display:flex;align-items:center;justify-content:center;}.container{background:var(--white);padding:2.2em 2.2em 2em 2.2em;border-radius:var(--border-radius);box-shadow:var(--shadow);max-width:95vw;width:380px;text-align:center;display:flex;flex-direction:column;align-items:center;}h2{color:var(--blue);font-size:1.35em;margin-bottom:0.7em;font-weight:600;}p{color:var(--green);font-size:1.08em;margin:0;}@media(max-width:600px){.container{padding:1.2em 0.5em;width:98vw;}}</style></head>";
@@ -208,6 +210,7 @@ void wifiConnectTask(void* parameter) {
             vTaskDelay(5 / portTICK_PERIOD_MS);
 		}
 		updateBrightness(128);
+		
 
 		if (WiFi.status() == WL_CONNECTED) {
 				wifiConnectionState = WIFI_CONNECTED;
@@ -224,6 +227,7 @@ void wifiConnectTask(void* parameter) {
 				updateTimeSync();
 		} else {
 				wifiConnectionState = WIFI_FAILED;
+				WiFi.disconnect();
 				LOG_WIFI_ERROR("can't connect to WiFi");
 				updateColor(CRGB::Red);  // 失败变红
 		}

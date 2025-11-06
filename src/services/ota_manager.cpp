@@ -1,17 +1,21 @@
 #include "services/ota_manager.h"
-#include "utils/logger.h"
-#include "hardware/lcd_driver.h"
-#include "hardware/rgb_led.h"
+#include "logger.h"
+#include "lcd_driver.h"
+#include "rgb_led.h"
 
 int OTAManager::progress = 0;
 String OTAManager::lastError = "";
 volatile OTAStatus OTAManager::currentStatus = OTA_IDLE;
 volatile OTAResult OTAManager::currentResult = OTA_IN_PROGRESS;
 
-void OTAManager::init() {
+OTAManager::OTAManager() {
     LOG_SYSTEM_INFO("OTA Manager initialized");
     currentStatus = OTA_IDLE;
     currentResult = OTA_IN_PROGRESS;
+}
+
+OTAManager::~OTAManager() {
+    LOG_SYSTEM_INFO("OTA Manager destroyed");
 }
 
 OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
@@ -36,6 +40,7 @@ OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
     
     LOG_SYSTEM_INFO("Starting OTA from URL: %s", url.c_str());
     lcdText("OTA Starting...", 1);
+    lcdText("Connecting...", 2);
     updateColor(CRGB::Orange);
     
     int httpCode = http.GET();
@@ -56,6 +61,8 @@ OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
     if (contentLength == 0) {
         lastError = "Content-Length is 0";
         LOG_SYSTEM_ERROR("OTA: Invalid content length");
+        lcdText("OTA Failed!", 1);
+        lcdText("No Content", 2);
         http.end();
         currentStatus = OTA_COMPLETED_FAILED;
         currentResult = OTA_FAIL_DOWNLOAD;
@@ -63,10 +70,14 @@ OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
     }
     
     LOG_SYSTEM_INFO("Firmware size: %d bytes", contentLength);
+    lcdText("Downloading...", 1);
+    lcdText("Size: " + String(contentLength) + " bytes", 2);
     
     if (!Update.begin(contentLength)) {
         lastError = "Not enough space: " + String(Update.errorString());
         LOG_SYSTEM_ERROR("OTA begin failed: %s", lastError.c_str());
+        lcdText("OTA Failed!", 1);
+        lcdText("No Space", 2);
         http.end();
         currentStatus = OTA_COMPLETED_FAILED;
         currentResult = OTA_FAIL_WRITE;
@@ -100,10 +111,10 @@ OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
         ESP.restart();
         return OTA_SUCCESS;
     } else {
-        lastError = Update.errorString();
+        lastError = Update.getError() + ": " + String(Update.errorString());
         LOG_SYSTEM_ERROR("OTA Update failed: %s", lastError.c_str());
         Update.abort();
-        lcdText("OTA Verify Failed!", 1);
+        lcdText("OTA Failed!", 1);
         lcdText(lastError.substring(0, 16), 2);
         updateColor(CRGB::Red);
         currentStatus = OTA_COMPLETED_FAILED;
@@ -113,7 +124,7 @@ OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
 }
 
 bool OTAManager::downloadFirmware(HTTPClient& http, size_t contentLength) {
-    WiFiClient* stream = http.getStreamPtr();
+    WiFiClient* stream = http.getStreamPtr();       //使用传入的http客户端获取流
     
     if (!stream) {
         lastError = "Stream pointer is null";
@@ -125,18 +136,21 @@ bool OTAManager::downloadFirmware(HTTPClient& http, size_t contentLength) {
     size_t written = 0;
     int lastDisplayedProgress = -1;
     uint32_t lastProgressTime = millis();
-    const uint32_t PROGRESS_UPDATE_INTERVAL = 100; // 100ms
+    const uint32_t PROGRESS_UPDATE_INTERVAL = 50;
     
     while (http.connected() && written < contentLength) {
         size_t available = stream->available();
         if (available) {
+            // 写入流，c是写入的字节数(缓冲区中的字符数)
             int c = stream->readBytes(buff, min(available, sizeof(buff)));
             
-            if (c <= 0) {
-                delay(1);
+            if (c <= 0) {       // 未找到有效数据，等待流
+                // delay(1);
+                vTaskDelay(1);
                 continue;
             }
             
+            // 写入到Update
             if (Update.write(buff, c) != c) {
                 lastError = "Write failed at " + String(written);
                 LOG_SYSTEM_ERROR("OTA write error: %s", lastError.c_str());
@@ -153,12 +167,14 @@ bool OTAManager::downloadFirmware(HTTPClient& http, size_t contentLength) {
                     LOG_SYSTEM_DEBUG("OTA Progress: %d%% (%d/%d bytes)", 
                                     progress, written, contentLength);
                     lcdText("Updating: " + String(progress) + "%", 1);
+                    lcdText("Written: " + String(written) + "/" + String(contentLength), 2);
                     lastDisplayedProgress = progress;
                 }
                 lastProgressTime = now;
             }
         } else {
-            delay(1);  // 让出 CPU 时间
+            // delay(1);  // 让出 CPU 时间
+            vTaskDelay(1);
         }
     }
     
@@ -166,6 +182,8 @@ bool OTAManager::downloadFirmware(HTTPClient& http, size_t contentLength) {
     if (written != contentLength) {
         lastError = "Download incomplete: " + String(written) + "/" + String(contentLength);
         LOG_SYSTEM_ERROR("OTA: %s", lastError.c_str());
+        lcdText("OTA Failed!", 1);
+        lcdText("Incomplete DL", 2);
         return false;
     }
     

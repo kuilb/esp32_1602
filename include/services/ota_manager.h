@@ -1,9 +1,8 @@
 #ifndef OTA_MANAGER_H
 #define OTA_MANAGER_H
 
-#include <Arduino.h>
+#include "myheader.h"
 #include <Update.h>
-#include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 
 enum OTAResult {
@@ -24,7 +23,8 @@ enum OTAStatus {
 
 class OTAManager {
 public:
-    static void init();
+    OTAManager();
+    ~OTAManager();
     static OTAResult updateFromURL(const String& url, bool useHTTPS = false);
     static OTAResult updateFromFile(uint8_t* data, size_t length);
     static int getProgress();

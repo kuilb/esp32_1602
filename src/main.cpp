@@ -115,8 +115,10 @@ void loop(){
         AP_server.handleClient();
     }
 
-    // 更新非阻塞时间同步
-    // updateTimeSync();
+    if(WiFi.status() != WL_CONNECTED){
+        LOG_SYSTEM_WARN("trying to reconnect WiFi...");
+        connectToWiFi();  // 尝试重新连接WiFi
+    }
     
     acceptClientIfNew();
     receiveClientData();
