@@ -96,6 +96,7 @@ void updateClockScreen() {
         lcdText("Can't get Time", 1);
         lcdText("Check network", 2);
         LOG_TIME_WARN("Time not synced yet, cannot display clock");
+        currentState = STATE_MENU;
         delay(800);
     }
 }

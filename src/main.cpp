@@ -115,7 +115,7 @@ void loop(){
         AP_server.handleClient();
     }
 
-    if(WiFi.status() != WL_CONNECTED){
+    if(WiFi.status() == WL_DISCONNECTED){
         LOG_SYSTEM_WARN("trying to reconnect WiFi...");
         connectToWiFi();  // 尝试重新连接WiFi
     }

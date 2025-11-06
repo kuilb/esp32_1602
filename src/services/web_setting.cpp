@@ -5,22 +5,24 @@ volatile bool isConfigDone = false;
 volatile bool isKeyDone = false;
 
 // OTA页面处理
-void web_setting_handleOTA() {
+void webSettingHandleOTA() {
     String html = "";
-    html += "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>OTA升级</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--red:#e57373;--red-dark:#d35f5f;--cyan:#77eedd;--cyan-dark:#55ccbb;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;text-align:center;}.container{max-width:500px;margin:40px auto;padding:28px 24px;background:var(--white);border-radius:var(--border-radius);box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;}h1{color:var(--blue);font-weight:600;margin:0;}h3{color:var(--gray-dark);margin:18px 0 10px 0;}.info{margin:15px 0 22px 0;color:var(--gray);font-size:1.05em;}input[type=text],input[type=file]{width:100%;max-width:400px;padding:10px;margin:10px 0;border:1px solid var(--border);border-radius:6px;font-size:16px;transition:border-color 0.2s,box-shadow 0.2s;}input[type=text]:focus,input[type=file]:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,123,255,0.15);}button{padding:12px 30px;margin:10px 5px;border:none;border-radius:var(--border-radius);cursor:pointer;font-size:16px;font-weight:500;transition:background-color 0.2s,transform 0.1s;color:var(--white);}.btn-primary{background-color:var(--blue);}.btn-primary:hover{background-color:var(--blue-dark);}.btn-secondary{background-color:var(--cyan);color:var(--gray-lighter);}.btn-secondary:hover{background-color:var(--cyan-dark);}.progress{width:100%;max-width:400px;height:40px;background:linear-gradient(to right,#e8f4f8,#f0f0f0);border-radius:20px;margin:20px auto 0 auto;overflow:hidden;box-shadow:inset 0 2px 4px rgba(0,0,0,0.1);position:relative;}.progress-bar{height:100%;background:linear-gradient(90deg,var(--blue) 0%,var(--cyan) 100%);width:0%;transition:width 0.4s ease;text-align:center;line-height:40px;color:var(--white);font-weight:600;font-size:15px;box-shadow:0 2px 8px rgba(0,103,182,0.3);position:relative;overflow:hidden;}.progress-bar::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent);animation:shimmer 2s infinite;}@keyframes shimmer{0%{left:-100%;}100%{left:100%;}}#status{margin-top:16px;min-height:24px;color:var(--blue);font-size:1.08em;}.btn-back{position:absolute;left:-130px;top:0;background-color:var(--red-dark);color:var(--white);border:none;border-radius:var(--border-radius);padding:10px 20px;cursor:pointer;font-size:16px;font-weight:500;transition:background-color 0.2s;}.btn-back:hover{background-color:var(--red-dark);}.header{position:relative;margin-bottom:18px;}</style></head>";
+    html += "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>OTA升级</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--red:#e57373;--red-dark:#d35f5f;--cyan:#77eedd;--cyan-dark:#55ccbb;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;text-align:center;}.container{max-width:380px;margin:32px auto;padding:24px;background:rgba(255,255,255,0.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:var(--border-radius);box-shadow:var(--shadow);}h1{color:var(--blue);font-weight:600;margin:0;}h3{color:var(--gray-dark);margin:18px 0 10px 0;}.info{margin:15px 0 22px 0;color:var(--gray);font-size:1.05em;}input[type=text],input[type=file]{width:100%;max-width:400px;padding:10px;margin:10px 0;border:1px solid var(--border);border-radius:6px;font-size:16px;transition:border-color 0.2s,box-shadow 0.2s;}input[type=text]:focus,input[type=file]:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,123,255,0.15);}button{padding:12px 30px;margin:10px 5px;border:none;border-radius:var(--border-radius);cursor:pointer;font-size:16px;font-weight:500;transition:background-color 0.2s,transform 0.1s;color:var(--white);}.btn-primary{background-color:var(--blue);}.btn-primary:hover{background-color:var(--blue-dark);}.btn-secondary{background-color:var(--cyan);color:var(--gray-lighter);}.btn-secondary:hover{background-color:var(--cyan-dark);}.progress{width:100%;max-width:400px;height:40px;background:linear-gradient(to right,#e8f4f8,#f0f0f0);border-radius:20px;margin:20px auto 0 auto;overflow:hidden;box-shadow:inset 0 2px 4px rgba(0,0,0,0.1);position:relative;}.progress-bar{height:100%;background:linear-gradient(90deg,var(--blue) 0%,var(--cyan) 100%);width:0%;transition:width 0.4s ease;text-align:center;line-height:40px;color:var(--white);font-weight:600;font-size:15px;box-shadow:0 2px 8px rgba(0,103,182,0.3);position:relative;overflow:hidden;}.progress-bar::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent);animation:shimmer 2s infinite;}@keyframes shimmer{0%{left:-100%;}100%{left:100%;}}#status{margin-top:16px;min-height:24px;color:var(--blue);font-size:1.08em;}.btn-back{position:absolute;left:-130px;top:0;background-color:var(--red-dark);color:var(--white);border:none;border-radius:var(--border-radius);padding:10px 20px;cursor:pointer;font-size:16px;font-weight:500;transition:background-color 0.2s;}.btn-back:hover{background-color:var(--red-dark);}.header{position:relative;margin-bottom:18px;}</style></head>";
     html += "<body><div class='container'><div class='header'><button class='btn-back' onclick='goBack()'>返回</button><h1>OTA固件升级</h1></div><div class='info'><p><strong>当前版本:</strong> v1.0.0</p><p><strong>分区方案:</strong> OTA双分区</p><p><strong>当前分区:</strong> <!-- 这里应由后端动态填充分区名 --></p></div><h3>方式1: 从URL升级</h3><input type='text' id='otaUrl' placeholder='http://yourserver.com/firmware.bin'><button class='btn-primary' onclick='startOTAFromURL()'>开始URL升级</button><h3>方式2: 上传固件文件</h3><input type='file' id='otaFile' accept='.bin'><button class='btn-secondary' onclick='startOTAFromFile()'>开始文件升级</button><div class='progress' id='progressBar' style='display:none;'><div class='progress-bar' id='progress'>0%</div></div><p id='status'></p></div>";
     html += "<script>var pollInterval=null;function goBack(){window.location.href='../';}function startOTAFromURL(){var url=document.getElementById('otaUrl').value;if(!url){alert('请输入URL');return;}var btn=event.target;btn.disabled=true;document.getElementById('status').innerText='正在启动 OTA...';document.getElementById('progressBar').style.display='block';fetch('/ota/url?url='+encodeURIComponent(url)).then(r=>{if(r.status===202){document.getElementById('status').innerText='正在下载固件...';pollInterval=setInterval(function(){fetch('/ota/progress').then(r=>r.json()).then(data=>{var pct=data.progress||0;document.getElementById('progress').style.width=pct+'%';document.getElementById('progress').innerText=pct+'%';if(data.status==='success'){clearInterval(pollInterval);document.getElementById('status').innerText='升级成功!设备将重启...';setTimeout(function(){window.location.href='/?ota=success';},2000);}else if(data.status==='failed'){clearInterval(pollInterval);document.getElementById('status').innerText='升级失败: '+data.error;btn.disabled=false;}}).catch(()=>{});},500);}else if(!r.ok){throw new Error('启动失败: HTTP '+r.status);}}).catch(error=>{document.getElementById('status').innerText='启动失败: '+error.message;btn.disabled=false;document.getElementById('progressBar').style.display='none';});}function startOTAFromFile(){var file=document.getElementById('otaFile').files[0];if(!file){alert('请选择文件');return;}document.getElementById('progressBar').style.display='block';document.getElementById('status').innerText='正在上传固件...';var formData=new FormData();formData.append('firmware',file);var xhr=new XMLHttpRequest();xhr.upload.onprogress=function(e){if(e.lengthComputable){var pct=Math.round((e.loaded/e.total)*100);document.getElementById('progress').style.width=pct+'%';document.getElementById('progress').innerText=pct+'%';}};xhr.onload=function(){if(xhr.status==200){var resp=JSON.parse(xhr.responseText);if(resp.success){document.getElementById('status').innerText='升级成功!设备将重启...';setTimeout(function(){window.location.href='/?ota=success';},1200);}else{document.getElementById('status').innerText='升级失败: '+resp.error;}}};xhr.open('POST','/ota/upload');xhr.send(formData);}</script></body></html>";
     setting_server.send(200, "text/html; charset=utf-8", html);
 }
 
 // OTA URL处理
-void web_setting_handleOTAURL() {
+void webSettingHandleOTAURL() {
+
+    // 如果发送的请求不含URL那么 HTTP400 Bad Request
     if (!setting_server.hasArg("url")) {
         setting_server.send(400, "application/json", "{\"success\":false,\"error\":\"No URL\"}");
         return;
     }
     
-    // 检查是否已有 OTA 在进行
+    // 如果已有 OTA 在进行那么 HTTP409 Conflict
     if (OTAManager::isInProgress()) {
         setting_server.send(409, "application/json", 
             "{\"success\":false,\"error\":\"OTA already in progress\"}");
@@ -47,7 +49,7 @@ void web_setting_handleOTAURL() {
 }
 
 // OTA进度查询
-void web_setting_handleOTAProgress() {
+void webSettingHandleOTAProgress() {
     int progress = OTAManager::getProgress();
     OTAStatus status = OTAManager::getStatus();
     String statusStr;
@@ -77,55 +79,68 @@ void web_setting_handleOTAProgress() {
 }
 
 // OTA文件上传处理
-void web_setting_handleOTAUpload() {
+void webSettingHandleOTAUpload() {
     HTTPUpload& upload = setting_server.upload();
     
     if (upload.status == UPLOAD_FILE_START) {
         LOG_SYSTEM_INFO("OTA Upload Start: %s", upload.filename.c_str());
         lcdText("Uploading...", 1);
+        lcdText(upload.filename, 2);
         updateColor(CRGB::Orange);
         
         if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
             LOG_SYSTEM_ERROR("OTA begin failed");
+            lcdText("OTA Begin Fail", 1);
+            lcdText("", 2);
         }
     } 
     else if (upload.status == UPLOAD_FILE_WRITE) {
+        // 如果写入字节不匹配
         if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
             LOG_SYSTEM_ERROR("OTA write failed");
+            lcdText("OTA Write Fail", 1);
+            lcdText("", 2);
         }
     } 
     else if (upload.status == UPLOAD_FILE_END) {
         if (Update.end(true)) {
             LOG_SYSTEM_INFO("OTA Success! Size: %u", upload.totalSize);
             lcdText("OTA Success!", 1);
+            lcdText("Rebooting...", 2);
             updateColor(CRGB::Green);
             setting_server.send(200, "application/json", "{\"success\":true}");
             delay(1000);
             ESP.restart();
         } else {
+            // 如果结束时出错，HTTP500 Internal Server Error
+            LOG_SYSTEM_ERROR("OTA End failed: %s", Update.errorString());
             setting_server.send(500, "application/json", 
                 "{\"success\":false,\"error\":\"" + String(Update.errorString()) + "\"}");
         }
     }
 }
 
-// 主页处理函数
-void web_setting_handleRoot() {
-    String html = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>ESP32 配置页面</title></head><body><div class=\"container\"><h2>ESP32 设置</h2><div class=\"main-buttons\"><button type=\"button\" class=\"btn search-btn\" onclick=\"openCitySearch()\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"></circle><line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"></line></svg><span>搜索城市</span></button><button type=\"button\" class=\"btn ota-btn\" onclick=\"location.href='/ota'\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path><polyline points=\"17 8 12 3 7 8\"></polyline><line x1=\"12\" y1=\"3\" x2=\"12\" y2=\"15\"></line></svg><span>OTA升级</span></button><button type=\"button\" id=\"toggle-key-btn\" class=\"btn key-btn\" onclick=\"toggleKeySettings()\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4\"></path></svg><span>和风天气密钥</span></button><button type=\"button\" class=\"btn exit-btn\" onclick=\"exitSettings()\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\"></path><polyline points=\"16 17 21 12 16 7\"></polyline><line x1=\"21\" y1=\"12\" x2=\"9\" y2=\"12\"></line></svg><span>退出设置</span></button></div><form id=\"key-settings-form\" action=\"/set\" method=\"GET\" style=\"display:none;\"><div class=\"key-fields\">";
+String errorCitySerachHandle(String errorMsg) {
+    String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>城市搜索错误</title>";
+    html += "<style>:root{--blue:#0067b6;--red:#e57373;--white:#fff;--border-radius:8px;--shadow:0 4px 12px rgba(0,0,0,0.08);}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#343a40;}.container{max-width:380px;margin:32px auto;padding:24px;background:rgba(255,255,255,0.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:var(--border-radius);box-shadow:var(--shadow);}h2{color:var(--red);font-weight:600;margin-bottom:12px;}p{font-size:1.18em;color:#6a7690;margin-bottom:18px;}svg{margin-bottom:18px;}</style>";
+    html += "<meta http-equiv='refresh' content='2;url=/'>";
+    html += "</head><body><div class='container'>";
+    html += "<svg width='56' height='56' viewBox='0 0 24 24' fill='none' stroke='#e57373' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10' fill='#fdeaea'/><line x1='8' y1='15' x2='16' y2='9' stroke='#e57373' stroke-width='2.2'/><line x1='16' y1='15' x2='8' y2='9' stroke='#e57373' stroke-width='2.2'/><circle cx='12' cy='12' r='10' stroke='#e57373' stroke-width='2.2' fill='none'/></svg>";
+    html += "<h2>城市搜索失败</h2>";
+    html += "<p>" + errorMsg + "</p>";
+    html += "<p>2秒后自动返回主页</p>";
+    html += "</div></body></html>";
+    return html;
+}
 
-    // 读取本地文件内容填入输入框
-    String host_val = "", kid_val = "", project_val = "", key_val = "";
-    if (SPIFFS.exists("/jwt_config.txt")) {
-        File file = SPIFFS.open("/jwt_config.txt", "r");
-        if (file) {
-            host_val = file.readStringUntil('\n'); host_val.trim();
-            kid_val = file.readStringUntil('\n'); kid_val.trim();
-            project_val = file.readStringUntil('\n'); project_val.trim();
-            key_val = file.readStringUntil('\n'); key_val.trim();
-            file.close();
-        }
-    }
-    html += "<label>和风天气 API Host:</label><input type='text' name='host' value='" + host_val + "'><br><label for=\"kid\">凭据ID:</label><input id=\"kid\" type=\"text\" name=\"kid\" value=\"" + kid_val + "\"><label for=\"project\">项目ID:</label><input id=\"project\" type=\"text\" name=\"project\" value=\"" + project_val + "\"><label for=\"key\">私钥:</label><input id=\"key\" type=\"text\" name=\"key\" value=\"" + key_val + "\"></div><div class=\"button-row\"><input type=\"submit\" value=\"提交\" class=\"btn submit-btn\"></div></form></div><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--red:#e57373;--red-dark:#d35f5f;--cyan:#77eedd;--cyan-dark:#55ccbb;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;}.container{max-width:500px;margin:32px auto;padding:24px;background:var(--white);border-radius:var(--border-radius);box-shadow:var(--shadow);}h2{text-align:center;margin-bottom:24px;color:var(--blue);font-weight:600;}.main-buttons{display:grid;grid-template-columns:1fr 1fr;gap:16px;}.btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:none;border-radius:var(--border-radius);font-size:16px;font-weight:500;cursor:pointer;transition:background-color 0.2s ease,transform 0.1s ease;color:var(--white);text-decoration:none;}.btn:hover{transform:translateY(-2px);}.btn:active{transform:translateY(0);}.btn svg{vertical-align:middle;}.search-btn{background-color:var(--blue);}.search-btn:hover{background-color:var(--blue-dark);}.ota-btn{background-color:var(--cyan);color:var(--gray-lighter);}.ota-btn:hover{background-color:var(--cyan-dark);}.key-btn{background-color:var(--gray-dark);}.key-btn:hover{background-color:var(--gray-dark);}.exit-btn{background-color:var(--red);}.exit-btn:hover{background-color:var(--red-dark);}#key-settings-form{margin-top:24px;padding:20px;background-color:#fdfdff;border:1px solid var(--border);border-radius:var(--border-radius);}.key-fields{display:flex;flex-direction:column;gap:12px;}.key-fields label{font-weight:500;color:var(--gray);}.key-fields input[type=text]{width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:16px;transition:border-color 0.2s,box-shadow 0.2s;}.key-fields input[type=text]:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,123,255,0.25);}.button-row{display:flex;justify-content:flex-end;margin-top:20px;}.submit-btn{background-color:var(--blue);}.submit-btn:hover{background-color:var(--blue-dark);}</style><script>function openCitySearch(){window.location.href='/citysearch';}function exitSettings(){fetch('/exit').finally(()=>{alert('请手动关闭此页面。');document.body.innerHTML = `<div class=\"container\" style=\"max-width: 420px; margin: 60px auto; padding: 36px 28px; background: var(--white); border-radius: var(--border-radius); box-shadow: var(--shadow); display: flex; flex-direction: column; align-items: center;\"><svg width=\"56\" height=\"56\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#0067b6\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"margin-bottom: 18px;\"><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"#eaf6ff\"/><polyline points=\"8 12.5 11 15.5 16 10.5\" stroke=\"#2ecc71\" stroke-width=\"2.2\" fill=\"none\"/><circle cx=\"12\" cy=\"12\" r=\"10\" stroke=\"#0067b6\" stroke-width=\"2.2\" fill=\"none\"/></svg><h2 style=\"color: var(--primary-color); font-weight: 600; margin-bottom: 12px;\">设置已完成</h2><p style=\"font-size: 1.18em; color: var(--dark-gray); margin-bottom: 18px;\">请手动关闭此页面</p></div><style>body { background: linear-gradient(90deg, rgba(179,255,253,0.5) 0%, rgba(227,230,255,0.5) 50%, rgba(253,229,245,0.5) 100%); }</style>`;});}function toggleKeySettings(){var form=document.getElementById('key-settings-form');var btn=document.getElementById('toggle-key-btn').querySelector('span');if(form.style.display==='none'){form.style.display='block';btn.textContent='收起密钥设置';}else{form.style.display='none';btn.textContent='和风天气密钥';}}</script></body></html>";
+// 主页处理函数
+void webSettingHandleRoot() {
+    String varApiHost = apiHost;
+    String varKid = kid;
+    String varProjectID = projectID;
+    String varBase64Key = base64Key;
+
+    String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>ESP32 配置页面</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--red:#e57373;--red-dark:#d35f5f;--cyan:#77eedd;--cyan-dark:#55ccbb;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;}.container{max-width:380px;margin:32px auto;padding:24px;background:rgba(255,255,255,0.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:var(--border-radius);box-shadow:var(--shadow);}h2{text-align:center;margin-bottom:24px;color:var(--blue);font-weight:600;}.main-buttons{display:grid;grid-template-columns:1fr 1fr;gap:16px;}.btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:none;border-radius:var(--border-radius);font-size:16px;font-weight:500;cursor:pointer;transition:background-color 0.2s ease,transform 0.1s ease;color:var(--white);text-decoration:none;}.btn:hover{transform:translateY(-2px);}.btn:active{transform:translateY(0);}.btn svg{vertical-align:middle;}.search-btn{background-color:var(--blue);}.search-btn:hover{background-color:var(--blue-dark);}.ota-btn{background-color:var(--cyan);color:var(--gray-lighter);}.ota-btn:hover{background-color:var(--cyan-dark);}.key-btn{background-color:var(--gray-dark);}.key-btn:hover{background-color:var(--gray-dark);}.exit-btn{background-color:var(--red);}.exit-btn:hover{background-color:var(--red-dark);}#key-settings-form{margin-top:24px;padding:20px;background-color:#fdfdff;border:1px solid var(--border);border-radius:var(--border-radius);}.key-fields{display:flex;flex-direction:column;gap:12px;}.key-fields label{font-weight:500;color:var(--gray);}.key-fields input[type=text]{width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:16px;transition:border-color 0.2s,box-shadow 0.2s;}.key-fields input[type=text]:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,123,255,0.25);}.button-row{display:flex;justify-content:flex-end;margin-top:20px;}.submit-btn{background-color:var(--blue);}.submit-btn:hover{background-color:var(--blue-dark);}</style></head><body><div class='container'><h2>ESP32 设置</h2><div class='main-buttons'><button type='button' class='btn search-btn' onclick='openCitySearch()'><svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'></circle><line x1='21' y1='21' x2='16.65' y2='16.65'></line></svg><span>搜索城市</span></button><button type='button' class='btn ota-btn' onclick=\"location.href='/ota'\"><svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'></path><polyline points='17 8 12 3 7 8'></polyline><line x1='12' y1='3' x2='12' y2='15'></line></svg><span>OTA升级</span></button><button type='button' id='toggle-key-btn' class='btn key-btn' onclick='toggleKeySettings()'><svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4'></path></svg><span>和风天气密钥</span></button><button type='button' class='btn exit-btn' onclick='exitSettings()'><svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'></path><polyline points='16 17 21 12 16 7'></polyline><line x1='21' y1='12' x2='9' y2='12'></line></svg><span>退出设置</span></button></div><form id='key-settings-form' action='/set' method='GET' style='display:none;'><div class='key-fields'><label>和风天气 API Host:</label><input type='text' name='host' value='" + varApiHost + "'><label for='kid'>凭据ID:</label><input id='kid' type='text' name='kid' value='" + varKid + "'><label for='project'>项目ID:</label><input id='project' type='text' name='project' value='" + varProjectID + "'><label for='key'>私钥:</label><input id='key' type='text' name='key' value='" + varBase64Key + "'></div><div class='button-row'><input type='submit' value='提交' class='btn submit-btn'></div></form></div><script>function openCitySearch(){window.location.href='/citysearch';}function exitSettings(){fetch('/exit').finally(()=>{alert('请手动关闭此页面。');document.body.innerHTML = `<div class='container' style='max-width: 420px; margin: 60px auto; padding: 36px 28px; background: var(--white); border-radius: var(--border-radius); box-shadow: var(--shadow); display: flex; flex-direction: column; align-items: center;'><svg width='56' height='56' viewBox='0 0 24 24' fill='none' stroke='#0067b6' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' style='margin-bottom: 18px;'><circle cx='12' cy='12' r='10' fill='#eaf6ff'/><polyline points='8 12.5 11 15.5 16 10.5' stroke='#2ecc71' stroke-width='2.2' fill='none'/><circle cx='12' cy='12' r='10' stroke='#0067b6' stroke-width='2.2' fill='none'/></svg><h2 style='color: var(--primary-color); font-weight: 600; margin-bottom: 12px;'>设置已完成</h2><p style='font-size: 1.18em; color: var(--dark-gray); margin-bottom: 18px;'>请手动关闭此页面</p></div><style>body { background: linear-gradient(90deg, rgba(179,255,253,0.5) 0%, rgba(227,230,255,0.5) 50%, rgba(253,229,245,0.5) 100%); }</style>`;});}function toggleKeySettings(){var form=document.getElementById('key-settings-form');var btn=document.getElementById('toggle-key-btn').querySelector('span');if(form.style.display==='none'){form.style.display='block';btn.textContent='收起密钥设置';}else{form.style.display='none';btn.textContent='和风天气密钥';}}</script></body></html>";
 
     setting_server.send(200, "text/html; charset=utf-8", html);
 }
@@ -197,7 +212,7 @@ void web_setting_handleSet() {
         String project = setting_server.arg("project");
         String privateKey = setting_server.arg("key");
 
-        // 打印到串口，调试用
+        // 打印到串口DEBUG等级日志
         LOG_WEATHER_DEBUG("==== Configuration received ====");
         LOG_WEATHER_DEBUG("API Host: " + apiHost);
         LOG_WEATHER_DEBUG("kid: " + kid);
@@ -218,72 +233,62 @@ void web_setting_handleSet() {
 void web_setting_setupWebServer() {
     isConfigDone=false;
 
-    setting_server.on("/", web_setting_handleRoot);       // 主页
+    setting_server.on("/", webSettingHandleRoot);       // 主页
     setting_server.on("/set", web_setting_handleSet);      // 设置参数
 
     // OTA相关路由
-    setting_server.on("/ota", web_setting_handleOTA);
-    setting_server.on("/ota/url", web_setting_handleOTAURL);
-    setting_server.on("/ota/progress", web_setting_handleOTAProgress);
+    setting_server.on("/ota", webSettingHandleOTA);
+    setting_server.on("/ota/url", webSettingHandleOTAURL);
+    setting_server.on("/ota/progress", webSettingHandleOTAProgress);
     setting_server.on("/ota/upload", HTTP_POST, 
-        []() { /* 上传完成后的响应 */ },
-        web_setting_handleOTAUpload  // 上传处理函数
+        []() { 
+            /* 上传完成后的响应 */ 
+        },
+        webSettingHandleOTAUpload  // 上传处理函数
     );
 
     setting_server.on("/exit", [](){
         isConfigDone = true;
-        setting_server.send(200, "text/plain", "Exiting configuration...");
+        // setting_server.send(200, "text/plain", "Exiting configuration...");
     });
 
     // 城市搜索页面
     setting_server.on("/citysearch", [](){
-        String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>城市搜索</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;}.container{max-width:420px;margin:40px auto;padding:28px 24px;background:var(--white);border-radius:var(--border-radius);box-shadow:var(--shadow);}h2{text-align:center;margin-bottom:24px;color:var(--blue);font-weight:600;}.search-form{display:flex;flex-direction:column;gap:16px;}.search-form input[type=text]{width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:16px;transition:border-color 0.2s,box-shadow 0.2s;}.search-form input[type=text]:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,123,255,0.15);}.search-form input[type=submit]{background-color:var(--blue);color:var(--white);padding:12px;border:none;border-radius:var(--border-radius);font-size:16px;font-weight:500;cursor:pointer;transition:background-color 0.2s,transform 0.1s;}.search-form input[type=submit]:hover{background-color:var(--blue-dark);transform:translateY(-2px);}</style></head><body><div class='container'><div class='header' style='position:relative;margin-bottom:18px;'><button class='btn-back' onclick='goBack()'>返回</button><h2 style='margin:0;'>城市搜索</h2></div><style>.btn-back{position:absolute;left:0px;top:0;background-color:var(--red-dark,#d35f5f);color:var(--white);border:none;border-radius:var(--border-radius);padding:10px 20px;cursor:pointer;font-size:16px;font-weight:500;transition:background-color 0.2s;}.btn-back:hover{background-color:var(--red-dark,#d35f5f);}</style><form class='search-form' action='/citysearch_result' method='GET'><input type='text' name='location' placeholder='请输入城市名或拼音' required><input type='submit' value='搜索'></form></div></body><script>function goBack(){window.location.href='../';}</script></html>";
+        String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>城市搜索</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;}.container{max-width:380px;margin:32px auto;padding:24px;background:rgba(255,255,255,0.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:var(--border-radius);box-shadow:var(--shadow);}h2{text-align:center;margin-bottom:24px;color:var(--blue);font-weight:600;}.search-form{display:flex;flex-direction:column;gap:16px;}.search-form input[type=text]{width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:16px;transition:border-color 0.2s,box-shadow 0.2s;}.search-form input[type=text]:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,123,255,0.15);}.search-form input[type=submit]{background-color:var(--blue);color:var(--white);padding:12px;border:none;border-radius:var(--border-radius);font-size:16px;font-weight:500;cursor:pointer;transition:background-color 0.2s,transform 0.1s;}.search-form input[type=submit]:hover{background-color:var(--blue-dark);transform:translateY(-2px);}</style></head><body><div class='container'><div class='header' style='position:relative;margin-bottom:18px;'><button class='btn-back' onclick='goBack()'>返回</button><h2 style='margin:0;'>城市搜索</h2></div><style>.btn-back{position:absolute;left:0px;top:0;background-color:var(--red-dark,#d35f5f);color:var(--white);border:none;border-radius:var(--border-radius);padding:10px 20px;cursor:pointer;font-size:16px;font-weight:500;transition:background-color 0.2s;}.btn-back:hover{background-color:var(--red-dark,#d35f5f);}</style><form class='search-form' action='/citysearch_result' method='GET'><input type='text' name='location' placeholder='请输入城市名或拼音' required><input type='submit' value='搜索'></form></div></body><script>function goBack(){window.location.href='../';}</script></html>";
         setting_server.send(200, "text/html; charset=utf-8", html);
     });
 
     // 城市搜索结果页面
     setting_server.on("/citysearch_result", [](){
         if (!setting_server.hasArg("location")) {
-            String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>缺少搜索参数</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--red:#e57373;--red-dark:#d35f5f;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;}.container{max-width:420px;margin:60px auto;padding:36px 28px;background:var(--white);border-radius:var(--border-radius);box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;}.icon-error{width:56px;height:56px;margin-bottom:18px;}h2{color:var(--red-dark);font-weight:600;margin-bottom:12px;}.desc{font-size: 1.1em;color: var(--gray-dark);margin-bottom: 8px;}</style><script>setTimeout(function(){window.location.href='/';},2000);</script></head><body><div class='container'><svg class='icon-error' viewBox='0 0 24 24' fill='none' stroke='#e57373' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10' fill='#ffeaea'/><line x1='8' y1='8' x2='16' y2='16' stroke='#e57373' stroke-width='2.2'/><line x1='16' y1='8' x2='8' y2='16' stroke='#e57373' stroke-width='2.2'/><circle cx='12' cy='12' r='10' stroke='#e57373' stroke-width='2.2' fill='none'/></svg><h2>缺少搜索参数</h2><div class='desc'>2秒后自动返回主页...</div></div></body></html>";
+            String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>缺少搜索参数</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--red:#e57373;--red-dark:#d35f5f;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;}.container{max-width:380px;margin:32px auto;padding:24px;background:rgba(255,255,255,0.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:var(--border-radius);box-shadow:var(--shadow);}.icon-error{width:56px;height:56px;margin-bottom:18px;}h2{color:var(--red-dark);font-weight:600;margin-bottom:12px;}.desc{font-size: 1.1em;color: var(--gray-dark);margin-bottom: 8px;}</style><script>setTimeout(function(){window.location.href='/';},2000);</script></head><body><div class='container'><svg class='icon-error' viewBox='0 0 24 24' fill='none' stroke='#e57373' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10' fill='#ffeaea'/><line x1='8' y1='8' x2='16' y2='16' stroke='#e57373' stroke-width='2.2'/><line x1='16' y1='8' x2='8' y2='16' stroke='#e57373' stroke-width='2.2'/><circle cx='12' cy='12' r='10' stroke='#e57373' stroke-width='2.2' fill='none'/></svg><h2>缺少搜索参数</h2><div class='desc'>2秒后自动返回主页...</div></div></body></html>";
             return;
         }
         String location = setting_server.arg("location");
         location.trim();
 
         // 读取API配置
-        String hostStr = "";
-        String jwtToken = "";
-        if (SPIFFS.exists("/jwt_config.txt")) {
-            File file = SPIFFS.open("/jwt_config.txt", "r");
-            if (file) {
-                hostStr = file.readStringUntil('\n'); hostStr.trim();
-                LOG_WEATHER_DEBUG("City search API host: " + hostStr);
-                String kid = file.readStringUntil('\n'); kid.trim();
-                LOG_WEATHER_DEBUG("City search kid: " + kid);
-                String project = file.readStringUntil('\n'); project.trim();
-                LOG_WEATHER_DEBUG("City search project: " + project);
-                String key = file.readStringUntil('\n'); key.trim();
-                LOG_WEATHER_DEBUG("City search key length: " + String(key.length()));
-                file.close();
-                // 确保先生成seed32
-                generateSeed32();
-                // 生成JWT
-                jwtToken = generate_jwt(kid, project, seed32);
-                LOG_WEATHER_DEBUG("City search JWT token generated, length: " + String(jwtToken.length()));
-            } else {
-                LOG_WEATHER_ERROR("Failed to open jwt_config.txt for city search");
-            }
-        } else {
-            LOG_WEATHER_ERROR("jwt_config.txt file not found for city search");
-        }
-        if (hostStr.length() == 0 || jwtToken.length() == 0) {
+        String varApiHost = apiHost;
+        String varKid = kid;
+        String varProjectID = projectID;
+        String varBase64Key = base64Key;
+
+        String jwtToken;
+        
+        // 确保先生成seed32
+        generateSeed32();
+        // 生成JWT
+        jwtToken = generate_jwt(varKid, varProjectID, seed32);
+        LOG_WEATHER_DEBUG("City search JWT token generated, length: " + String(jwtToken.length()));
+           
+        if (varApiHost.length() == 0 || jwtToken.length() == 0) {
             LOG_WEATHER_ERROR("API configuration missing for city search (host or token empty)");
             setting_server.send(200, "text/html; charset=utf-8", "API配置缺失，请先配置主页面参数");
             return;
         }
 
         // 请求城市搜索API
-        String url = "https://" + hostStr + "/geo/v2/city/lookup?location=" + location + "&number=10";
+        String url = "https://" + varApiHost + "/geo/v2/city/lookup?location=" + location + "&number=10";
         LOG_WEATHER_INFO("City search request URL: " + url);
         HTTPClient http;
         http.begin(url);
@@ -295,9 +300,8 @@ void web_setting_setupWebServer() {
         String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>搜索结果</title></head><body>";
         html += "<h2>搜索结果</h2>";
         if (httpCode != 200) {
-            html += "<p>请求失败，HTTP代码：" + String(httpCode) + "</p></body></html>";
             http.end();
-            setting_server.send(200, "text/html; charset=utf-8", html);
+            setting_server.send(200, "text/html; charset=utf-8", errorCitySerachHandle("请求失败，HTTP代码：" + String(httpCode)));
             return;
         }
         int payloadSize = http.getSize();
@@ -305,9 +309,8 @@ void web_setting_setupWebServer() {
         // 使用RAII内存管理
         MemoryManager::SafeBuffer compressedBuffer(payloadSize + 8, "CitySearch_Response");
         if (!compressedBuffer.isValid()) {
-            html += "<p>内存分配失败</p></body></html>";
             http.end();
-            setting_server.send(200, "text/html; charset=utf-8", html);
+            setting_server.send(200, "text/html; charset=utf-8", errorCitySerachHandle("内存分配失败"));
             return;
         }
         
@@ -328,22 +331,19 @@ void web_setting_setupWebServer() {
         if (iCount >= 2 && compressedBuffer.get()[0] == 0x1f && compressedBuffer.get()[1] == 0x8b) {
             int uncompSize = zt.gzip_info(compressedBuffer.get(), iCount);
             if (uncompSize <= 0) {
-                html += "<p>Gzip解压失败</p></body></html>";
-                setting_server.send(200, "text/html; charset=utf-8", html);
+                setting_server.send(200, "text/html; charset=utf-8", errorCitySerachHandle("Gzip解压失败"));
                 return;
             }
             
             MemoryManager::SafeBuffer uncompressedBuffer(uncompSize + 8, "CitySearch_Decompressed");
             if (!uncompressedBuffer.isValid()) {
-                html += "<p>内存分配失败</p></body></html>";
-                setting_server.send(200, "text/html; charset=utf-8", html);
+                setting_server.send(200, "text/html; charset=utf-8", errorCitySerachHandle("内存分配失败"));
                 return;
             }
             
             int rc = zt.gunzip(compressedBuffer.get(), iCount, uncompressedBuffer.get());
             if (rc != ZT_SUCCESS) {
-                html += "<p>Gzip解压失败</p></body></html>";
-                setting_server.send(200, "text/html; charset=utf-8", html);
+                setting_server.send(200, "text/html; charset=utf-8", errorCitySerachHandle("Gzip解压失败"));
                 return;
             }
             jsonData = String((char *)uncompressedBuffer.get(), uncompSize);
@@ -357,8 +357,7 @@ void web_setting_setupWebServer() {
         DeserializationError error = deserializeJson(doc, jsonData);
         if (error) {
             LOG_WEATHER_ERROR("City search JSON parse failed: " + String(error.c_str()));
-            html += "<p>JSON解析失败</p></body></html>";
-            setting_server.send(200, "text/html; charset=utf-8", html);
+            setting_server.send(200, "text/html; charset=utf-8", errorCitySerachHandle("JSON解析失败"));
             return;
         }
         
@@ -369,24 +368,21 @@ void web_setting_setupWebServer() {
         if (doc["code"].as<String>() != "200") {
             String code = doc["code"].as<String>();
             LOG_WEATHER_WARN("City search API error code: " + code);
-            html += "<p>API错误，错误代码：" + code + "</p></body></html>";
-            setting_server.send(200, "text/html; charset=utf-8", html);
+            setting_server.send(200, "text/html; charset=utf-8", errorCitySerachHandle("API错误，错误代码：" + code));
             return;
         }
         
         // 检查location字段是否存在且为数组
         if (!doc["location"].is<JsonArray>()) {
             LOG_WEATHER_WARN("City search response: location field missing or not array");
-            html += "<p>未找到候选城市</p></body></html>";
-            setting_server.send(200, "text/html; charset=utf-8", html);
+            setting_server.send(200, "text/html; charset=utf-8", errorCitySerachHandle("未找到候选城市"));
             return;
         }
         JsonArray locArr = doc["location"].as<JsonArray>();
         LOG_WEATHER_INFO("City search found " + String(locArr.size()) + " cities");
         
         if (locArr.size() == 0) {
-            html += "<p>未找到匹配的城市</p></body></html>";
-            setting_server.send(200, "text/html; charset=utf-8", html);
+            setting_server.send(200, "text/html; charset=utf-8", errorCitySerachHandle("未找到匹配的城市"));
             return;
         }
         
@@ -476,7 +472,7 @@ void web_setting_setupWebServer() {
         isReadyToDisplay = false;
         
         // 返回成功页面并自动关闭弹出窗口
-        String response = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>设置成功</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--green:#4CAF50;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;}.container{max-width:420px;margin:60px auto;padding:36px 28px;background:var(--white);border-radius:var(--border-radius);box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;}.icon-success{width:56px;height:56px;margin-bottom:18px;}h2{color:var(--green);font-weight:600;margin-bottom:12px;}.info{margin:10px 0;color:var(--gray);font-size:1.08em;}.desc{font-size:1.1em;color:var(--gray-dark);margin-bottom:8px;}</style><script>setTimeout(function(){window.location.href='/';},2000);</script></head><body><div class='container'><svg class='icon-success' viewBox='0 0 24 24' fill='none' stroke='#4CAF50' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10' fill='#eaf6ff'/><polyline points='8 12.5 11 15.5 16 10.5' stroke='#4CAF50' stroke-width='2.2' fill='none'/><circle cx='12' cy='12' r='10' stroke='#4CAF50' stroke-width='2.2' fill='none'/></svg><h2>✓ 设置成功</h2><div class='info'>LocationID: " + locid + "</div><div class='info'>城市: " + cityname + "</div><div class='desc'>窗口将在2秒后自动关闭...</div></div></body></html>";
+        String response = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>设置成功</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--green:#4CAF50;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;}.container{max-width:380px;margin:32px auto;padding:24px;background:rgba(255,255,255,0.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:var(--border-radius);box-shadow:var(--shadow);}.icon-success{width:56px;height:56px;margin-bottom:18px;}h2{color:var(--green);font-weight:600;margin-bottom:12px;}.info{margin:10px 0;color:var(--gray);font-size:1.08em;}.desc{font-size:1.1em;color:var(--gray-dark);margin-bottom:8px;}</style><script>setTimeout(function(){window.location.href='/';},2000);</script></head><body><div class='container'><svg class='icon-success' viewBox='0 0 24 24' fill='none' stroke='#4CAF50' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10' fill='#eaf6ff'/><polyline points='8 12.5 11 15.5 16 10.5' stroke='#4CAF50' stroke-width='2.2' fill='none'/><circle cx='12' cy='12' r='10' stroke='#4CAF50' stroke-width='2.2' fill='none'/></svg><h2>✓ 设置成功</h2><div class='info'>LocationID: " + locid + "</div><div class='info'>城市: " + cityname + "</div><div class='desc'>窗口将在2秒后自动关闭...</div></div></body></html>";
         
         setting_server.send(200, "text/html; charset=utf-8", response);
     });
@@ -493,6 +489,6 @@ void web_setting_setupWebServer() {
         delay(1);
     }
     lcdText("Config Done", 1);
-    lcdText("Saved & Exit", 2);
+    lcdText("Exiting...", 2);
     delay(500);
 }
