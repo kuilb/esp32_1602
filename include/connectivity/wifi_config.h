@@ -27,6 +27,7 @@ enum WiFiConnectionState {
     WIFI_IDLE,         /**< 初始状态，未开始连接 */
     WIFI_CONNECTING,   /**< 正在连接中 */
     WIFI_CONNECTED,    /**< 已连接 */
+    WIFI_DISCONNECTED, /**< 连接断开 */
     WIFI_FAILED        /**< 连接失败 */
 };
 

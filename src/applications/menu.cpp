@@ -229,7 +229,7 @@ void _displayMenu(const Menu* menu, int menuIndex, int scrollOffset) {
                 
                 // 如果是Wireless Screen，根据 WiFi 状态动态修改名称
                 if (displayIndex == 0) {
-                    if (wifiConnectionState == WIFI_CONNECTED || wifiConnectionState == WIFI_CONNECTING) {
+                    if (wifiConnectionState == WIFI_CONNECTED) {
                         itemName = "Wireless Screen";
                     } else {
                         itemName = "Config WiFi";
