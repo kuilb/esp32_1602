@@ -1,0 +1,72 @@
+<script src="component.js"></script>
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiFi 配置</title>
+</head>
+<style>
+    
+</style>
+<body>
+    <web-styles></web-styles>
+    <div class="container">
+        <h1>WiFi 配网</h1>
+        <form action="/wifi_set" method="POST" style="width:100%;max-width:340px;" id="wifiForm">
+            <label for="manualssid">WiFi名称(SSID):</label>
+            <input type="text" name="ssid" id="manualssid" placeholder="请输入SSID" required>
+            <label for="password">密码:</label>
+            <input type="password" name="password" id="password" required>
+            <div class="button-group">
+                <input type="submit" value="连接WiFi" class="btn-blue">
+                <button type="button" class="btn-cyan" id="scanBtn">扫描附近WiFi</button>
+            </div>
+        </form>
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>扫描中，请稍候...</p>
+        </div>
+    </div>
+    <script>
+        document.getElementById("scanBtn").addEventListener("click", function(e) {
+            document.getElementById("loading").classList.remove("hidden");
+            document.querySelector(".container").style.opacity = "0.5";
+            fetch("/wifi_scan")
+            .then(response => response.text())
+            .then(data => {
+                document.body.innerHTML = data;
+            })
+            .catch(error => {
+                console.error("扫描失败:", error);
+                document.getElementById("loading").classList.add("hidden");
+                document.querySelector(".container").style.opacity = "1";
+                alert("扫描失败,请重试");
+            });
+        });
+
+        // 检查连接WiFi输入
+        document.getElementById("wifiForm").addEventListener("submit", function(e) {
+            const ssid = document.getElementById("manualssid").value.trim();
+            const password = document.getElementById("password").value.trim();
+            if (!ssid) {
+                alert("请输入WiFi名称(SSID)");
+                e.preventDefault();
+                return;
+            }
+            if (!password) {
+                alert("请输入密码");
+                e.preventDefault();
+                return;
+            }
+            if (password.length < 8) {
+                alert("密码至少8位");
+                e.preventDefault();
+                return;
+            }
+        });
+    </script>
+</body>
+</html>

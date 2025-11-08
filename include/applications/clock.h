@@ -15,6 +15,8 @@
 #include "menu.h"
 #include "button.h"
 
+extern struct tm localTimeInfo;  /**< 本地时间信息结构体 */
+
 enum TimeSyncState {
     TIME_SYNC_IDLE = 0,        /**< 空闲状态 */
     TIME_SYNC_IN_PROGRESS,     /**< 同步进行中 */
@@ -28,5 +30,6 @@ extern volatile bool isTimeSyncInProgress;   /**< 时间同步是否正在进行
 void initTimeSync();                 /**< 初始化NTP时间同步 */
 void updateTimeSync();               /**< 更新时间同步状态 */
 void updateClockScreen();            /**< 更新LCD上的时钟显示 */
+void timeSyncTask(void* parameter);  /**< 时间同步后台任务 */
 
 #endif

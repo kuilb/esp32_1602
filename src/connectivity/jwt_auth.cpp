@@ -37,9 +37,37 @@ void init_jwt() {
     file.readBytesUntil('\n', base64Key, sizeof(base64Key));
     file.readBytesUntil('\n', location, sizeof(location));
 
-    // 移除换行符和空白字符
+    // 移除所有字段的换行符和空白字符
+    for (int i = 0; i < sizeof(apiHost); i++) {
+        if (apiHost[i] == '\n' || apiHost[i] == '\r' || apiHost[i] == ' ' || apiHost[i] == '\t') {
+            apiHost[i] = '\0';
+            break;
+        }
+    }
+    
+    for (int i = 0; i < sizeof(kid); i++) {
+        if (kid[i] == '\n' || kid[i] == '\r' || kid[i] == ' ' || kid[i] == '\t') {
+            kid[i] = '\0';
+            break;
+        }
+    }
+    
+    for (int i = 0; i < sizeof(projectID); i++) {
+        if (projectID[i] == '\n' || projectID[i] == '\r' || projectID[i] == ' ' || projectID[i] == '\t') {
+            projectID[i] = '\0';
+            break;
+        }
+    }
+    
+    for (int i = 0; i < sizeof(base64Key); i++) {
+        if (base64Key[i] == '\n' || base64Key[i] == '\r' || base64Key[i] == ' ' || base64Key[i] == '\t') {
+            base64Key[i] = '\0';
+            break;
+        }
+    }
+    
     for (int i = 0; i < sizeof(location); i++) {
-        if (location[i] == '\n' || location[i] == '\r') {
+        if (location[i] == '\n' || location[i] == '\r' || location[i] == ' ' || location[i] == '\t') {
             location[i] = '\0';
             break;
         }

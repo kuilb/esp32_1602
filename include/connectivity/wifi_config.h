@@ -15,6 +15,7 @@
 #include "rgb_led.h"
 #include "myheader.h"
 #include "network.h"
+#include "web_component.h"
 
 extern WebServer AP_server;                     /**< 配网模式使用的 Web 服务器 */
 extern DNSServer dnsServer;                     /**< DNS 服务器用于强制门户 */

@@ -16,6 +16,7 @@ static TimeSyncState lastTimeSyncState = TIME_SYNC_IDLE;
 long lastWeatherFail = -15000;
 InterfaceState currentState = STATE_MENU;
 WiFiConnectionState currentWiFiState = WIFI_IDLE;
+tm currentTimeInfo;
 
 void _enterWirelessScreen(){
     inMenuMode = false;
@@ -187,6 +188,7 @@ void initMenu() {
 void _displayMenu(const Menu* menu, int menuIndex, int scrollOffset) {
     // LOG_MENU_VERBOSE("menu cursor at index " + String(menuIndex) + " scroll offset " + String(scrollOffset));
     lcdResetCursor();
+    char timeBuf[8];
     
     // 检查是否为主菜单，如果是则显示状态栏
     if (menu == &allMenus[MENU_MAIN]) {
@@ -208,7 +210,8 @@ void _displayMenu(const Menu* menu, int menuIndex, int scrollOffset) {
                         if(isTimeSyncInProgress){
                             statusLine += "T:Syncing...";
                         } else if (timeSyncState == TIME_SYNC_SUCCESS) {
-                            statusLine += "T:OK";
+                            strftime(timeBuf, sizeof(timeBuf), " %H:%M", &localTimeInfo);
+                            statusLine += "T:OK " + String(timeBuf);
                         } else {
                             statusLine += "T:--";
                         }
@@ -425,6 +428,11 @@ bool _checkStateChanges() {
         lastTimeSyncState = timeSyncState;
         return true;
     }
+
+    if(timeSyncState == TIME_SYNC_SUCCESS && currentTimeInfo.tm_min != localTimeInfo.tm_min) {
+        currentTimeInfo = localTimeInfo;
+        return true;
+    }
     
     return false;
 }
@@ -433,15 +441,8 @@ bool _checkStateChanges() {
 TaskHandle_t _menuTaskHandle = NULL;
 void _menuTask(void* parameter) {
     static unsigned long lastDisplayUpdate = 0;
-    static bool hasTriedTimeSync = false;  // 标记是否已经尝试过时间同步
 
     while (true) {
-        // 一次性后台时间同步检查
-        if (!hasTriedTimeSync && WiFi.status() == WL_CONNECTED && timeSyncState != TIME_SYNC_SUCCESS) {
-            hasTriedTimeSync = true;
-            updateTimeSync();
-        }
-        
         if (inMenuMode) {
             switch (currentState) {
                 case STATE_MENU:

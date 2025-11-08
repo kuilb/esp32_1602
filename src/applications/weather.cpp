@@ -145,7 +145,7 @@ bool fetchWeatherData() {
     // 拼接 URL
     String url = "https://" + hostStr + "/v7/weather/now?location=" + locStr;
     LOG_WEATHER_DEBUG("Final Request URL: %s", url.c_str());
-
+    
     HTTPClient http;
     http.begin(url);
     http.addHeader("Accept-Encoding", "gzip");                  // 请求 gzip 压缩响应

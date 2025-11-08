@@ -6,6 +6,7 @@ volatile bool isTimeSyncInProgress = false;
 static unsigned long timeSyncStartTime = 0;
 static unsigned long lastTimeSyncAttempt = 0;
 TimeSyncState timeSyncState = TIME_SYNC_IDLE;
+struct tm localTimeInfo;
 
 // 初始化时间同步
 void initTimeSync() {
@@ -51,20 +52,20 @@ void updateTimeSync() {
     if (now - lastTimeSyncAttempt > TIME_SYNC_RETRY_INTERVAL) {
         lastTimeSyncAttempt = now;
         
-        struct tm timeinfo;
-        if (getLocalTime(&timeinfo)) {
+        if (getLocalTime(&localTimeInfo)) {
             LOG_TIME_INFO("NTP Time Synced successfully!");
             timeSyncState = TIME_SYNC_SUCCESS;
             isTimeSyncInProgress = false;
             
             // 获取 UNIX 时间戳
-            time_t unixTimestamp = mktime(&timeinfo);
+            time_t unixTimestamp = mktime(&localTimeInfo);
             LOG_TIME_DEBUG("UNIX Timestamp: %ld", unixTimestamp);
+
             
             // 显示同步成功的时间
             LOG_TIME_INFO("Time sync took %lu ms", now - timeSyncStartTime);
             char timeStr[64];
-            strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
+            strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &localTimeInfo);
             LOG_TIME_INFO("Current time: %s", timeStr);
         } else {
             LOG_TIME_INFO("Waiting for NTP response...");
@@ -74,16 +75,15 @@ void updateTimeSync() {
 
 void updateClockScreen() {
     if (timeSyncState == TIME_SYNC_SUCCESS) {
-        struct tm timeinfo;
-        if (getLocalTime(&timeinfo)) {
+        if (getLocalTime(&localTimeInfo)) {
             char timeBuf[17];
             char dateBuf[17];
 
             // 格式化时间
-            strftime(timeBuf, sizeof(timeBuf), "    %H:%M:%S", &timeinfo);
+            strftime(timeBuf, sizeof(timeBuf), "    %H:%M:%S", &localTimeInfo);
             
             // 格式化日期和星期
-            strftime(dateBuf, sizeof(dateBuf), "   %m/%d  %a", &timeinfo);
+            strftime(dateBuf, sizeof(dateBuf), "   %m/%d  %a", &localTimeInfo);
 
             lcdText(dateBuf, 2);   // 第1行显示日期 + 星期
             lcdText(timeBuf, 1);   // 第2行显示时间
@@ -99,4 +99,17 @@ void updateClockScreen() {
         currentState = STATE_MENU;
         delay(800);
     }
+}
+
+// 时间同步后台任务
+void timeSyncTask(void* parameter) {
+    LOG_TIME_INFO("Time sync background task started");
+    
+    while (timeSyncState != TIME_SYNC_SUCCESS) {
+        updateTimeSync();
+        vTaskDelay(pdMS_TO_TICKS(1000));  // 每秒检查一次
+    }
+    
+    LOG_TIME_INFO("Time sync background task completed");
+    vTaskDelete(NULL);
 }

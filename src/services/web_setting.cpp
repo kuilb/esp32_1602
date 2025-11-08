@@ -6,10 +6,198 @@ volatile bool isKeyDone = false;
 
 // OTA页面处理
 void webSettingHandleOTA() {
-    String html = "";
-    html += "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>OTA升级</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--red:#e57373;--red-dark:#d35f5f;--cyan:#77eedd;--cyan-dark:#55ccbb;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;text-align:center;}.container{max-width:380px;margin:32px auto;padding:24px;background:rgba(255,255,255,0.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:var(--border-radius);box-shadow:var(--shadow);}h1{color:var(--blue);font-weight:600;margin:0;}h3{color:var(--gray-dark);margin:18px 0 10px 0;}.info{margin:15px 0 22px 0;color:var(--gray);font-size:1.05em;}input[type=text],input[type=file]{width:100%;max-width:400px;padding:10px;margin:10px 0;border:1px solid var(--border);border-radius:6px;font-size:16px;transition:border-color 0.2s,box-shadow 0.2s;}input[type=text]:focus,input[type=file]:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,123,255,0.15);}button{padding:12px 30px;margin:10px 5px;border:none;border-radius:var(--border-radius);cursor:pointer;font-size:16px;font-weight:500;transition:background-color 0.2s,transform 0.1s;color:var(--white);}.btn-primary{background-color:var(--blue);}.btn-primary:hover{background-color:var(--blue-dark);}.btn-secondary{background-color:var(--cyan);color:var(--gray-lighter);}.btn-secondary:hover{background-color:var(--cyan-dark);}.progress{width:100%;max-width:400px;height:40px;background:linear-gradient(to right,#e8f4f8,#f0f0f0);border-radius:20px;margin:20px auto 0 auto;overflow:hidden;box-shadow:inset 0 2px 4px rgba(0,0,0,0.1);position:relative;}.progress-bar{height:100%;background:linear-gradient(90deg,var(--blue) 0%,var(--cyan) 100%);width:0%;transition:width 0.4s ease;text-align:center;line-height:40px;color:var(--white);font-weight:600;font-size:15px;box-shadow:0 2px 8px rgba(0,103,182,0.3);position:relative;overflow:hidden;}.progress-bar::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent);animation:shimmer 2s infinite;}@keyframes shimmer{0%{left:-100%;}100%{left:100%;}}#status{margin-top:16px;min-height:24px;color:var(--blue);font-size:1.08em;}.btn-back{position:absolute;left:-130px;top:0;background-color:var(--red-dark);color:var(--white);border:none;border-radius:var(--border-radius);padding:10px 20px;cursor:pointer;font-size:16px;font-weight:500;transition:background-color 0.2s;}.btn-back:hover{background-color:var(--red-dark);}.header{position:relative;margin-bottom:18px;}</style></head>";
-    html += "<body><div class='container'><div class='header'><button class='btn-back' onclick='goBack()'>返回</button><h1>OTA固件升级</h1></div><div class='info'><p><strong>当前版本:</strong> v1.0.0</p><p><strong>分区方案:</strong> OTA双分区</p><p><strong>当前分区:</strong> <!-- 这里应由后端动态填充分区名 --></p></div><h3>方式1: 从URL升级</h3><input type='text' id='otaUrl' placeholder='http://yourserver.com/firmware.bin'><button class='btn-primary' onclick='startOTAFromURL()'>开始URL升级</button><h3>方式2: 上传固件文件</h3><input type='file' id='otaFile' accept='.bin'><button class='btn-secondary' onclick='startOTAFromFile()'>开始文件升级</button><div class='progress' id='progressBar' style='display:none;'><div class='progress-bar' id='progress'>0%</div></div><p id='status'></p></div>";
-    html += "<script>var pollInterval=null;function goBack(){window.location.href='../';}function startOTAFromURL(){var url=document.getElementById('otaUrl').value;if(!url){alert('请输入URL');return;}var btn=event.target;btn.disabled=true;document.getElementById('status').innerText='正在启动 OTA...';document.getElementById('progressBar').style.display='block';fetch('/ota/url?url='+encodeURIComponent(url)).then(r=>{if(r.status===202){document.getElementById('status').innerText='正在下载固件...';pollInterval=setInterval(function(){fetch('/ota/progress').then(r=>r.json()).then(data=>{var pct=data.progress||0;document.getElementById('progress').style.width=pct+'%';document.getElementById('progress').innerText=pct+'%';if(data.status==='success'){clearInterval(pollInterval);document.getElementById('status').innerText='升级成功!设备将重启...';setTimeout(function(){window.location.href='/?ota=success';},2000);}else if(data.status==='failed'){clearInterval(pollInterval);document.getElementById('status').innerText='升级失败: '+data.error;btn.disabled=false;}}).catch(()=>{});},500);}else if(!r.ok){throw new Error('启动失败: HTTP '+r.status);}}).catch(error=>{document.getElementById('status').innerText='启动失败: '+error.message;btn.disabled=false;document.getElementById('progressBar').style.display='none';});}function startOTAFromFile(){var file=document.getElementById('otaFile').files[0];if(!file){alert('请选择文件');return;}document.getElementById('progressBar').style.display='block';document.getElementById('status').innerText='正在上传固件...';var formData=new FormData();formData.append('firmware',file);var xhr=new XMLHttpRequest();xhr.upload.onprogress=function(e){if(e.lengthComputable){var pct=Math.round((e.loaded/e.total)*100);document.getElementById('progress').style.width=pct+'%';document.getElementById('progress').innerText=pct+'%';}};xhr.onload=function(){if(xhr.status==200){var resp=JSON.parse(xhr.responseText);if(resp.success){document.getElementById('status').innerText='升级成功!设备将重启...';setTimeout(function(){window.location.href='/?ota=success';},1200);}else{document.getElementById('status').innerText='升级失败: '+resp.error;}}};xhr.open('POST','/ota/upload');xhr.send(formData);}</script></body></html>";
+    String html = getWebComponent();
+    html += R"(
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>OTA升级</title>
+    <style>
+        .progress {
+            width: 100%;
+            max-width: 400px;
+            height: 40px;
+            background: linear-gradient(to right, #e8f4f8, #f0f0f0);
+            border-radius: 20px;
+            margin: 20px auto 0 auto;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--blue) 0%, var(--cyan) 100%);
+            width: 0%;
+            transition: width 0.4s ease;
+            text-align: center;
+            line-height: 40px;
+            color: var(--white);
+            font-weight: 600;
+            font-size: 15px;
+            box-shadow: 0 2px 8px rgba(0, 103, 182, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                left: -100%;
+            }
+
+            100% {
+                left: 100%;
+            }
+        }
+
+        #status {
+            margin-top: 16px;
+            min-height: 24px;
+            color: var(--blue);
+            font-size: 1.08em;
+        }
+    </style>
+</head>
+
+<body>
+    <web-styles></web-styles>
+    <div class='container'>
+        <button class='btn-red' onclick='goBack()' style='position: absolute; left: 25px; top: 20;'>返回</button>
+
+        <h1>OTA固件升级</h1>
+        <h3>方式1: 从URL升级</h3>
+        <input type='text' id='otaUrl' placeholder='http://yourserver.com/firmware.bin'>
+        <button class='btn-blue' onclick='startOTAFromURL(event)'>开始URL升级</button>
+        <br><br>
+
+        <h3>方式2: 上传固件文件</h3>
+        <input type='file' id='otaFile' accept='.bin'>
+        <button class='btn-cyan' onclick='startOTAFromFile()'>开始文件升级</button>
+        <div class='progress' id='progressBar' style='display:none;'>
+            <div class='progress-bar' id='progress'>0%</div>
+        </div>
+        <p id='status'></p>
+    </div>
+    <script>
+        var pollInterval = null;
+        function goBack() {
+            window.location.href = '../';
+        }
+        function OTASuccess() {
+            document.getElementById('status').innerText = '升级成功!设备将重启...';
+            setTimeout(function () { 
+                alert('请手动关闭此页面。');
+                document.body.innerHTML = `
+                <div class='container'>
+                    <svg width='56' height='56' viewBox='0 0 24 24' fill='none' stroke='#0067b6' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' style='margin-bottom: 18px;'>
+                        <circle cx='12' cy='12' r='10' fill='#eaf6ff' />
+                        <polyline points='8 12.5 11 15.5 16 10.5' stroke='#2ecc71' stroke-width='2.2' fill='none' />
+                        <circle cx='12' cy='12' r='10' stroke='#0067b6' stroke-width='2.2' fill='none' />
+                    </svg>
+                    <h1>OTA已完成</h1>
+                    <p style='font-size: 1.18em; color: var(--gray-lighter); margin-bottom: 18px;'>请手动关闭此页面</p>
+                </div>
+                `;
+            }, 2000);
+        }
+        function startOTAFromURL(event) {
+            var url = document.getElementById('otaUrl').value;
+            if (!url) { alert('请输入URL'); return; }
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'http://' + url;
+            }
+
+            var btn = event.target;
+            btn.disabled = true;
+            document.getElementById('status').innerText = '正在启动 OTA...';
+            document.getElementById('progressBar').style.display = 'block';
+            fetch('/ota/url?url=' + encodeURIComponent(url))
+                .then(r => {
+                    if (r.status === 202) {
+                        document.getElementById('status').innerText = '正在下载固件...';
+                        pollInterval = setInterval(function () {
+                            // /ota/progress返回Json的 progress status error对象
+                            fetch('/ota/progress')
+                                .then(r => r.json())
+                                .then(data => {
+                                    var pct = data.progress || 0;
+                                    document.getElementById('progress').style.width = pct + '%';
+                                    document.getElementById('progress').innerText = pct + '%';
+                                    if (data.status === 'success') {
+                                        clearInterval(pollInterval);
+                                        OTASuccess();
+                                    } else if (data.status === 'failed') {
+                                        clearInterval(pollInterval);
+                                        document.getElementById('status').innerText = '升级失败: ' + data.error;
+                                        btn.disabled = false;
+                                    }
+                                })
+                                .catch(() => { });
+                        }, 500);
+                    } else if (!r.ok) {
+                        throw new Error('HTTP ' + r.status);
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('status').innerText = '启动OTA失败: ' + error.message;
+                    btn.disabled = false;
+                    document.getElementById('progressBar').style.display = 'none';
+                });
+        }
+
+        function startOTAFromFile() {
+            var file = document.getElementById('otaFile').files[0];
+            if (!file) { alert('请选择文件'); return; }
+
+            document.getElementById('progressBar').style.display = 'block';
+            document.getElementById('status').innerText = '正在上传固件...';
+
+            var formData = new FormData();
+            formData.append('firmware', file);
+            var xhr = new XMLHttpRequest();
+            xhr.upload.onprogress = function (e) {
+                if (e.lengthComputable) {
+                    var pct = Math.round((e.loaded / e.total) * 100);
+                    document.getElementById('progress').style.width = pct + '%';
+                    document.getElementById('progress').innerText = pct + '%';
+                }
+            };
+
+            xhr.onload = function () {
+                if (xhr.status == 200) {
+                    var resp = JSON.parse(xhr.responseText);
+                    if (resp.success) {
+                        OTASuccess();
+                    } else {
+                        document.getElementById('status').innerText = '升级失败: ' + resp.error;
+                    }
+                }
+                else {
+                    document.getElementById('status').innerText = '上传失败: HTTP ' + xhr.status;
+                }
+            };
+            xhr.open('POST', '/ota/upload');
+            xhr.send(formData);
+        }
+    </script>
+</body>
+
+</html>
+    )";
     setting_server.send(200, "text/html; charset=utf-8", html);
 }
 
@@ -121,15 +309,29 @@ void webSettingHandleOTAUpload() {
 }
 
 String errorCitySerachHandle(String errorMsg) {
-    String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>城市搜索错误</title>";
-    html += "<style>:root{--blue:#0067b6;--red:#e57373;--white:#fff;--border-radius:8px;--shadow:0 4px 12px rgba(0,0,0,0.08);}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#343a40;}.container{max-width:380px;margin:32px auto;padding:24px;background:rgba(255,255,255,0.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:var(--border-radius);box-shadow:var(--shadow);}h2{color:var(--red);font-weight:600;margin-bottom:12px;}p{font-size:1.18em;color:#6a7690;margin-bottom:18px;}svg{margin-bottom:18px;}</style>";
-    html += "<meta http-equiv='refresh' content='2;url=/'>";
-    html += "</head><body><div class='container'>";
-    html += "<svg width='56' height='56' viewBox='0 0 24 24' fill='none' stroke='#e57373' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10' fill='#fdeaea'/><line x1='8' y1='15' x2='16' y2='9' stroke='#e57373' stroke-width='2.2'/><line x1='16' y1='15' x2='8' y2='9' stroke='#e57373' stroke-width='2.2'/><circle cx='12' cy='12' r='10' stroke='#e57373' stroke-width='2.2' fill='none'/></svg>";
-    html += "<h2>城市搜索失败</h2>";
-    html += "<p>" + errorMsg + "</p>";
-    html += "<p>2秒后自动返回主页</p>";
-    html += "</div></body></html>";
+    String html = getWebComponent();
+
+    html += R"(
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset='UTF-8'>
+	<meta name='viewport' content='width=device-width, initial-scale=1.0'>
+	<title>城市搜索</title>
+</head>
+<body>
+	<web-styles></web-styles>
+	<div class='container'>
+		<svg class='icon-error' width='56' height='56' viewBox='0 0 24 24' fill='none' stroke='#e57373' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10' fill='#ffeaea'/><line x1='8' y1='8' x2='16' y2='16' stroke='#e57373' stroke-width='2.2'/><line x1='16' y1='8' x2='8' y2='16' stroke='#e57373' stroke-width='2.2'/><circle cx='12' cy='12' r='10' stroke='#e57373' stroke-width='2.2' fill='none'/></svg>
+		<h1 style='color: var(--red)'>)" + errorMsg + R"("</h1>
+		<div class='desc'>2秒后自动返回主页...</div>
+	</div>
+</body>
+<script>
+		setTimeout(function(){window.location.href = '/';}, 2000);
+</script>
+</html>
+    )";
     return html;
 }
 
@@ -140,7 +342,97 @@ void webSettingHandleRoot() {
     String varProjectID = projectID;
     String varBase64Key = base64Key;
 
-    String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>ESP32 配置页面</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--red:#e57373;--red-dark:#d35f5f;--cyan:#77eedd;--cyan-dark:#55ccbb;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;}.container{max-width:380px;margin:32px auto;padding:24px;background:rgba(255,255,255,0.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:var(--border-radius);box-shadow:var(--shadow);}h2{text-align:center;margin-bottom:24px;color:var(--blue);font-weight:600;}.main-buttons{display:grid;grid-template-columns:1fr 1fr;gap:16px;}.btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:none;border-radius:var(--border-radius);font-size:16px;font-weight:500;cursor:pointer;transition:background-color 0.2s ease,transform 0.1s ease;color:var(--white);text-decoration:none;}.btn:hover{transform:translateY(-2px);}.btn:active{transform:translateY(0);}.btn svg{vertical-align:middle;}.search-btn{background-color:var(--blue);}.search-btn:hover{background-color:var(--blue-dark);}.ota-btn{background-color:var(--cyan);color:var(--gray-lighter);}.ota-btn:hover{background-color:var(--cyan-dark);}.key-btn{background-color:var(--gray-dark);}.key-btn:hover{background-color:var(--gray-dark);}.exit-btn{background-color:var(--red);}.exit-btn:hover{background-color:var(--red-dark);}#key-settings-form{margin-top:24px;padding:20px;background-color:#fdfdff;border:1px solid var(--border);border-radius:var(--border-radius);}.key-fields{display:flex;flex-direction:column;gap:12px;}.key-fields label{font-weight:500;color:var(--gray);}.key-fields input[type=text]{width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:16px;transition:border-color 0.2s,box-shadow 0.2s;}.key-fields input[type=text]:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,123,255,0.25);}.button-row{display:flex;justify-content:flex-end;margin-top:20px;}.submit-btn{background-color:var(--blue);}.submit-btn:hover{background-color:var(--blue-dark);}</style></head><body><div class='container'><h2>ESP32 设置</h2><div class='main-buttons'><button type='button' class='btn search-btn' onclick='openCitySearch()'><svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'></circle><line x1='21' y1='21' x2='16.65' y2='16.65'></line></svg><span>搜索城市</span></button><button type='button' class='btn ota-btn' onclick=\"location.href='/ota'\"><svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'></path><polyline points='17 8 12 3 7 8'></polyline><line x1='12' y1='3' x2='12' y2='15'></line></svg><span>OTA升级</span></button><button type='button' id='toggle-key-btn' class='btn key-btn' onclick='toggleKeySettings()'><svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4'></path></svg><span>和风天气密钥</span></button><button type='button' class='btn exit-btn' onclick='exitSettings()'><svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'></path><polyline points='16 17 21 12 16 7'></polyline><line x1='21' y1='12' x2='9' y2='12'></line></svg><span>退出设置</span></button></div><form id='key-settings-form' action='/set' method='GET' style='display:none;'><div class='key-fields'><label>和风天气 API Host:</label><input type='text' name='host' value='" + varApiHost + "'><label for='kid'>凭据ID:</label><input id='kid' type='text' name='kid' value='" + varKid + "'><label for='project'>项目ID:</label><input id='project' type='text' name='project' value='" + varProjectID + "'><label for='key'>私钥:</label><input id='key' type='text' name='key' value='" + varBase64Key + "'></div><div class='button-row'><input type='submit' value='提交' class='btn submit-btn'></div></form></div><script>function openCitySearch(){window.location.href='/citysearch';}function exitSettings(){fetch('/exit').finally(()=>{alert('请手动关闭此页面。');document.body.innerHTML = `<div class='container' style='max-width: 420px; margin: 60px auto; padding: 36px 28px; background: var(--white); border-radius: var(--border-radius); box-shadow: var(--shadow); display: flex; flex-direction: column; align-items: center;'><svg width='56' height='56' viewBox='0 0 24 24' fill='none' stroke='#0067b6' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' style='margin-bottom: 18px;'><circle cx='12' cy='12' r='10' fill='#eaf6ff'/><polyline points='8 12.5 11 15.5 16 10.5' stroke='#2ecc71' stroke-width='2.2' fill='none'/><circle cx='12' cy='12' r='10' stroke='#0067b6' stroke-width='2.2' fill='none'/></svg><h2 style='color: var(--primary-color); font-weight: 600; margin-bottom: 12px;'>设置已完成</h2><p style='font-size: 1.18em; color: var(--dark-gray); margin-bottom: 18px;'>请手动关闭此页面</p></div><style>body { background: linear-gradient(90deg, rgba(179,255,253,0.5) 0%, rgba(227,230,255,0.5) 50%, rgba(253,229,245,0.5) 100%); }</style>`;});}function toggleKeySettings(){var form=document.getElementById('key-settings-form');var btn=document.getElementById('toggle-key-btn').querySelector('span');if(form.style.display==='none'){form.style.display='block';btn.textContent='收起密钥设置';}else{form.style.display='none';btn.textContent='和风天气密钥';}}</script></body></html>";
+    String html = getWebComponent();
+
+    html += R"(
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>ESP32 配置页面</title>
+    <style>
+        .main-buttons{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+        .button-row{display:flex;justify-content:flex-end;margin-top:10px;}
+        #key-settings-form{text-align:left;width:80%;display:none;}
+    </style>
+</head>
+<body>
+    <web-styles></web-styles>
+    <div class='container'>
+        <h1>ESP32 设置</h1>
+        <div class='main-buttons'>
+            <button type='button' class='btn-blue' onclick='openCitySearch()'>
+                <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                    <circle cx='11' cy='11' r='8'></circle>
+                    <line x1='21' y1='21' x2='16.65' y2='16.65'></line>
+                </svg>
+                <span>搜索城市</span>
+            </button>
+            <button type='button' class='btn-cyan' onclick="location.href='/ota'">
+                <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                    <path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'></path>
+                    <polyline points='17 8 12 3 7 8'></polyline>
+                    <line x1='12' y1='3' x2='12' y2='15'></line>
+                </svg>
+                <span>OTA升级</span>
+            </button>
+            <button type='button' id='toggle-key-btn' class='btn-gray' onclick='toggleKeySettings()'>
+                <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                    <path d='M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4'></path>
+                </svg>
+                <span>和风天气密钥</span>
+            </button>
+            <button type='button' class='btn-red' onclick='exitSettings()'>
+                <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                    <path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'></path>
+                    <polyline points='16 17 21 12 16 7'></polyline>
+                    <line x1='21' y1='12' x2='9' y2='12'></line>
+                </svg>
+                <span>退出设置</span>
+            </button>
+        </div>
+        <form id='key-settings-form' action='/set' method='GET' style='margin-top:10px;'>
+            <label>和风天气 API Host:</label><input type='text' name='host' value=')" + varApiHost + R"('>
+            <label for='kid'>凭据ID:</label><input id='kid' type='text' name='kid' value=')" + varKid + R"('>
+            <label for='project'>项目ID:</label><input id='project' type='text' name='project' value=')" + varProjectID + R"('>
+            <label for='key'>私钥:</label><input id='key' type='text' name='key' value=')" + varBase64Key + R"('>
+            <div style='display:flex;justify-content:flex-end;margin-top:10px;'>
+                <input type='submit' value='提交' class='btn-blue'>
+            </div>
+        </form>
+    </div>
+    <script>
+        function openCitySearch(){window.location.href='/citysearch';}
+        function exitSettings(){
+            fetch('/exit').finally(()=>{
+                alert('请手动关闭此页面。');
+                document.body.innerHTML=`<div class='container'>
+                    <svg width='56' height='56' viewBox='0 0 24 24' fill='none' stroke='#0067b6' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' style='margin-bottom:18px;'>
+                        <circle cx='12' cy='12' r='10' fill='#eaf6ff'/>
+                        <polyline points='8 12.5 11 15.5 16 10.5' stroke='#2ecc71' stroke-width='2.2' fill='none'/>
+                        <circle cx='12' cy='12' r='10' stroke='#0067b6' stroke-width='2.2' fill='none'/>
+                    </svg>
+                    <h1>设置已完成</h1>
+                    <p style='font-size:1.18em;color:var(--gray-lighter);margin-bottom:18px;'>请手动关闭此页面</p>
+                </div>`;
+            });
+        }
+        function toggleKeySettings(){
+            var form=document.getElementById('key-settings-form');
+            var btn=document.getElementById('toggle-key-btn').querySelector('span');
+            if(form.style.display==='block'){
+                form.style.display='none';
+                btn.textContent='和风天气密钥';
+            }else{
+                form.style.display='block';
+                btn.textContent='收起密钥设置';
+            }
+        }
+    </script>
+</body>
+</html>
+    )";
 
     setting_server.send(200, "text/html; charset=utf-8", html);
 }
@@ -249,56 +541,104 @@ void web_setting_setupWebServer() {
 
     setting_server.on("/exit", [](){
         isConfigDone = true;
-        // setting_server.send(200, "text/plain", "Exiting configuration...");
+        setting_server.send(200, "text/plain", "Exiting configuration...");
     });
 
     // 城市搜索页面
     setting_server.on("/citysearch", [](){
-        String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>城市搜索</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;}.container{max-width:380px;margin:32px auto;padding:24px;background:rgba(255,255,255,0.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:var(--border-radius);box-shadow:var(--shadow);}h2{text-align:center;margin-bottom:24px;color:var(--blue);font-weight:600;}.search-form{display:flex;flex-direction:column;gap:16px;}.search-form input[type=text]{width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:16px;transition:border-color 0.2s,box-shadow 0.2s;}.search-form input[type=text]:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,123,255,0.15);}.search-form input[type=submit]{background-color:var(--blue);color:var(--white);padding:12px;border:none;border-radius:var(--border-radius);font-size:16px;font-weight:500;cursor:pointer;transition:background-color 0.2s,transform 0.1s;}.search-form input[type=submit]:hover{background-color:var(--blue-dark);transform:translateY(-2px);}</style></head><body><div class='container'><div class='header' style='position:relative;margin-bottom:18px;'><button class='btn-back' onclick='goBack()'>返回</button><h2 style='margin:0;'>城市搜索</h2></div><style>.btn-back{position:absolute;left:0px;top:0;background-color:var(--red-dark,#d35f5f);color:var(--white);border:none;border-radius:var(--border-radius);padding:10px 20px;cursor:pointer;font-size:16px;font-weight:500;transition:background-color 0.2s;}.btn-back:hover{background-color:var(--red-dark,#d35f5f);}</style><form class='search-form' action='/citysearch_result' method='GET'><input type='text' name='location' placeholder='请输入城市名或拼音' required><input type='submit' value='搜索'></form></div></body><script>function goBack(){window.location.href='../';}</script></html>";
+        String html = getWebComponent();
+        html += R"(
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>城市搜索</title>
+</head>
+<body>
+    <web-styles></web-styles>
+    <div class='container' style='position: relative;'>
+        <button type='button' class='btn-red' onclick='goBack()' style='position: absolute; left: 25px; top: 20;'>返回</button>
+        <div style='margin-bottom:18px;'>
+            <h1 style='text-align: center; margin:0;'>城市搜索</h1>
+        </div>
+        <form action='/citysearch_result' method='GET'>
+            <input type='text' name='location' placeholder='请输入城市名或拼音' required style='width: 100%;'>
+            <div style='display: flex;flex-direction: column; gap: 16px; width: 100%;'>
+                <input type='submit' value='搜索' class='btn-blue' onclick='showLoading()'>
+            </div>
+        </form>
+        <div class='loading hidden'>
+            <div class='spinner'></div>
+            <p>搜索中...</p>
+        </div>
+    </div>
+</body>
+<script>
+    function goBack() {
+        window.location.href = '../';
+    }
+    function showLoading() {
+        var input = document.querySelector('input[name=\'location\']');
+        if (input.value.trim() === '') return;
+        document.querySelector('.loading').classList.remove('hidden');
+    }
+</script>
+</html>
+        )";
+
         setting_server.send(200, "text/html; charset=utf-8", html);
     });
 
     // 城市搜索结果页面
     setting_server.on("/citysearch_result", [](){
         if (!setting_server.hasArg("location")) {
-            String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>缺少搜索参数</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--red:#e57373;--red-dark:#d35f5f;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;}.container{max-width:380px;margin:32px auto;padding:24px;background:rgba(255,255,255,0.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:var(--border-radius);box-shadow:var(--shadow);}.icon-error{width:56px;height:56px;margin-bottom:18px;}h2{color:var(--red-dark);font-weight:600;margin-bottom:12px;}.desc{font-size: 1.1em;color: var(--gray-dark);margin-bottom: 8px;}</style><script>setTimeout(function(){window.location.href='/';},2000);</script></head><body><div class='container'><svg class='icon-error' viewBox='0 0 24 24' fill='none' stroke='#e57373' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10' fill='#ffeaea'/><line x1='8' y1='8' x2='16' y2='16' stroke='#e57373' stroke-width='2.2'/><line x1='16' y1='8' x2='8' y2='16' stroke='#e57373' stroke-width='2.2'/><circle cx='12' cy='12' r='10' stroke='#e57373' stroke-width='2.2' fill='none'/></svg><h2>缺少搜索参数</h2><div class='desc'>2秒后自动返回主页...</div></div></body></html>";
+            LOG_WEATHER_WARN("City search request missing 'location' parameter");
+            setting_server.send(200, "text/html; charset=utf-8", errorCitySerachHandle("请输入地名"));
             return;
         }
+
         String location = setting_server.arg("location");
         location.trim();
 
         // 读取API配置
         String varApiHost = apiHost;
+        varApiHost.trim();
         String varKid = kid;
+        varKid.trim();
         String varProjectID = projectID;
+        varProjectID.trim();
         String varBase64Key = base64Key;
+        varBase64Key.trim();
 
         String jwtToken;
+        jwtToken.trim();
         
         // 确保先生成seed32
         generateSeed32();
+
         // 生成JWT
         jwtToken = generate_jwt(varKid, varProjectID, seed32);
         LOG_WEATHER_DEBUG("City search JWT token generated, length: " + String(jwtToken.length()));
            
         if (varApiHost.length() == 0 || jwtToken.length() == 0) {
             LOG_WEATHER_ERROR("API configuration missing for city search (host or token empty)");
-            setting_server.send(200, "text/html; charset=utf-8", "API配置缺失，请先配置主页面参数");
+            setting_server.send(200, "text/html; charset=utf-8", errorCitySerachHandle("API配置错误"));
             return;
         }
 
         // 请求城市搜索API
         String url = "https://" + varApiHost + "/geo/v2/city/lookup?location=" + location + "&number=10";
         LOG_WEATHER_INFO("City search request URL: " + url);
+        
         HTTPClient http;
-        http.begin(url);
+        http.begin(url);                            // 让HTTPClient自动处理HTTPS和DNS
         http.addHeader("Accept-Encoding", "gzip");
         http.addHeader("Authorization", "Bearer " + jwtToken);
         LOG_WEATHER_DEBUG("City search authorization header set");
+        
         int httpCode = http.GET();
         LOG_WEATHER_INFO("City search HTTP response code: " + String(httpCode));
-        String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>搜索结果</title></head><body>";
-        html += "<h2>搜索结果</h2>";
         if (httpCode != 200) {
             http.end();
             setting_server.send(200, "text/html; charset=utf-8", errorCitySerachHandle("请求失败，HTTP代码：" + String(httpCode)));
@@ -385,25 +725,47 @@ void web_setting_setupWebServer() {
             setting_server.send(200, "text/html; charset=utf-8", errorCitySerachHandle("未找到匹配的城市"));
             return;
         }
-        
-        html += "<div style='max-width:420px;margin:40px auto;padding:28px 24px;background:#fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.08);'>";
-        html += "<h2 style='text-align:center;color:#0067b6;font-weight:600;margin-bottom:24px;'>搜索结果</h2>";
-        html += "<ul style='list-style:none;padding:0;margin:0;'>";
+
+        String html = getWebComponent();
+        html += R"(
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='UTF-8'>
+    <title>搜索结果</title>
+</head>
+<body>
+    <web-styles></web-styles>
+      <div class='container'>
+          <button type='button' class='btn-red' onclick='goBack()' style='position: absolute; left: 25px; top: 20;'>返回</button>
+          <h1>搜索结果</h1>
+          <ul style='list-style:none;padding:0;margin:0;display:grid;grid-template-columns:1fr 1fr;gap:16px;'>
+        )";
         for (JsonObject obj : locArr) {
             String name = obj["name"].as<String>();
             String adm1 = obj["adm1"].as<String>();
             String country = obj["country"].as<String>();
             String locid = obj["id"].as<String>();
             String fxlink = obj["fxLink"].as<String>();
-            html += "<li style='margin:16px 0;display:flex;justify-content:center;'>";
-            html += "<form action='/set_location' method='POST' style='display:inline;'>";
+
+            html += "<li style='margin:0;'><form action='/set_location' method='POST' style='display:inline;'>";
             html += "<input type='hidden' name='locid' value='" + locid + "'>";
             html += "<input type='hidden' name='fxlink' value='" + fxlink + "'>";
-            html += "<button type='submit' style='padding:12px 28px;border-radius:6px;background:#0067b6;color:#fff;border:none;cursor:pointer;font-size:16px;font-weight:500;box-shadow:0 2px 8px rgba(0,103,182,0.10);transition:background 0.2s;min-width:180px;'>" + name + " (" + adm1 + ", " + country + ")</button>";
+            html += "<button type='submit' class = 'btn-blue'>" + name + " (" + adm1 + ", " + country + ")</button>";
             html += "</form></li>";
         }
-        html += "</ul>";
-        html += "</div>";
+        html += R"(
+</ul>
+    </div>
+</body>
+<script>
+    function goBack() {
+        window.location.href = '../citysearch';
+    }
+</script>
+</html>
+        )";
+
         setting_server.send(200, "text/html; charset=utf-8", html);
     });
 
@@ -472,8 +834,31 @@ void web_setting_setupWebServer() {
         isReadyToDisplay = false;
         
         // 返回成功页面并自动关闭弹出窗口
-        String response = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>设置成功</title><style>:root{--blue:#0067b6;--blue-dark:#0045a4;--green:#4CAF50;--gray-dark:#6a7690;--gray:#6c757d;--gray-light:#f8f9fa;--gray-lighter:#343a40;--white:#fff;--border:#dee2e6;--shadow:0 4px 12px rgba(0,0,0,0.08);--border-radius:8px;}*{box-sizing:border-box;margin:0;padding:0;}body{background:linear-gradient(90deg,rgba(179,255,253,0.5) 0%,rgba(227,230,255,0.5) 50%,rgba(253,229,245,0.5) 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:var(--gray-light);color:var(--gray-lighter);line-height:1.5;}.container{max-width:380px;margin:32px auto;padding:24px;background:rgba(255,255,255,0.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:var(--border-radius);box-shadow:var(--shadow);}.icon-success{width:56px;height:56px;margin-bottom:18px;}h2{color:var(--green);font-weight:600;margin-bottom:12px;}.info{margin:10px 0;color:var(--gray);font-size:1.08em;}.desc{font-size:1.1em;color:var(--gray-dark);margin-bottom:8px;}</style><script>setTimeout(function(){window.location.href='/';},2000);</script></head><body><div class='container'><svg class='icon-success' viewBox='0 0 24 24' fill='none' stroke='#4CAF50' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10' fill='#eaf6ff'/><polyline points='8 12.5 11 15.5 16 10.5' stroke='#4CAF50' stroke-width='2.2' fill='none'/><circle cx='12' cy='12' r='10' stroke='#4CAF50' stroke-width='2.2' fill='none'/></svg><h2>✓ 设置成功</h2><div class='info'>LocationID: " + locid + "</div><div class='info'>城市: " + cityname + "</div><div class='desc'>窗口将在2秒后自动关闭...</div></div></body></html>";
-        
+        String response = getWebComponent();
+        response += R"(
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>设置成功</title>
+</head>
+<body>
+    <web-styles></web-styles>
+    <div class='container'>
+        <svg class='icon-success' width='56' height='56' viewBox='0 0 24 24' fill='none' stroke='#4CAF50' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10' fill='#eaf6ff'/><polyline points='8 12.5 11 15.5 16 10.5' stroke='#4CAF50' stroke-width='2.2' fill='none'/><circle cx='12' cy='12' r='10' stroke='#4CAF50' stroke-width='2.2' fill='none'/></svg>
+        <h1>设置成功</h1>
+        <div class='info'>LocationID: )" + locid + R"(</div>
+        <div class='info'>城市: )" + cityname + R"(</div>
+        <div class='desc'>窗口将在2秒后自动关闭...</div>
+    </div>
+</body>
+<script>
+		setTimeout(function(){window.location.href = '/';}, 2000);
+</script>
+</html>
+        )";
+
         setting_server.send(200, "text/html; charset=utf-8", response);
     });
     

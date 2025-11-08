@@ -1,0 +1,24 @@
+<script src="component.js"></script>
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置成功</title>
+</head>
+<body>
+    <web-styles></web-styles>
+    <div class="container">
+        <svg class="icon-success" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" fill="#eaf6ff"/><polyline points="8 12.5 11 15.5 16 10.5" stroke="#4CAF50" stroke-width="2.2" fill="none"/><circle cx="12" cy="12" r="10" stroke="#4CAF50" stroke-width="2.2" fill="none"/></svg>
+        <h1>设置成功</h1>
+        <div class="info">LocationID: " + locid + "</div>
+        <div class="info">城市: " + cityname + "</div>
+        <div class="desc">窗口将在2秒后自动关闭...</div>
+    </div>
+</body>
+<script>
+		setTimeout(function(){window.location.href = '/';}, 2000);
+</script>
+</html>
