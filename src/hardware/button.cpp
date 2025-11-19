@@ -49,7 +49,7 @@ void scanButtonsTask(void *pvParameters) {
             btn.lastState = currentState;
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(10));  // 扫描频率10ms，提升响应速度
     }
 }
 
@@ -57,8 +57,9 @@ void scanButtonsTask(void *pvParameters) {
 // 处理按键事件
 void handleButtonsTask(void *pvParameters) {
     while (true) {
+
+        // 菜单模式下按键逻辑交由菜单处理函数处理
         if (inMenuMode) {
-            // 菜单模式下按键逻辑交由菜单处理函数处理
             vTaskDelay(pdMS_TO_TICKS(100));     // 节流
             continue;
         }

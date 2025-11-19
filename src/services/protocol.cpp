@@ -7,6 +7,8 @@ static float currentFPS = 0.0f;
 
 // 解码函数
 void processIncoming(const uint8_t* raw, unsigned int fullLen) {
+    if (inMenuMode) return;
+    
     LOG_DISPLAY_VERBOSE("Processing incoming data frame of length " + String(fullLen) + " bytes");
 
     // LOG_DISPLAY_VERBOSE("Raw bytes: ");
@@ -14,10 +16,6 @@ void processIncoming(const uint8_t* raw, unsigned int fullLen) {
     //     LOG_DISPLAY_VERBOSE("0x" + String(raw[i], HEX));
     //     LOG_DISPLAY_VERBOSE(" ");
     // }
-
-    if (inMenuMode) {
-        return;
-    }
 
     // 帧率统计
     uint32_t now = millis();

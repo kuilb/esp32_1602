@@ -351,6 +351,10 @@ void wifiConnectTask(void* parameter) {
 				LOG_WIFI_INFO("starting background time sync...");
 				initTimeSync();
 				
+				// 启用WiFi Modem Sleep以降低功耗
+				WiFi.setSleep(true);
+				LOG_WIFI_INFO("WiFi Modem Sleep enabled for power saving");
+				
 				// 创建后台时间同步任务
 				xTaskCreate(timeSyncTask, "TimeSyncTask", 4096, NULL, 1, NULL);
 		} else {
@@ -370,9 +374,9 @@ void connectToWiFi() {
 		_loadWiFiCredentials();
 
 		if (savedSSID == "") {
-				LOG_WIFI_WARN("config not found, entering config mode");
+				LOG_WIFI_WARN("config not found");
 				wifiConnectionState = WIFI_FAILED;
-				// enterConfigMode();
+				updateColor(CRGB::Red);  		// 无配置红灯
 				return;
 		}
 
@@ -391,7 +395,6 @@ void connectToWiFi() {
 
 // 初始化wifi
 void wifiinit(){
-	// 连接WiFi
 	if (digitalRead(BUTTEN_CENTER_PIN)) {
 			LOG_WIFI_INFO("Entering config mode by button");
 			enterConfigMode();

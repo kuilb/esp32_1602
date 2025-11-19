@@ -60,7 +60,7 @@ void listDir(const char* dirname, uint8_t levels) {
 
 void setup() {
     // 首先初始化日志系统
-    Logger::init(LOG_LEVEL_DEBUG);  // 可以通过此处调整全局日志级别
+    Logger::init(LOG_LEVEL_VERBOSE);  // 可以通过此处调整全局日志级别
     
     init();
     initrgb();
@@ -70,10 +70,10 @@ void setup() {
 
     // 欢迎消息
     lcdText("Wireless 1602A",1);
-    lcdText("2025/11/02",2);
+    lcdText("2025/11/18",2);
 
     LOG_SYSTEM_INFO("Wireless 1602A by Kulib");
-    LOG_SYSTEM_INFO("2025/11/01");
+    LOG_SYSTEM_INFO("2025/11/18");
     LOG_SYSTEM_INFO("开始初始化...");
 
     // 挂载 SPIFFS
@@ -124,4 +124,6 @@ void loop(){
     acceptClientIfNew();
     receiveClientData();
     tryDisplayCachedFrames();
+    
+    vTaskDelay(1);  // 1ms延时节流
 }

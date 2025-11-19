@@ -21,7 +21,7 @@ const AboutPage aboutMePages[] = {
 };
 
 const AboutPage aboutProjectPages[] = {
-    {"ESP32 1602A", "Ver.2025/11/3"},
+    {"ESP32 1602A", "Ver.2025/11/18"},
     {"ESP32-S3-N8R8", "8MB FLASH+PSRAM"},
     {"Features:", "Wireless LCD"},
     {"WiFi Config", "AP + Web UI"},
@@ -60,9 +60,6 @@ void aboutMe(){
     inMenuMode = false;
     int currentPage = 0;
     const int totalPages = 6; // 页面数量
-    
-    // 初始延迟，防止一进入就退出
-    globalButtonDelay(FIRST_TIME_DELAY);
     
     while(true) {
         showAboutPage(aboutMePages[currentPage].line1, aboutMePages[currentPage].line2);

@@ -2,7 +2,6 @@
 #include "utils/logger.h"
 
 // 时间同步相关变量
-volatile bool isTimeSyncInProgress = false;
 static unsigned long timeSyncStartTime = 0;
 static unsigned long lastTimeSyncAttempt = 0;
 TimeSyncState timeSyncState = TIME_SYNC_IDLE;
@@ -27,7 +26,7 @@ void initTimeSync() {
     
     LOG_TIME_INFO("Initializing time sync...");
     configTime(GMT_OFFSET_HOUR * 3600, 0, "ntp.aliyun.com", "ntp1.aliyun.com", "ntp.ntsc.ac.cn");
-    isTimeSyncInProgress = true;
+    timeSyncState = TIME_SYNC_IN_PROGRESS;
     timeSyncStartTime = millis();
     lastTimeSyncAttempt = millis();
     LOG_TIME_DEBUG("NTP servers configured, waiting for response...");
@@ -35,7 +34,8 @@ void initTimeSync() {
 
 // 更新时间同步状态
 void updateTimeSync() {
-    if (timeSyncState == TIME_SYNC_IN_PROGRESS || timeSyncState == TIME_SYNC_SUCCESS || WiFi.status() != WL_CONNECTED) {
+    if (timeSyncState == TIME_SYNC_SUCCESS || WiFi.status() != WL_CONNECTED) {
+        LOG_TIME_WARN("Time sync not in progress or already successful, or WiFi not connected");
         return;
     }
     
@@ -44,7 +44,7 @@ void updateTimeSync() {
     // 检查超时
     if (now - timeSyncStartTime > TIME_SYNC_TIMEOUT) {
         LOG_TIME_WARN("Sync timeout after 10 seconds");
-        isTimeSyncInProgress = false;
+        timeSyncState = TIME_SYNC_FAILED;
         return;
     }
     
@@ -55,7 +55,6 @@ void updateTimeSync() {
         if (getLocalTime(&localTimeInfo)) {
             LOG_TIME_INFO("NTP Time Synced successfully!");
             timeSyncState = TIME_SYNC_SUCCESS;
-            isTimeSyncInProgress = false;
             
             // 获取 UNIX 时间戳
             time_t unixTimestamp = mktime(&localTimeInfo);

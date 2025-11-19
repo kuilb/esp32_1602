@@ -114,6 +114,7 @@ bool fetchWeatherData() {
         LOG_WEATHER_ERROR("Missing API configuration");
         lcdText("No API config", 1);
         lcdText("Use web config", 2);
+        delay(1000);
         return false;
     }
 
@@ -122,6 +123,7 @@ bool fetchWeatherData() {
         LOG_WEATHER_ERROR("Missing city/location configuration");
         lcdText("No City Set", 1);
         lcdText("Use Web Config", 2);
+        delay(1000);
         return false;
     }
 

@@ -19,16 +19,16 @@ WiFiConnectionState currentWiFiState = WIFI_IDLE;
 tm currentTimeInfo;
 
 void _enterWirelessScreen(){
-    inMenuMode = false;
     LOG_MENU_INFO("Entering Wireless Screen");
+    inMenuMode = false;
 
+    // WiFi 未连接时，启动配网
     if (WiFi.status() != WL_CONNECTED) {
-        // WiFi 未连接时，启动配网
         LOG_MENU_INFO("Starting AP config mode from menu");
         enterConfigMode();
     }
+    // WiFi 已连接时，显示连接信息
     else{
-        // WiFi 已连接时，显示连接信息
         lcdText("SSID:" + savedSSID ,1);
         lcdText("IP:" + WiFi.localIP().toString(),2);
     }
@@ -40,7 +40,6 @@ void _enterBrightnessScreen() {
     snprintf(buf, sizeof(buf), "%d%%", (brightness * 100 + 127) / 255);
     lcdText(buf, 2);
 
-    globalButtonDelay(FIRST_TIME_DELAY);  // 进入时防抖
     int lastBrightness = brightness;
 
     while (!isButtonReadyToRespond(CENTER)) {
@@ -92,8 +91,6 @@ void _connectInfo(){
         lcdText("Not Connected", 1);
         lcdText("", 2);
     }
-    
-    globalButtonDelay(FIRST_TIME_DELAY);  // 防止立即退出
 
     for(;;){
         if(isButtonReadyToRespond(CENTER)){
@@ -107,13 +104,11 @@ void _connectInfo(){
 void _setClockInterface(){
     isNewInterface = true;
     currentState = STATE_CLOCK;
-    globalButtonDelay(FIRST_TIME_DELAY);  // 防止立即退出
 }
 
 void _setWeatherInterface(){
     isNewInterface = true;
     currentState = STATE_WEATHER;
-    globalButtonDelay(FIRST_TIME_DELAY);  // 防止立即退出
 }
 
 void _playBadAppleWrapper() {
@@ -178,10 +173,7 @@ int scrollOffset = -1;      // 当前显示窗口起始项，-1为状态栏
 
 // 初始化
 void initMenu() {
-    // 显示菜单界面
-    _displayMenu(currentMenu, menuCursor, scrollOffset);
-    
-    // 启动菜单任务
+    if(inConfigMode) return; // 配置模式不启动菜单任务
     xTaskCreate(_menuTask, "_menuTask", 16384, NULL, 1, &_menuTaskHandle);
 }
 
@@ -207,19 +199,21 @@ void _displayMenu(const Menu* menu, int menuIndex, int scrollOffset) {
                         break;
                     case WIFI_CONNECTED:
                         statusLine = "W:OK ";
-                        if(isTimeSyncInProgress){
+                        if(timeSyncState == TIME_SYNC_IN_PROGRESS){
                             statusLine += "T:Syncing...";
                         } else if (timeSyncState == TIME_SYNC_SUCCESS) {
                             strftime(timeBuf, sizeof(timeBuf), " %H:%M", &localTimeInfo);
                             statusLine += "T:OK " + String(timeBuf);
-                        } else {
-                            statusLine += "T:--";
+                        } else if(timeSyncState == TIME_SYNC_FAILED){
+                            statusLine += "T:Failed";
                         }
                         break;
                     case WIFI_FAILED:
                         statusLine = "W:can't connect";
                         break;
                     case WIFI_IDLE:
+                        statusLine = "W:idle";
+                        break;
                     default:
                         statusLine = "offline mode";
                         break;
@@ -289,12 +283,6 @@ void _handleMenuInterface() {
         isDisplayNeedsUpdate = false;
     }
 
-    static bool firstEntry = true;
-    if (firstEntry) {
-        globalButtonDelay(FIRST_TIME_DELAY);
-        firstEntry = false;
-    }
-
     int lastPressedButton = -1;
     for (int i = 0; i < 5; i++) {
         if (isButtonReadyToRespond(i, BUTTON_DEBOUNCE_DELAY)) { 
@@ -348,7 +336,6 @@ void _handleMenuInterface() {
             isDisplayNeedsUpdate = true;
 
             // 菜单选项
-            firstEntry = true;     // 重置防误触
             if (currentMenu->items[menuCursor].nextState != MENU_NONE) {
                 const Menu* nextMenu = _getMenuByState(currentMenu->items[menuCursor].nextState);
                 if (nextMenu) {
@@ -361,11 +348,14 @@ void _handleMenuInterface() {
                     } else {
                         scrollOffset = 0;
                     }
+                    
+                    globalButtonDelay(FIRST_TIME_DELAY);  // 切换菜单后防抖
                 }
             }
             // 动作选项
             else if (currentMenu->items[menuCursor].action) {
                 currentMenu->items[menuCursor].action();  // 触发动作
+                globalButtonDelay(FIRST_TIME_DELAY);  // 执行动作后防抖
             } 
             break;
     }
@@ -429,9 +419,13 @@ bool _checkStateChanges() {
         return true;
     }
 
-    if(timeSyncState == TIME_SYNC_SUCCESS && currentTimeInfo.tm_min != localTimeInfo.tm_min) {
-        currentTimeInfo = localTimeInfo;
-        return true;
+    // 只有在时间同步成功后才检查时间变化
+    if (timeSyncState == TIME_SYNC_SUCCESS) {
+        getLocalTime(&localTimeInfo);
+        if (currentTimeInfo.tm_min != localTimeInfo.tm_min) {
+            currentTimeInfo = localTimeInfo;
+            return true;
+        }
     }
     
     return false;
@@ -464,7 +458,7 @@ void _menuTask(void* parameter) {
                     if(isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)){
                         LOG_MENU_INFO("exit to main menu");
                         currentState = STATE_MENU;
-                        resetButtonDebounce();  // 重置防抖
+                        globalButtonDelay(FIRST_TIME_DELAY);  // 状态切换防抖
                         break;
                     }
 
@@ -473,6 +467,7 @@ void _menuTask(void* parameter) {
                 case STATE_WEATHER: 
                     if(!_ensureisTimeSynced()){
                         currentState = STATE_MENU;
+                        globalButtonDelay(FIRST_TIME_DELAY);  // 状态切换防抖
                         break;
                     }
 
@@ -504,7 +499,7 @@ void _menuTask(void* parameter) {
                     if(isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)){
                         LOG_MENU_INFO("exit to main menu");
                         currentState = STATE_MENU;
-                        resetButtonDebounce();  // 重置防抖
+                        globalButtonDelay(FIRST_TIME_DELAY);  // 状态切换防抖
                         break;
                     }
                     if(isReadyToDisplay == false){
@@ -526,6 +521,6 @@ void _menuTask(void* parameter) {
                     break;
             }
         }
-        vTaskDelay(10 / portTICK_PERIOD_MS);  // 稳定刷新
+        vTaskDelay(5 / portTICK_PERIOD_MS);  // 快速刷新提升响应
     }
 }

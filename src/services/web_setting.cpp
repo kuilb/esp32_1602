@@ -347,90 +347,144 @@ void webSettingHandleRoot() {
     html += R"(
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset='UTF-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
     <title>ESP32 配置页面</title>
     <style>
-        .main-buttons{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-        .button-row{display:flex;justify-content:flex-end;margin-top:10px;}
-        #key-settings-form{text-align:left;width:80%;display:none;}
+        .main-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .button-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+
+        #key-settings-form {
+            text-align: left;
+            width: 80%;
+            display: none;
+        }
     </style>
 </head>
+
 <body>
     <web-styles></web-styles>
     <div class='container'>
         <h1>ESP32 设置</h1>
         <div class='main-buttons'>
-            <button type='button' class='btn-blue' onclick='openCitySearch()'>
-                <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+            <button type='button' class='btn-blue' onclick='openCitySearch()'><svg xmlns='http://www.w3.org/2000/svg'
+                    width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'
+                    stroke-linecap='round' stroke-linejoin='round'>
                     <circle cx='11' cy='11' r='8'></circle>
                     <line x1='21' y1='21' x2='16.65' y2='16.65'></line>
-                </svg>
-                <span>搜索城市</span>
-            </button>
-            <button type='button' class='btn-cyan' onclick="location.href='/ota'">
-                <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                </svg><span>搜索城市</span></button>
+            <button type='button' class='btn-cyan' onclick="location.href='/ota'
+                "><svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none'
+                    stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
                     <path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'></path>
                     <polyline points='17 8 12 3 7 8'></polyline>
                     <line x1='12' y1='3' x2='12' y2='15'></line>
-                </svg>
-                <span>OTA升级</span>
-            </button>
-            <button type='button' id='toggle-key-btn' class='btn-gray' onclick='toggleKeySettings()'>
-                <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
-                    <path d='M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4'></path>
-                </svg>
-                <span>和风天气密钥</span>
-            </button>
-            <button type='button' class='btn-red' onclick='exitSettings()'>
-                <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                </svg><span>OTA升级</span></button>
+            <button type='button' id='toggle-key-btn' class='btn-gray' onclick='toggleKeySettings()'><svg
+                    xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none'
+                    stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                    <path
+                        d='M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4'>
+                    </path>
+                </svg><span>和风天气密钥</span></button>
+            <button type='button' class='btn-red' onclick='exitSettings()'><svg xmlns='http://www.w3.org/2000/svg'
+                    width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'
+                    stroke-linecap='round' stroke-linejoin='round'>
                     <path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'></path>
                     <polyline points='16 17 21 12 16 7'></polyline>
                     <line x1='21' y1='12' x2='9' y2='12'></line>
-                </svg>
-                <span>退出设置</span>
-            </button>
+                </svg><span>退出设置</span></button>
         </div>
-        <form id='key-settings-form' action='/set' method='GET' style='margin-top:10px;'>
-            <label>和风天气 API Host:</label><input type='text' name='host' value=')" + varApiHost + R"('>
-            <label for='kid'>凭据ID:</label><input id='kid' type='text' name='kid' value=')" + varKid + R"('>
-            <label for='project'>项目ID:</label><input id='project' type='text' name='project' value=')" + varProjectID + R"('>
-            <label for='key'>私钥:</label><input id='key' type='text' name='key' value=')" + varBase64Key + R"('>
-            <div style='display:flex;justify-content:flex-end;margin-top:10px;'>
-                <input type='submit' value='提交' class='btn-blue'>
+        <form id='key-settings-form' action='/set' method='GET' style='margin-top: 10px;'>
+            <label>和风天气 API Host:</label>
+            <input type='text' name='host' id='apiHost' value=')" + varApiHost +  R"(' required>
+
+            <label for='kid'>凭据ID:</label>
+            <input id='kid' type='text' name='kid' value=')" + varKid +  R"(' required>
+
+            <label for='project'>项目ID:</label>
+            <input id='project' type='text' name='project' value=')" + varProjectID + R"(' required>
+
+            <label for='key'>私钥:</label>
+            <input id='key' type='text' name='key' value=')" + varBase64Key + R"(' required>
+            <div style='display: flex; justify-content: flex-end; margin-top: 10px;'>
+                <button type='button' class='btn-blue' onclick='submitKeySettings()'>提交</button>
             </div>
+            <p id='key-error' style='color:#e57373;margin-top:8px;display:none;'>请完整填写所有字段。</p>
         </form>
     </div>
     <script>
-        function openCitySearch(){window.location.href='/citysearch';}
-        function exitSettings(){
-            fetch('/exit').finally(()=>{
+        function openCitySearch() {
+            window.location.href = '/citysearch';
+        }
+        function exitSettings() {
+            fetch('/exit').finally(() => {
                 alert('请手动关闭此页面。');
-                document.body.innerHTML=`<div class='container'>
-                    <svg width='56' height='56' viewBox='0 0 24 24' fill='none' stroke='#0067b6' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' style='margin-bottom:18px;'>
-                        <circle cx='12' cy='12' r='10' fill='#eaf6ff'/>
-                        <polyline points='8 12.5 11 15.5 16 10.5' stroke='#2ecc71' stroke-width='2.2' fill='none'/>
-                        <circle cx='12' cy='12' r='10' stroke='#0067b6' stroke-width='2.2' fill='none'/>
+                document.body.innerHTML = `
+                <div class='container'>
+                    <svg width='56' height='56' viewBox='0 0 24 24' fill='none' stroke='#0067b6' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' style='margin-bottom: 18px;'>
+                        <circle cx='12' cy='12' r='10' fill='#eaf6ff' />
+                        <polyline points='8 12.5 11 15.5 16 10.5' stroke='#2ecc71' stroke-width='2.2' fill='none' />
+                        <circle cx='12' cy='12' r='10' stroke='#0067b6' stroke-width='2.2' fill='none' />
                     </svg>
                     <h1>设置已完成</h1>
-                    <p style='font-size:1.18em;color:var(--gray-lighter);margin-bottom:18px;'>请手动关闭此页面</p>
-                </div>`;
+                    <p style='font-size: 1.18em; color: var(--gray-lighter); margin-bottom: 18px;'>请手动关闭此页面</p>
+                </div>
+                `;
             });
         }
-        function toggleKeySettings(){
-            var form=document.getElementById('key-settings-form');
-            var btn=document.getElementById('toggle-key-btn').querySelector('span');
-            if(form.style.display==='block'){
-                form.style.display='none';
-                btn.textContent='和风天气密钥';
-            }else{
-                form.style.display='block';
-                btn.textContent='收起密钥设置';
+        function submitKeySettings() {
+            var host = document.getElementById('apiHost').value.trim();
+            var kid = document.getElementById('kid').value.trim();
+            var project = document.getElementById('project').value.trim();
+            var key = document.getElementById('key').value.trim();
+            var errorEl = document.getElementById('key-error');
+            if (!host || !kid || !project || !key) {
+                errorEl.style.display = 'block';
+                return;
+            }
+            errorEl.style.display = 'none';
+            fetch(`/set?host=${encodeURIComponent(host)}&kid=${encodeURIComponent(kid)}&project=${encodeURIComponent(project)}&key=${encodeURIComponent(key)}`)
+                .then(function (res) { return res.json ? res.json() : res.text(); })
+                .then(function (data) {
+                    if (data && data.error) {
+                        errorEl.textContent = data.error;
+                        errorEl.style.display = 'block';
+                    } else {
+                        alert('保存成功');
+                    }
+                })
+                .catch(function () {
+                    errorEl.textContent = '提交失败，请稍后重试。';
+                    errorEl.style.display = 'block';
+                });
+        }
+        function toggleKeySettings() {
+            var form = document.getElementById('key-settings-form');
+            var btn = document.getElementById('toggle-key-btn').querySelector('span');
+            if (form.style.display === 'block') {
+                form.style.display = 'none';
+                btn.textContent = '和风天气密钥';
+            }
+            else {
+                form.style.display = 'block';
+                btn.textContent = '收起密钥设置';
             }
         }
     </script>
 </body>
+
 </html>
     )";
 
@@ -439,7 +493,7 @@ void webSettingHandleRoot() {
 
 
 // 保存 JWT 配置信息
-void saveJWTConfig(const String& apiHost,
+bool saveJWTConfig(const String& apiHost,
                    const String& kid,
                    const String& projectID,
                    const String& privateKey) {
@@ -447,82 +501,104 @@ void saveJWTConfig(const String& apiHost,
     File file = SPIFFS.open("/jwt_config.txt", "w");
     if (!file) {
         LOG_WEATHER_ERROR("Failed to save JWT config - cannot open file");
-        lcdText("Save JWT Fail", 1);
-        lcdText("Check FS/Retry", 2);
-        return;
+        return false;
     }
 
     if (!file.println(apiHost)) {
         LOG_WEATHER_ERROR("Failed to save JWT config - write API Host failed");
-        lcdText("Save JWT Fail", 1);
-        lcdText("Write Err", 2);
         file.close();
-        return;
+        return false;
     }
 
     if (!file.println(kid)) {
         LOG_WEATHER_ERROR("Failed to save JWT config - write kid failed");
-        lcdText("Save JWT Fail", 1);
-        lcdText("Write Err", 2);
         file.close();
-        return;
+        return false;
     }
 
     if (!file.println(projectID)) {
         LOG_WEATHER_ERROR("Failed to save JWT config - write projectID failed");
-        lcdText("Save JWT Fail", 1);
-        lcdText("Write Err", 2);
         file.close();
-        return;
+        return false;
     }
 
     if (!file.println(privateKey)) {
         LOG_WEATHER_ERROR("Failed to save JWT config - write private key failed");
-        lcdText("Save JWT Fail", 1);
-        lcdText("Write Err", 2);
         file.close();
-        return;
+        return false;
     }
 
     file.flush();
     file.close();
 
     LOG_WEATHER_INFO("JWT configuration saved successfully");
-    lcdText("JWT Saved", 1);
-    lcdText(" ", 2);
+    return true;
 }
 
 // 处理设置
 void web_setting_handleSet() {
-    if (setting_server.hasArg("host") &&
-        setting_server.hasArg("kid") &&
-        setting_server.hasArg("project") &&
-        setting_server.hasArg("key")) {
-
-        String apiHost = setting_server.arg("host");
-        String kid = setting_server.arg("kid");
-        String project = setting_server.arg("project");
-        String privateKey = setting_server.arg("key");
-
-        // 打印到串口DEBUG等级日志
-        LOG_WEATHER_DEBUG("==== Configuration received ====");
-        LOG_WEATHER_DEBUG("API Host: " + apiHost);
-        LOG_WEATHER_DEBUG("kid: " + kid);
-        LOG_WEATHER_DEBUG("projectID: " + project);
-        LOG_WEATHER_DEBUG("private key length: " + String(privateKey.length()));
-
-        saveJWTConfig(apiHost, kid, project, privateKey);
-
-        setting_server.send(200, "text/html; charset=utf-8", "JWT 配置已保存");
-    } else {
-        setting_server.send(200, "text/html; charset=utf-8", "提交数据不完整");
+    // 基本参数存在性检查
+    if (!(setting_server.hasArg("host") &&
+          setting_server.hasArg("kid") &&
+          setting_server.hasArg("project") &&
+          setting_server.hasArg("key"))) {
+        setting_server.send(400, "application/json; charset=utf-8", "{\"error\":\"提交数据不完整\"}");
+        return;
     }
 
-    // 配置完成标志
-    isConfigDone = true;
+    String apiHost = setting_server.arg("host");
+    String kid = setting_server.arg("kid");
+    String project = setting_server.arg("project");
+    String privateKey = setting_server.arg("key");
+
+    apiHost.trim();
+    kid.trim();
+    project.trim();
+    privateKey.trim();
+
+    // 简单有效性校验：不能为空
+    if (apiHost.length() == 0) {
+        setting_server.send(400, "application/json; charset=utf-8", "{\"error\":\"API Host 不能为空\"}");
+        return;
+    }
+    if (kid.length() == 0) {
+        setting_server.send(400, "application/json; charset=utf-8", "{\"error\":\"凭据ID 不能为空\"}");
+        return;
+    }
+    if (project.length() == 0) {
+        setting_server.send(400, "application/json; charset=utf-8", "{\"error\":\"项目ID 不能为空\"}");
+        return;
+    }
+    if (privateKey.length() == 0) {
+        setting_server.send(400, "application/json; charset=utf-8", "{\"error\":\"私钥 不能为空\"}");
+        return;
+    }
+
+    // 打印到串口DEBUG等级日志
+    LOG_WEATHER_DEBUG("==== Configuration received ====");
+    LOG_WEATHER_DEBUG("API Host: " + apiHost);
+    LOG_WEATHER_DEBUG("kid: " + kid);
+    LOG_WEATHER_DEBUG("projectID: " + project);
+    LOG_WEATHER_DEBUG("private key length: " + String(privateKey.length()));
+
+    if (!saveJWTConfig(apiHost, kid, project, privateKey)) {
+        // 保存失败
+        setting_server.send(500, "application/json; charset=utf-8", "{\"error\":\"保存配置失败\"}");
+        return;
+    }
+
+    // 保存成功
+    setting_server.send(200, "application/json; charset=utf-8", "{\"ok\":true}");
 }
 
 void web_setting_setupWebServer() {
+    if(wifiConnectionState != WIFI_CONNECTED) {
+        LOG_SYSTEM_WARN("Web setting server setup called but WiFi not connected");
+        lcdText("WiFi Not Conn", 1);
+        lcdText(" ", 2);
+        return;
+    }
+
     isConfigDone=false;
 
     setting_server.on("/", webSettingHandleRoot);       // 主页

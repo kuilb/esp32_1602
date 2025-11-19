@@ -118,8 +118,8 @@ OTAResult OTAManager::updateFromURL(const String& url, bool useHTTPS) {
         lcdText(lastError.substring(0, 16), 2);
         updateColor(CRGB::Red);
         currentStatus = OTA_COMPLETED_FAILED;
-        currentResult = OTA_FAIL_VERIFY;
-        return OTA_FAIL_VERIFY;
+        currentResult = OTA_FAIL_WRITE;
+        return OTA_FAIL_WRITE;
     }
 }
 
@@ -167,7 +167,7 @@ bool OTAManager::downloadFirmware(HTTPClient& http, size_t contentLength) {
                     LOG_SYSTEM_DEBUG("OTA Progress: %d%% (%d/%d bytes)", 
                                     progress, written, contentLength);
                     lcdText("Updating: " + String(progress) + "%", 1);
-                    lcdText("Written: " + String(written) + "/" + String(contentLength), 2);
+                    lcdText("" + String(written) + "/" + String(contentLength), 2);
                     lastDisplayedProgress = progress;
                 }
                 lastProgressTime = now;
