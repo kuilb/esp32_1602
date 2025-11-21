@@ -1,0 +1,185 @@
+<script src="component.js"></script>
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>城市搜索</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <style>
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+        .shake {
+            animation: shake 0.5s;
+        }
+    </style>
+</head>
+<body>
+    <web-styles></web-styles>
+    <div class="container" style="position: relative;">
+        <button type='button' class='btn-red' onclick="goBack()" style="position: absolute; left: 25px; top: 20;">返回</button>
+        <div style="margin-bottom:18px;">
+            <h1 style="text-align: center; margin:0;">城市搜索</h1>
+        </div>
+        <input type="text" name="location" id="locationInput" placeholder="请输入英语城市名或拼音" required style="width: 60%;" oninput="this.value=this.value.replace(/[^a-zA-Z\s]/g,'')">
+        <div style='display: flex;flex-direction: column; gap: 16px; width: 35%;'>
+            <input type="submit" value="搜索" class='btn-blue' onclick="getCitySerachResult();" />
+        </div>
+        <div class="loading hidden" id="loadingBox" style="margin-top: 65px;">
+            <div class="spinner"></div>
+            <p>请求已受理，正在处理...</p>
+        </div>
+        <div id="resultBox" style="margin-top:24px;"></div>
+    </div>
+</body>
+<script>
+    function getCitySerachResult() {
+        const location = document.getElementById('locationInput').value.trim();
+        const loadingBox = document.getElementById('loadingBox');
+        const resultBox = document.getElementById('resultBox');
+        resultBox.innerHTML = '';
+        if (!location) {
+            alert('请输入城市名或拼音');
+            return;
+        }
+        if (!/^[a-zA-Z\s]+$/.test(location)) {
+            alert('城市名只能包含英文字母和空格');
+            return;
+        }
+        loadingBox.classList.remove('hidden');
+        fetch(`/citysearch_result?location=${encodeURIComponent(location)}`)
+            .then(response => handleResponse(response, loadingBox, resultBox, location))
+            .catch(() => {
+                loadingBox.classList.add('hidden');
+                resultBox.innerHTML = '<div style="color:var(--red);">请求失败，请检查网络。</div>';
+            });
+    }
+
+    function handleResponse(response, loadingBox, resultBox, location) {
+        // 首次请求
+        if (response.status !== 200 && response.status !== 202) {
+            loadingBox.classList.add('hidden');
+            response.text().then(msg => {
+                const {error} = JSON.parse(msg || '{}');
+                resultBox.innerHTML = `<div style='color:var(--red);'>错误：HTTP ${response.status}<br>${error || '请求失败'}</div>`;
+            });
+            return;
+        }
+
+        // 开始轮询
+        if (response.status === 202) {
+            pollResult(location, loadingBox, resultBox);
+            return;
+        }
+        loadingBox.classList.add('hidden');
+        response.json().then(data => processData(data, resultBox)).catch(() => {
+            resultBox.innerHTML = '<div style="color:var(--red);">返回数据格式错误。</div>';
+        });
+    }
+
+    // 处理返回的数据，渲染按钮
+    function processData(data, resultBox) {
+        if (data.success && Array.isArray(data.results)) {
+            let html = "<h2 style='color:var(--blue)'>搜索结果</h2><ul style='list-style:none;padding:0;margin:0;display:grid;grid-template-columns:1fr 1fr;gap:16px;'>";
+            data.results.forEach((obj, idx) => {
+                const {name = '', adm1 = '', country = '', locid = '', fxlink = ''} = obj;
+                const btnId = `setlocbtn_${idx}`;
+                html += `<li><button type='button' class='btn-blue' id='${btnId}' onclick="setLocation('${locid}','${btnId}','${name}','${adm1}','${country}','${fxlink}')">${name} (${adm1}, ${country})</button></li>`;
+            });
+            html += "</ul>";
+            resultBox.innerHTML = html;
+        } 
+        else if (data.success && data.locid && data.cityname) {
+            resultBox.innerHTML = `<div style="color:var(--cyan);">设置成功</div><div class="info">LocationID: ${data.locid}</div><div class="info">城市: ${data.cityname}</div>`;
+        } 
+        else {
+            resultBox.innerHTML = `<div style="color:var(--red);">${data.message || '未找到相关城市'}</div>`;
+        }
+    }
+
+    // 设置选定的城市
+    function setLocation(locid, btnId, name, adm1, country, fxlink) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.disabled = true;
+        btn.textContent = '设置中...';
+        fetch('/set_location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'locid=' + encodeURIComponent(locid) + '&fxlink=' + encodeURIComponent(fxlink)
+        }).then(res => {
+            if (res.ok) {
+                document.querySelectorAll('button.btn-blue[id^="setlocbtn_"]').forEach(b => b.outerHTML = '');
+                const resultBox = document.getElementById('resultBox');
+                resultBox.innerHTML = `<div style='text-align:center; color:var(--cyan-dark); font-size:22px;'>设置成功<br>${name} (${adm1}, ${country})</div>`;
+            } 
+            else {
+                btn.disabled = false;
+                btn.textContent = `${name} (${adm1}, ${country})`;
+                btn.classList.add('shake');
+                setTimeout(() => btn.classList.remove('shake'), 500);
+                res.text().then(msg => {
+                    const resultBox = document.getElementById('resultBox');
+                    const existingError = resultBox.querySelector('.error-msg');
+                    if (existingError) existingError.remove();
+                    resultBox.insertAdjacentHTML('afterbegin', `<div class='error-msg' style='color:var(--red); font-size:14px; text-align:center; margin-bottom:10px;'>设置失败：${msg || '服务器错误'}</div>`);
+                }).catch(() => {
+                    const resultBox = document.getElementById('resultBox');
+                    const existingError = resultBox.querySelector('.error-msg');
+                    if (existingError) existingError.remove();
+                    resultBox.insertAdjacentHTML('afterbegin', `<div class='error-msg' style='color:var(--red); font-size:14px; text-align:center; margin-bottom:10px;'>设置失败：服务器错误</div>`);
+                });
+            }
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.textContent = `${name} (${adm1}, ${country})`;
+            btn.classList.add('shake');
+            setTimeout(() => btn.classList.remove('shake'), 500);
+            const resultBox = document.getElementById('resultBox');
+            const existingError = resultBox.querySelector('.error-msg');
+            if (existingError) existingError.remove();
+            resultBox.insertAdjacentHTML('afterbegin', `<div class='error-msg' style='color:var(--red); font-size:14px; text-align:center; margin-bottom:10px;'>设置失败：网络错误</div>`);
+        });
+    }
+
+    // 轮询函数
+    function pollResult(location, loadingBox, resultBox, retry = 0) {
+        if (retry > 10) {
+            loadingBox.classList.add('hidden');
+            resultBox.innerHTML = '<div style="color:var(--red);">处理超时，请稍后重试。</div>';
+            return;
+        }
+        setTimeout(() => {
+            fetch(`/citysearch_result?location=${encodeURIComponent(location)}&final=1`)
+                .then(response => {
+                    if (response.status === 202) {
+                        pollResult(location, loadingBox, resultBox, retry + 1);
+                        return;
+                    }
+                    loadingBox.classList.add('hidden');
+                    if (response.status !== 200) {
+                        response.text().then(msg => resultBox.innerHTML = `<div style='color:var(--red);'>错误：HTTP ${response.status}<br>${msg || '请求失败'}</div>`);
+                        return;
+                    }
+                    response.json().then(data => processData(data, resultBox)).catch(() => resultBox.innerHTML = '<div style="color:var(--red);">返回数据格式错误。</div>');
+                })
+                .catch(() => {
+                    loadingBox.classList.add('hidden');
+                    resultBox.innerHTML = '<div style="color:var(--red);">请求失败，请检查网络。</div>';
+                });
+        }, 1200);
+    }
+
+    function goBack() {
+        window.location.href = '../';
+    }
+</script>
+</html>

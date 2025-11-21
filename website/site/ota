@@ -8,6 +8,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OTA升级</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <style>
         .progress {
             width: 100%;
@@ -107,6 +108,8 @@
                 `;
             }, 2000);
         }
+
+        // 从URL升级
         function startOTAFromURL(event) {
             var url = document.getElementById('otaUrl').value;
             if (!url) { alert('请输入URL'); return; }
@@ -152,6 +155,7 @@
                 });
         }
 
+        // 从文件升级
         function startOTAFromFile() {
             var file = document.getElementById('otaFile').files[0];
             if (!file) { alert('请选择文件'); return; }

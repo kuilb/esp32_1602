@@ -78,7 +78,7 @@ void _resetWifi(){
 }
 
 void _setupWebSetting(){
-    web_setting_setupWebServer();
+    webSettingSetupWebServer();
     LOG_WEB_INFO("Web configured");
 }
 

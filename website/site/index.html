@@ -8,6 +8,7 @@
     <meta charset='UTF-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
     <title>ESP32 配置页面</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <style>
         .main-buttons {
             display: grid;
@@ -62,31 +63,102 @@
                     <line x1='21' y1='12' x2='9' y2='12'></line>
                 </svg><span>退出设置</span></button>
         </div>
-        <form id='key-settings-form' action='/set' method='GET'style='margin-top: 10px;'>
+        <form id='key-settings-form' action='/set' method='GET' style='margin-top: 10px;'>
             <label>和风天气 API Host:</label>
-            <input type='text' name='host' value='" + varApiHost + "'>
+            <input type='text' name='host' id='apiHost' value='' required>
 
             <label for='kid'>凭据ID:</label>
-            <input id='kid' type='text' name='kid' value='" + varKid + "'>
+            <input id='kid' type='text' name='kid' value='' required>
 
             <label for='project'>项目ID:</label>
-            <input id='project' type='text' name='project' value='" + varProjectID + "'>
+            <input id='project' type='text' name='project' value='' required>
 
             <label for='key'>私钥:</label>
-            <input id='key' type='text' name='key' value='" + varBase64Key + "'>
-            <div style='display: flex; justify-content: flex-end; margin-top: 10px;'>
-                <input type='submit' value='提交' class='btn-blue'>
+            <input id='key' type='text' name='key' value='' required>
+            <div style='display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 10px;'>
+                <span id='key-error' style='color:#e57373; display:none; font-size: 0.98em;'>请完整填写所有字段。</span>
+                <button type='button' class='btn-blue' style='width:100px;' onclick='submitKeySettings()'>提交</button>
             </div>
         </form>
     </div>
     <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log('正在获取预填写数据...');
+            fetch('/get_api_info')
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    document.getElementById('apiHost').value = data.apiHost || '';
+                    document.getElementById('kid').value = data.kID || '';
+                    document.getElementById('project').value = data.projectID || '';
+                    document.getElementById('key').value = data.privateKey || '';
+                    console.log('预填写数据已加载。');
+                })
+                .catch(function (error) {
+                    console.error('获取预填写数据时出错:', error);
+                });
+        });
+
+        function submitKeySettings() {
+            var apiHost = document.getElementById('apiHost').value.trim();
+            var kID = document.getElementById('kid').value.trim();
+            var projectID = document.getElementById('project').value.trim();
+            var privateKey = document.getElementById('key').value.trim();
+            var errorEl = document.getElementById('key-error');
+            if (!apiHost || !kID || !projectID || !privateKey) {
+                errorEl.style.display = 'block';
+                return;
+            }
+            errorEl.style.display = 'none';
+
+            const body = {
+                apiHost: apiHost,
+                kID: kID,
+                projectID: projectID,
+                privateKey: privateKey
+            };
+
+            fetch('/set', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            })
+                .then(function (res) { return res.json ? res.json() : res.text(); })
+                .then(function (data) {
+                    if (data && data.error) {
+                        errorEl.textContent = data.error;
+                        errorEl.style.display = 'block';
+                    } else {
+                        alert('保存成功');
+                    }
+                })
+                .catch(function (err) {
+                    console.error('请求出错:\n' + err);
+                    errorEl.textContent = '提交失败，请稍后重试。';
+                    errorEl.style.display = 'block';
+                });
+        }
+
         function openCitySearch() {
             window.location.href = '/citysearch';
         }
+
         function exitSettings() {
-            fetch('/exit').finally(() => {
-                alert('请手动关闭此页面。');
-                document.body.innerHTML = `
+            fetch('/exit')
+                .then(res => {
+                    console.log('响应状态:', res.status);
+                    return res.text();
+                })
+                .then(text => {
+                    console.log('响应内容:', text);
+                })
+                .catch(err => {
+                    console.error('请求出错:', err);
+                })
+                .finally(() => {
+                    alert('请手动关闭此页面。');
+                    document.body.innerHTML = `
                 <div class='container'>
                     <svg width='56' height='56' viewBox='0 0 24 24' fill='none' stroke='#0067b6' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' style='margin-bottom: 18px;'>
                         <circle cx='12' cy='12' r='10' fill='#eaf6ff' />
@@ -97,8 +169,9 @@
                     <p style='font-size: 1.18em; color: var(--gray-lighter); margin-bottom: 18px;'>请手动关闭此页面</p>
                 </div>
                 `;
-            });
+                });
         }
+
         function toggleKeySettings() {
             var form = document.getElementById('key-settings-form');
             var btn = document.getElementById('toggle-key-btn').querySelector('span');

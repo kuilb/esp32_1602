@@ -83,6 +83,7 @@ void updateWeatherScreen() {
         lcdPrint("Pres:");
         lcdPrint(pressure);
         clearOtherChar();
+        lcdText(" ",2);
         
     } else if(interface_num == 3){
         lcdResetCursor();

@@ -141,23 +141,22 @@ bool OTAManager::downloadFirmware(HTTPClient& http, size_t contentLength) {
     while (http.connected() && written < contentLength) {
         size_t available = stream->available();
         if (available) {
-            // 写入流，c是写入的字节数(缓冲区中的字符数)
-            int c = stream->readBytes(buff, min(available, sizeof(buff)));
+            // 写入流数据到缓冲区
+            int currentSize = stream->readBytes(buff, min(available, sizeof(buff)));
             
-            if (c <= 0) {       // 未找到有效数据，等待流
-                // delay(1);
+            if (currentSize <= 0) {       // 未找到有效数据，等待流
                 vTaskDelay(1);
                 continue;
             }
             
-            // 写入到Update
-            if (Update.write(buff, c) != c) {
+            // 写入缓冲区数据到Flash
+            if (Update.write(buff, currentSize) != currentSize) {
                 lastError = "Write failed at " + String(written);
                 LOG_SYSTEM_ERROR("OTA write error: %s", lastError.c_str());
                 return false;
             }
             
-            written += c;
+            written += currentSize;
             
             // 定期更新进度显示
             uint32_t now = millis();
@@ -167,13 +166,12 @@ bool OTAManager::downloadFirmware(HTTPClient& http, size_t contentLength) {
                     LOG_SYSTEM_DEBUG("OTA Progress: %d%% (%d/%d bytes)", 
                                     progress, written, contentLength);
                     lcdText("Updating: " + String(progress) + "%", 1);
-                    lcdText("" + String(written) + "/" + String(contentLength), 2);
+                    lcdText("" + String(written/1024) + "/" + String(contentLength/1024) + " KB", 2);
                     lastDisplayedProgress = progress;
                 }
                 lastProgressTime = now;
             }
         } else {
-            // delay(1);  // 让出 CPU 时间
             vTaskDelay(1);
         }
     }

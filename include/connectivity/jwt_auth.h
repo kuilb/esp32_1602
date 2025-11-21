@@ -44,4 +44,7 @@ void generateSeed32();
  */
 String generate_jwt(const String& kid, const String& projectID, const uint8_t* seed32);
 
+// 检测 base64 PKCS#8 Ed25519 私钥 (返回是否有效)
+bool validate_base64_ed25519_key(const char* base64);
+
 #endif

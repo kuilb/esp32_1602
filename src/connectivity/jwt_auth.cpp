@@ -279,3 +279,38 @@ String generate_jwt(const String& kid, const String& projectID, const uint8_t* s
     LOG_JWT_VERBOSE("Final JWT: %s", jwt.c_str());
     return jwt;
 }
+
+// 检查私钥是否有效
+bool validate_base64_ed25519_key(const char* base64) {
+    if (!base64) return false;
+    size_t len = strlen(base64);
+    // 长度应为64
+    if (len != 64) {
+        LOG_JWT_WARN("validate_base64_ed25519_key: unexpected base64 length: %d", (int)len);
+        return false;
+    }
+    // 检查是否为base64格式
+    for (size_t i = 0; base64[i]; ++i) {
+        char c = base64[i];
+        if (c == '\n' || c == '\r' || c == ' ' || c == '\t') continue;
+        if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '+' || c == '/' || c == '-' || c == '_' || c == '=')) {
+            LOG_JWT_DEBUG("validate_base64_ed25519_key: invalid char in base64: %c", c);
+            return false;
+        }
+    }
+
+    // 尝试解码并提取seed32
+    uint8_t der[128] = {0};
+    int der_len = _base64_decode(base64, der);
+    if (der_len <= 0) {
+        LOG_JWT_DEBUG("validate_base64_ed25519_key: base64 decode failed");
+        return false;
+    }
+    
+    uint8_t tmpSeed[32] = {0};
+    if (!_extract_ed25519_seed(der, der_len, tmpSeed)) {
+        LOG_JWT_DEBUG("validate_base64_ed25519_key: seed extraction failed");
+        return false;
+    }
+    return true;
+}
