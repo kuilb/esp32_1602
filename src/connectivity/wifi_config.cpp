@@ -2,7 +2,7 @@
 #include <lwip/dns.h>
 
 // 配网模式使用的 Web 服务器（监听端口 80）
-WebServer AP_server(80);
+WebServer apServer(80);
 
 // DNS 服务器用于强制门户
 DNSServer dnsServer;
@@ -16,6 +16,10 @@ bool inConfigMode = false;
 
 // WiFi连接状态
 WiFiConnectionState wifiConnectionState = WIFI_IDLE;
+
+// 扫描状态
+WifiScanState wifiScanState = WIFI_SCAN_IDLE;
+String scanResult = "";
 
 // 保存WiFi信息
 void _saveWiFiCredentials(const String& ssid, const String& password) {
@@ -70,6 +74,73 @@ void _loadWiFiCredentials() {
 		}
 }
 
+void wifiConfigHandler(){
+	// 计算总长度
+    unsigned int len1 = strlen_P(webComponent);
+    unsigned int len2 = strlen_P(wifiConfigHtml);
+    unsigned int totalLen = len1 + len2;
+
+    // 设置 Content-Length 并发送头（空 body）
+    apServer.setContentLength(totalLen);
+    apServer.send(200, "text/html; charset=utf-8", "");
+
+    // 直接发送 PROGMEM 内容块
+    apServer.sendContent_P(webComponent, len1);
+    apServer.sendContent_P(wifiConfigHtml, len2);
+}
+
+void wifiScanhandler(){
+	if (wifiScanState == WIFI_SCAN_IDLE) {
+        wifiScanState = WIFI_SCAN_SCANNING;
+        apServer.send(202, "application/json", "{\"status\":\"scanning\"}");
+        
+        // 创建任务进行WiFi扫描
+        xTaskCreate([](void*){
+            int n = WiFi.scanNetworks();
+            LOG_NETWORK_INFO("Find %d WiFi!", n);
+            
+            scanResult = "{\"status\":\"done\",\"networks\":[";
+            
+            for (int i = 0; i < n; ++i) {
+                scanResult += "{\"ssid\":\"" + WiFi.SSID(i) + "\",\"rssi\":" + String(WiFi.RSSI(i)) + ",\"secure\":" + ((WiFi.encryptionType(i) != WIFI_AUTH_OPEN) ? "true" : "false") + "}";
+                if (i != n - 1) {
+                    scanResult += ",";
+                }
+            }
+            
+            scanResult += "]}";
+            wifiScanState = WIFI_SCAN_DONE;
+			LOG_NETWORK_DEBUG(scanResult.c_str());
+            vTaskDelete(NULL);
+        }, "ScanTask", 4096, NULL, 1, NULL);
+    } 
+
+	else {
+        if (wifiScanState != WIFI_SCAN_DONE) {
+			LOG_NETWORK_DEBUG("send HTTP 202 scanning");
+            apServer.send(202, "application/json", "{\"status\":\"scanning\"}");
+        } else if (scanResult != "") {
+            apServer.send(200, "application/json", scanResult);
+            scanResult = "";
+        } else {
+			LOG_NETWORK_DEBUG("send HTTP 500 scanning (no results)");
+            apServer.send(500, "application/json", "{\"error\":\"no result\"}");
+			wifiScanState = WIFI_SCAN_IDLE;
+        }
+    }
+}
+
+void wifiSethandler(){
+	String ssid = apServer.arg("ssid");
+	String password = apServer.arg("password");
+	LOG_NETWORK_INFO("access /wifi_set");
+	LOG_NETWORK_INFO("ssid: %s", ssid.c_str());
+	_saveWiFiCredentials(ssid, password);
+	apServer.send(200, "application/json", "{\"success\":true}");
+	delay(500);
+	ESP.restart();
+}
+
 // 进入配网
 void enterConfigMode() {
 	updateColor(CRGB::Purple);  // 配网紫灯
@@ -84,216 +155,46 @@ void enterConfigMode() {
 	dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
 
 	// 捕获所有DNS请求并重定向到配网页面
-	AP_server.onNotFound([](){
-		AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-		AP_server.send(302, "text/plain", "");
+	apServer.onNotFound([](){
+		apServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+		apServer.send(302, "text/plain", "");
 	});
 
     // 配网页面
-	AP_server.on("/", [](){
-		String html = getWebComponent();
-		html += R"(
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset='UTF-8'>
-    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>WiFi 配置</title>
-</head>
-<style>
-    
-</style>
-<body>
-    <web-styles></web-styles>
-    <div class='container'>
-        <h1>WiFi 配网</h1>
-        <form action='/wifi_set' method='POST' style='width:100%;max-width:340px;' id='wifiForm'>
-            <label for='manualssid'>WiFi名称(SSID):</label>
-            <input type='text' name='ssid' id='manualssid' placeholder='请输入SSID' required>
-            <label for='password'>密码:</label>
-            <input type='password' name='password' id='password' required>
-            <div class='button-group'>
-                <input type='submit' value='连接WiFi' class='btn-blue' id='connectBtn'>
-                <button type='button' class='btn-cyan' id='scanBtn'>扫描附近WiFi</button>
-            </div>
-        </form>
-        <div id='loading' class='loading hidden'>
-            <div class='spinner'></div>
-            <p>扫描中，请稍候...</p>
-        </div>
-    </div>
-    <script>
-        document.getElementById('scanBtn').addEventListener('click', function(e) {
-            document.getElementById('loading').classList.remove('hidden');
-            document.querySelector('.container').style.opacity = '0.5';
-            fetch('/wifi_scan')
-            .then(response => response.text())
-            .then(data => {
-                document.body.innerHTML = data;
-            })
-            .catch(error => {
-                console.error('扫描失败:', error);
-                document.getElementById('loading').classList.add('hidden');
-                document.querySelector('.container').style.opacity = '1';
-                alert('扫描失败,请重试');
-            });
-        });
-
-        // 检查连接WiFi输入
-        document.getElementById('wifiForm').addEventListener('submit', function(e) {
-            const ssid = document.getElementById('manualssid').value.trim();
-            const password = document.getElementById('password').value.trim();
-            if (!ssid) {
-                alert('请输入WiFi名称(SSID)');
-                e.preventDefault();
-                return;
-            }
-            if (!password) {
-                alert('请输入密码');
-                e.preventDefault();
-                return;
-            }
-            if (password.length < 8) {
-                alert('密码至少8位');
-                e.preventDefault();
-                return;
-            }
-        });
-    </script>
-</body>
-</html>
-		)";
-
-        AP_server.send(200, "text/html; charset=utf-8", html);
-	});
+	apServer.on("/", wifiConfigHandler);
 
     // 扫描WiFi并展示列表
-	AP_server.on("/wifi_scan", [](){
-        int n = WiFi.scanNetworks();
-        LOG_NETWORK_INFO("Find %d WiFi!" ,n);
-        if (n == 0) {
-                AP_server.send(500, "text/plain", "No WiFi networks found");
-                return;
-        }
-        String html = getWebComponent();
-		html += R"(
-<!DOCTYPE html>
-<html>
+	apServer.on("/wifi_scan", wifiScanhandler);
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WiFi选择</title> 
-</head>
-
-<body>
-    <web-styles></web-styles>
-    <div class="container">
-        <h1>WiFi配网</h1>
-        <form action="/wifi_set" method="POST" style="width:100%;max-width:340px;margin:0 auto;" id="wifiForm">
-            <label for="ssid">WiFi列表:</label><select name="ssid" id="ssid">
-		)";
-		for (int i = 0; i < n; ++i) {
-			html += "<option value='" + WiFi.SSID(i) + "'>" + WiFi.SSID(i) + "</option>";
-		}
-		html += R"(
-            </select><label for="password">密码:</label>
-            <input type="password" name="password" id="password" required>
-            <br><br>
-            <input type="submit" value="连接WiFi" class="btn-blue">
-        </form>
-    </div>
-</body>
-<script>
-    document.getElementById("wifiForm").addEventListener("submit", function(e) {
-        const password = document.getElementById("password").value.trim();
-        if (!password) {
-            alert("请输入密码");
-            e.preventDefault();
-            return;
-        }
-        if (password.length < 8) {
-            alert("密码至少8位");
-            e.preventDefault();
-            return;
-        }
-    });
-</script>
-</html>
-		)";
-
-        AP_server.send(200, "text/html; charset=utf-8", html);
-    });
-
-	AP_server.on("/wifi_set", [](){
-		String ssid = AP_server.arg("ssid");
-		String password = AP_server.arg("password");
-		_saveWiFiCredentials(ssid, password);
-
-        // 显示保存成功页面并重启
-		String html = getWebComponent();
-		html += R"(
-<!DOCTYPE html>
-<html>
-
-<head>
-    <meta charset='UTF-8'>
-    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>WiFi配置</title>
-    <style>
-        p {
-            color: var(--cyan);
-            font-size: 1.08em;
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
-    </style>
-</head>
-
-<body>
-    <web-styles></web-styles>
-    <div class="container">
-        <h1>WiFi信息已保存</h1>
-        <p>设备正在重启，请稍候...</p>
-    </div>
-</body>
-</html>
-	)";
-
-	    AP_server.send(200, "text/html; charset=utf-8", html);
-		delay(500);
-		ESP.restart();
-	});
+	// 处理WiFi信息提交
+	apServer.on("/wifi_set", wifiSethandler);
 
 	// 常见的强制门户检测端点
 	// Android 设备检测
-	AP_server.on("/generate_204", [](){
-		AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-		AP_server.send(302, "text/plain", "");
+	apServer.on("/generate_204", [](){
+		apServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+		apServer.send(302, "text/plain", "");
 	});
 	
 	// iOS 设备检测
-	AP_server.on("/hotspot-detect.html", [](){
-		AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-		AP_server.send(302, "text/plain", "");
+	apServer.on("/hotspot-detect.html", [](){
+		apServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+		apServer.send(302, "text/plain", "");
 	});
 	
 	// Windows 设备检测
-	AP_server.on("/ncsi.txt", [](){
-		AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-		AP_server.send(302, "text/plain", "");
+	apServer.on("/ncsi.txt", [](){
+		apServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+		apServer.send(302, "text/plain", "");
 	});
 	
 	// 通用重定向端点
-	AP_server.on("/redirect", [](){
-		AP_server.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-		AP_server.send(302, "text/plain", "");
+	apServer.on("/redirect", [](){
+		apServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+		apServer.send(302, "text/plain", "");
 	});
 
-	AP_server.begin();
+	apServer.begin();
 
 	// 在屏幕上显示ip
 	lcdText("Connect to AP",1);

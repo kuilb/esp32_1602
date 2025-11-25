@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" id="图层_1" x="0" y="0" viewBox="0 0 18 18" stroke="currentColor" stroke-width="1.5">
+	<style>
+		.st0 {
+			fill: none;
+			stroke: currentColor;
+			stroke-width: 1.5;
+			stroke-linecap: round;
+			stroke-linejoin: round;
+			stroke-miterlimit: 3
+		}
+	</style>
+	<path
+		d="M8.5 8.7c1.6 1.6 1.6 4.2 0 5.8s-4.2 1.6-5.8 0c0 0 0 0 0 0-1.6-1.6-1.5-4.3.1-5.8C4.4 7.2 6.9 7.2 8.5 8.7L8.5 8.7zM15.8 1.5 14.2 3M8.5 8.7 11.6 5.6M16.7 5c-2.4-2 0 0-2.4-2M11.6 5.6c2.5 2 0 0 2.5 2M11.6 5.6 14.2 3"
+		class="st0" />
+</svg>

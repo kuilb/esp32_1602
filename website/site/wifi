@@ -3,52 +3,362 @@
 
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WiFi 配置</title>
 </head>
-<style>
-    
-</style>
-<body>
+    <style>
+        .wifi-list {
+            border: 1px solid #ccc;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+            border-radius: 5px;
+        }
+        .wifi-item {
+            padding: 8px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            min-height: 32px;
+            display: flex;
+            align-items: center;
+        }
+        .wifi-item:hover {
+            background-color: #f0f0f0;
+        }
+        .wifi-item.selected {
+            background-color: #e0e0e0;
+        }
+        #pagination {
+            margin-top: 10px;
+            text-align: center;
+        }
+        #pagination button {
+            margin: 0 5px;
+        }
+        .pagination-inline {
+            display: none;
+        }
+        .pagination-inline button {
+            display: flex;
+            margin: 0 2px;
+            padding: 5px 10px;
+            background-color: var(--blue-dark);
+            color: var(--white);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .pagination-inline button:disabled {
+            background-color: var(--gray-dark);
+            cursor: not-allowed;
+        }
+    </style><body>
     <web-styles></web-styles>
     <div class="container">
         <h1>WiFi 配网</h1>
         <form action="/wifi_set" method="POST" style="width:100%;max-width:340px;" id="wifiForm">
             <label for="manualssid">WiFi名称(SSID):</label>
             <input type="text" name="ssid" id="manualssid" placeholder="请输入SSID" required>
+            <div id="pageInfo" style="display:flex; justify-content:space-between; align-items:center; margin:5px 0;">
+                <span id="pageText"></span>
+                <div class="pagination-inline">
+                    <button id="prev" type="button" disabled>←</button>
+                    <button id="next" type="button" disabled>→</button>
+                </div>
+            </div>
             <label for="password">密码:</label>
             <input type="password" name="password" id="password" required>
             <div class="button-group">
-                <input type="submit" value="连接WiFi" class="btn-blue">
+                <input type="submit" class="btn-blue" value="连接WiFi" id="connectBtn">
                 <button type="button" class="btn-cyan" id="scanBtn">扫描附近WiFi</button>
             </div>
         </form>
         <div id="loading" class="loading hidden">
             <div class="spinner"></div>
-            <p>扫描中，请稍候...</p>
+            <p>请稍候...</p>
         </div>
     </div>
     <script>
-        document.getElementById("scanBtn").addEventListener("click", function(e) {
+        function disableInputs() {
+            document.getElementById('manualssid').disabled = true;
+            document.getElementById('password').disabled = true;
+            document.getElementById('scanBtn').disabled = true;
+            document.getElementById('connectBtn').disabled = true;
+        }
+
+        function enableInputs() {
+            document.getElementById('manualssid').disabled = false;
+            document.getElementById('password').disabled = false;
+            document.getElementById('scanBtn').disabled = false;
+            document.getElementById('connectBtn').disabled = false;
+        }
+
+        function getSignalIcon(rssi) {
+            let level = 1;
+            if(rssi>-65) level=3;
+            else if(rssi>-75) level=2;
+
+            return `
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" stroke="currentColor" stroke-width="1.0">
+                <path d="M8,14l-2.3-2.3l1.2-1.2C7.1,10.2,7.6,10,8,10c0.4,0,0.9,0.2,1.2,0.5l1.2,1.2L8,14z"/>
+                ${level >= 2 ? "<path d='M4.3,10.2L2.8,8.8L4,7.7C5.1,6.6,6.5,6,8,6s2.9,0.6,4,1.7l1.2,1.2l-1.4,1.4l-1.2-1.2C9.9,8.4,9,8,8,8S6.1,8.4,5.4,9.1L4.3,10.2z'/>" : ""}
+                ${level >= 3 ? "<path d='M0,6l1.2-1.2C3,3,5.4,2,8,2c2.6,0,5,1,6.8,2.8L16,6l-1.4,1.4l-1.2-1.2C12,4.8,10,4,8,4C6,4,4,4.8,2.6,6.2L1.4,7.4L0,6z'/>" : ""}
+            </svg>
+            `;
+        }
+
+        function getSecureIcon(secure) {
+            if(secure) return`
+            <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'>
+                <rect x='3' y='11' width='18' height='11' rx='2' ry='2'></rect>
+                <path d='M7 11V7a5 5 0 0 1 10 0v4'></path>
+            </svg>` 
+            else return `
+            <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'>
+                <rect x='3' y='11' width='18' height='11' rx='2' ry='2'></rect>
+                <path d='M7 11V7a5 5 0 0 1 9.9-1'></path>
+            </svg>`;
+        }
+        
+        let networks = [];
+        let currentPage = 0;
+        const itemsPerPage = 4;
+        
+        function handleScanSuccess(data) {
+            enableInputs();
+            networks = data.networks;
+            currentPage = 0;
+
+            // 检查是否已存在WiFi列表div
+            let listDiv = document.querySelector('.wifi-list');
+            if (!listDiv) {
+                // 不存在则创建
+                listDiv = document.createElement('div');
+                listDiv.className = 'wifi-list';
+                const pageInfo = document.getElementById('pageInfo');
+                pageInfo.parentNode.insertBefore(listDiv, pageInfo.nextSibling);
+            } else {
+                // 已存在则清空内容
+                listDiv.innerHTML = '';
+            }
+
+            // 替换手动输入的SSID输入框为列表
+            const manualInput = document.getElementById('manualssid');
+            const label = document.querySelector('label[for="manualssid"]');
+            label.textContent = '选择WiFi:';
+            document.querySelector('.pagination-inline').style.display = 'flex';
+
+            renderPage();
+
+            // 添加分页事件
+            document.getElementById('prev').onclick = () => {
+                if (currentPage > 0) {
+                    currentPage--;
+                    renderPage();
+                }
+            };
+            document.getElementById('next').onclick = () => {
+                if (currentPage < Math.ceil(networks.length / itemsPerPage) - 1) {
+                    currentPage++;
+                    renderPage();
+                }
+            };
+        }
+        
+        function renderPage() {
+            const listDiv = document.querySelector('.wifi-list');
+            if (!listDiv) return;
+
+            // 清屏
+            listDiv.innerHTML = '';
+            // 获取当前页的项目
+            const pageItems = networks.slice(currentPage * itemsPerPage, 
+                                             currentPage * itemsPerPage + itemsPerPage);
+
+            for (let i = 0; i < itemsPerPage; i++) {
+                const network = pageItems[i];
+                const item = document.createElement('div');
+                item.className = 'wifi-item';
+                if (network) {
+                    item.innerHTML = `${getSecureIcon(network.secure)} ${getSignalIcon(network.rssi)}  ${network.ssid}`;
+                    item.onclick = () => {
+                        document.querySelectorAll('.wifi-item').forEach(i => i.classList.remove('selected'));
+                        item.classList.add('selected');
+                        document.getElementById('manualssid').value = network.ssid;
+                    };
+                }
+                // 不足的部分留空
+                listDiv.appendChild(item);
+            }
+            const totalPages = Math.ceil(networks.length / itemsPerPage);
+            document.getElementById('pageText').textContent = `第 ${currentPage + 1} 页 / 共 ${totalPages} 页`;
+            document.getElementById('prev').disabled = currentPage === 0;
+            document.getElementById('next').disabled = currentPage >= totalPages - 1;
+        }
+        
+        // 连接WiFi按钮
+        document.getElementById("wifiForm").addEventListener("submit", function (e) {
+            e.preventDefault(); // 阻止表单默认提交
+            const ssid = document.getElementById("manualssid").value.trim();
+            const password = document.getElementById("password").value.trim();
+            if (!ssid) {
+                alert("请输入WiFi名称(SSID)");
+                return;
+            }
+            if (!password) {
+                alert("请输入密码");
+                return;
+            }
+            if (password.length < 8) {
+                alert("密码至少8位");
+                return;
+            }
+            disableInputs();
             document.getElementById("loading").classList.remove("hidden");
             document.querySelector(".container").style.opacity = "0.5";
-            fetch("/wifi_scan")
-            .then(response => response.text())
-            .then(data => {
-                document.body.innerHTML = data;
+            fetch("/wifi_set", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: "ssid=" + encodeURIComponent(ssid) + "&password=" + encodeURIComponent(password)
+            })
+            .then(response => {
+                if (response.ok) {
+                    document.body.innerHTML = `
+                        <head>
+                            <meta charset='UTF-8'>
+                            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+                            <title>WiFi配置</title>
+                            <style>
+                                p {
+                                    color: var(--cyan);
+                                    font-size: 1.08em;
+                                    animation: pulse 1.5s infinite;
+                                }
+                                @keyframes pulse {
+                                    0%, 100% { opacity: 1; }
+                                    50% { opacity: 0.3; }
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <web-styles></web-styles>
+                            <div class="container">
+                                <h1>WiFi信息已保存</h1>
+                                <p>设备正在重启，请稍候...</p>
+                            </div>
+                        </body>
+                    `;
+                } else {
+                    enableInputs();
+                    document.getElementById("loading").classList.add("hidden");
+                    document.querySelector(".container").style.opacity = "1";
+                    alert("连接请求失败，请重试");
+                }
             })
             .catch(error => {
-                console.error("扫描失败:", error);
+                enableInputs();
                 document.getElementById("loading").classList.add("hidden");
                 document.querySelector(".container").style.opacity = "1";
-                alert("扫描失败,请重试");
+                console.error("连接请求失败:", error);
+                alert("连接请求失败，请重试");
             });
         });
 
+        // 添加WiFi扫描的轮询函数
+        function pollScan(retry = 0) {
+            if (retry > 10) {
+                enableInputs();
+                document.getElementById("loading").classList.add("hidden");
+                document.querySelector(".container").style.opacity = "1";
+                alert("扫描超时，请重试");
+                return;
+            }
+            setTimeout(() => {
+                fetch("/wifi_scan")
+                    .then(response => {
+                        if (response.status === 202) {
+                            pollScan(retry + 1);
+                            return;
+                        }
+                        document.getElementById("loading").classList.add("hidden");
+                        document.querySelector(".container").style.opacity = "1";
+                        if (response.status !== 200) {
+                            enableInputs();
+                            alert("扫描失败");
+                            return;
+                        }
+                        response.text().then(text => {
+                            try {
+                                const data = JSON.parse(text);
+                                if (data.status === 'done' && Array.isArray(data.networks)) {
+                                    handleScanSuccess(data);
+                                } else {
+                                    alert("扫描失败：无效响应");
+                                }
+                            } catch (error) {
+                                console.error("JSON解析失败:", error);
+                                console.log("响应内容:", text);
+                                alert("解析响应失败，请检查后端响应格式");
+                            }
+                        });
+                    })
+                    .catch(error => {
+                        enableInputs();
+                        console.error("轮询失败:", error);
+                        document.getElementById("loading").classList.add("hidden");
+                        document.querySelector(".container").style.opacity = "1";
+                        alert("扫描失败，请重试");
+                    });
+            }, 1000);  // 每1秒轮询一次
+        }
+
+        // 修改扫描附近WiFi的事件监听器，使用轮询
+        document.getElementById("scanBtn").addEventListener("click", function (e) {
+            disableInputs();
+            document.getElementById("loading").classList.remove("hidden");
+            document.querySelector(".container").style.opacity = "0.5";
+            fetch("/wifi_scan")
+                .then(response => {
+                    if (response.status === 202) {
+                        pollScan();
+                        return;
+                    }
+                    document.getElementById("loading").classList.add("hidden");
+                    document.querySelector(".container").style.opacity = "1";
+                    if (response.status !== 200) {
+                        enableInputs();
+                        alert("扫描失败");
+                        return;
+                    }
+                    response.text().then(text => {
+                        try {
+                            const data = JSON.parse(text);
+                            if (data.status === 'done' && Array.isArray(data.networks)) {
+                                handleScanSuccess(data);
+                            } else {
+                                alert("扫描失败：无效响应");
+                            }
+                        } catch (error) {
+                            console.error("JSON解析失败:", error);
+                            console.log("响应内容:", text);
+                            alert("解析响应失败，请检查后端响应格式");
+                        }
+                    });
+                })
+                .catch(error => {
+                    enableInputs();
+                    console.error("扫描失败:", error);
+                    document.getElementById("loading").classList.add("hidden");
+                    document.querySelector(".container").style.opacity = "1";
+                    alert("扫描失败,请重试");
+                });
+        });
+
         // 检查连接WiFi输入
-        document.getElementById("wifiForm").addEventListener("submit", function(e) {
+        document.getElementById("wifiForm").addEventListener("submit", function (e) {
             const ssid = document.getElementById("manualssid").value.trim();
             const password = document.getElementById("password").value.trim();
             if (!ssid) {
@@ -69,4 +379,5 @@
         });
     </script>
 </body>
+
 </html>

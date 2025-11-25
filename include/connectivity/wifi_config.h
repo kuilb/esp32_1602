@@ -15,11 +15,17 @@
 #include "rgb_led.h"
 #include "myheader.h"
 #include "network.h"
-#include "web_component.h"
+#include "web_pages.h"
 
-extern WebServer AP_server;                     /**< 配网模式使用的 Web 服务器 */
+extern WebServer apServer;                     /**< 配网模式使用的 Web 服务器 */
 extern DNSServer dnsServer;                     /**< DNS 服务器用于强制门户 */
 extern String savedSSID, savedPassword;         /**< 已保存的 WiFi SSID 和密码 */
+
+enum WifiScanState {
+    WIFI_SCAN_IDLE,
+    WIFI_SCAN_SCANNING,
+    WIFI_SCAN_DONE
+};
 
 /**
  * @brief WiFi 连接状态枚举

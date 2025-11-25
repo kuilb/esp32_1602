@@ -226,33 +226,81 @@ const char index_html[] PROGMEM = R"rawliteral(
     <div class='container'>
         <h1>ESP32 设置</h1>
         <div class='main-buttons'>
-            <button type='button' class='btn-blue' onclick='openCitySearch()'><svg xmlns='http://www.w3.org/2000/svg'
-                    width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'
-                    stroke-linecap='round' stroke-linejoin='round'>
-                    <circle cx='11' cy='11' r='8'></circle>
-                    <line x1='21' y1='21' x2='16.65' y2='16.65'></line>
-                </svg><span>搜索城市</span></button>
-            <button type='button' class='btn-cyan' onclick="location.href='/ota'
-                "><svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none'
-                    stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
-                    <path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'></path>
-                    <polyline points='17 8 12 3 7 8'></polyline>
-                    <line x1='12' y1='3' x2='12' y2='15'></line>
-                </svg><span>OTA升级</span></button>
-            <button type='button' id='toggle-key-btn' class='btn-gray' onclick='toggleKeySettings()'><svg
-                    xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none'
-                    stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+            <button type='button' class='btn-blue' onclick='openCitySearch()'>
+                <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" x="0" y="0" viewBox="0 0 18 18">
+                    <style>
+                        .st0 {
+                            fill: none;
+                            stroke: currentColor;
+                            stroke-width: 2.5;
+                            stroke-linecap: round;
+                            stroke-linejoin: round;
+                            stroke-miterlimit: 2.25
+                        }
+                    </style>
+                    <circle cx="7.1" cy="7.1" r="6.1" class="st0" />
+                    <path d="M17 17 11.4 11.4" class="st0" />
                     <path
-                        d='M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4'>
-                    </path>
-                </svg><span>和风天气密钥</span></button>
-            <button type='button' class='btn-red' onclick='exitSettings()'><svg xmlns='http://www.w3.org/2000/svg'
-                    width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'
-                    stroke-linecap='round' stroke-linejoin='round'>
+                        d="M7.1,10.2l1.8-1.8c0.5-0.5,0.8-1.1,0.8-1.8S9.4,5.3,8.9,4.8c-1-1-2.7-1.1-3.7-0.1C4.7,5.1,4.4,5.8,4.4,6.5	s0.3,1.3,0.8,1.8L7.1,10.2z"
+                        style="fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:128" />
+                </svg>
+                <span>搜索城市</span>
+            </button>
+            <button type='button' class='btn-cyan' onclick="location.href='/ota'">
+                <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="0 0 18 18" stroke='currentColor'>
+                    <style>
+                        .st0 {
+                            fill: none;
+                            stroke: currentColor;
+                            stroke-width: .9168;
+                            stroke-linecap: round;
+                            stroke-linejoin: round;
+                            stroke-miterlimit: 133.3333
+                        }
+                    </style>
+                    <g id="加载">
+                        <path id="primary" d="M0.8,6.8c0-1.6,1.4-2.9,3-2.9c1.1,0,2.1,0.5,2.6,1.4" class="st0" />
+                        <path id="primary-2" d="M6.9,7.2c0,1.6-1.4,2.9-3,2.9c-1.1,0-2.1-0.5-2.6-1.4" class="st0" />
+                        <path id="primary-3" d="M4.6 5.3 6.5 5.3 6.5 3.5" class="st0" />
+                        <path id="primary-4" d="M3.1 8.7 1.1 8.7 1.1 10.5" class="st0" />
+                    </g>
+                    <g id="边框">
+                        <path
+                            d="M9.3,8.1c-0.7,0,7.2,0,7.2,0c0.4,0,0.8,0.4,0.8,0.8v4c0,0.4-0.4,0.8-0.8,0.8H2.9c-0.4,0-0.8-0.4-0.8-0.8 c0,0,0-1.4,0-0.7"
+                            style="fill-rule:evenodd;clip-rule:evenodd;fill:none;stroke:currentColor;stroke-width:1.2;stroke-miterlimit:10" />
+                        <path d="M15.1,8.3c0,0,0-1.5,0-0.9"
+                            style="fill-rule:evenodd;clip-rule:evenodd;fill:none;stroke:currentColor;stroke-width:2;stroke-miterlimit:10" />
+                    </g>
+                </svg>
+                <span>OTA升级</span>
+            </button>
+            <button type='button' id='toggle-key-btn' class='btn-gray' onclick='toggleKeySettings()'>
+                <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" x="0" y="0" viewBox="0 0 18 18" stroke="currentColor" stroke-width="1.5">
+                    <style>
+                        .st0 {
+                            fill: none;
+                            stroke: currentColor;
+                            stroke-width: 1.5;
+                            stroke-linecap: round;
+                            stroke-linejoin: round;
+                            stroke-miterlimit: 3
+                        }
+                    </style>
+                    <path
+                        d="M8.5 8.7c1.6 1.6 1.6 4.2 0 5.8s-4.2 1.6-5.8 0c0 0 0 0 0 0-1.6-1.6-1.5-4.3.1-5.8C4.4 7.2 6.9 7.2 8.5 8.7L8.5 8.7zM15.8 1.5 14.2 3M8.5 8.7 11.6 5.6M16.7 5c-2.4-2 0 0-2.4-2M11.6 5.6c2.5 2 0 0 2.5 2M11.6 5.6 14.2 3"
+                        class="st0" />
+                </svg>
+                <span>和风天气密钥</span>
+            </button>
+            <button type='button' class='btn-red' onclick='exitSettings()'>
+                <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none'
+                    stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
                     <path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'></path>
                     <polyline points='16 17 21 12 16 7'></polyline>
                     <line x1='21' y1='12' x2='9' y2='12'></line>
-                </svg><span>退出设置</span></button>
+                </svg>
+                <span>退出设置</span>
+            </button>
         </div>
         <form id='key-settings-form' action='/set' method='GET' style='margin-top: 10px;'>
             <label>和风天气 API Host:</label>
@@ -350,16 +398,18 @@ const char index_html[] PROGMEM = R"rawliteral(
                 .finally(() => {
                     alert('请手动关闭此页面。');
                     document.body.innerHTML = `
-                <div class='container'>
-                    <svg width='56' height='56' viewBox='0 0 24 24' fill='none' stroke='#0067b6' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' style='margin-bottom: 18px;'>
-                        <circle cx='12' cy='12' r='10' fill='#eaf6ff' />
-                        <polyline points='8 12.5 11 15.5 16 10.5' stroke='#2ecc71' stroke-width='2.2' fill='none' />
-                        <circle cx='12' cy='12' r='10' stroke='#0067b6' stroke-width='2.2' fill='none' />
-                    </svg>
-                    <h1>设置已完成</h1>
-                    <p style='font-size: 1.18em; color: var(--gray-lighter); margin-bottom: 18px;'>请手动关闭此页面</p>
-                </div>
-                `;
+
+                    <div class='container'>
+                        <svg width='56' height='56' viewBox='0 0 24 24' fill='none' stroke='#0067b6' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' style='margin-bottom: 18px;'>
+                            <circle cx='12' cy='12' r='10' fill='#eaf6ff' />
+                            <polyline points='8 12.5 11 15.5 16 10.5' stroke='#2ecc71' stroke-width='2.2' fill='none' />
+                            <circle cx='12' cy='12' r='10' stroke='#0067b6' stroke-width='2.2' fill='none' />
+                        </svg>
+                        <h1>设置已完成</h1>
+                        <p style='font-size: 1.18em; color: var(--gray-lighter); margin-bottom: 18px;'>请手动关闭此页面</p>
+                    </div>
+                    
+                    `;
                 });
         }
 
@@ -375,6 +425,13 @@ const char index_html[] PROGMEM = R"rawliteral(
                 btn.textContent = '收起密钥设置';
             }
         }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('svg').forEach(function (svg) {
+                svg.setAttribute('width', '18');
+                svg.setAttribute('height', '18');
+            });
+        });
     </script>
 </body>
 
@@ -771,6 +828,394 @@ const char city_search_html[] PROGMEM = R"rawliteral(
 </html>
 
 )rawliteral";
+
+
+const char wifiConfigHtml[] PROGMEM = R"rawliteral(
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiFi 配置</title>
+</head>
+    <style>
+        .wifi-list {
+            border: 1px solid #ccc;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+            border-radius: 5px;
+        }
+        .wifi-item {
+            padding: 8px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            min-height: 32px;
+            display: flex;
+            align-items: center;
+        }
+        .wifi-item:hover {
+            background-color: #f0f0f0;
+        }
+        .wifi-item.selected {
+            background-color: #e0e0e0;
+        }
+        #pagination {
+            margin-top: 10px;
+            text-align: center;
+        }
+        #pagination button {
+            margin: 0 5px;
+        }
+        .pagination-inline {
+            display: none;
+        }
+        .pagination-inline button {
+            display: flex;
+            margin: 0 2px;
+            padding: 5px 10px;
+            background-color: var(--blue-dark);
+            color: var(--white);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .pagination-inline button:disabled {
+            background-color: var(--gray-dark);
+            cursor: not-allowed;
+        }
+    </style><body>
+    <web-styles></web-styles>
+    <div class="container">
+        <h1>WiFi 配网</h1>
+        <form action="/wifi_set" method="POST" style="width:100%;max-width:340px;" id="wifiForm">
+            <label for="manualssid">WiFi名称(SSID):</label>
+            <input type="text" name="ssid" id="manualssid" placeholder="请输入SSID" required>
+            <div id="pageInfo" style="display:flex; justify-content:space-between; align-items:center; margin:5px 0;">
+                <span id="pageText"></span>
+                <div class="pagination-inline">
+                    <button id="prev" type="button" disabled>←</button>
+                    <button id="next" type="button" disabled>→</button>
+                </div>
+            </div>
+            <label for="password">密码:</label>
+            <input type="password" name="password" id="password" required>
+            <div class="button-group">
+                <input type="submit" class="btn-blue" value="连接WiFi" id="connectBtn">
+                <button type="button" class="btn-cyan" id="scanBtn">扫描附近WiFi</button>
+            </div>
+        </form>
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>请稍候...</p>
+        </div>
+    </div>
+    <script>
+        function disableInputs() {
+            document.getElementById('manualssid').disabled = true;
+            document.getElementById('password').disabled = true;
+            document.getElementById('scanBtn').disabled = true;
+            document.getElementById('connectBtn').disabled = true;
+        }
+
+        function enableInputs() {
+            document.getElementById('manualssid').disabled = false;
+            document.getElementById('password').disabled = false;
+            document.getElementById('scanBtn').disabled = false;
+            document.getElementById('connectBtn').disabled = false;
+        }
+
+        function getSignalIcon(rssi) {
+            let level = 1;
+            if(rssi>-65) level=3;
+            else if(rssi>-75) level=2;
+
+            return `
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" stroke="currentColor" stroke-width="1.0">
+                <path d="M8,14l-2.3-2.3l1.2-1.2C7.1,10.2,7.6,10,8,10c0.4,0,0.9,0.2,1.2,0.5l1.2,1.2L8,14z"/>
+                ${level >= 2 ? "<path d='M4.3,10.2L2.8,8.8L4,7.7C5.1,6.6,6.5,6,8,6s2.9,0.6,4,1.7l1.2,1.2l-1.4,1.4l-1.2-1.2C9.9,8.4,9,8,8,8S6.1,8.4,5.4,9.1L4.3,10.2z'/>" : ""}
+                ${level >= 3 ? "<path d='M0,6l1.2-1.2C3,3,5.4,2,8,2c2.6,0,5,1,6.8,2.8L16,6l-1.4,1.4l-1.2-1.2C12,4.8,10,4,8,4C6,4,4,4.8,2.6,6.2L1.4,7.4L0,6z'/>" : ""}
+            </svg>
+            `;
+        }
+
+        function getSecureIcon(secure) {
+            if(secure) return`
+            <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'>
+                <rect x='3' y='11' width='18' height='11' rx='2' ry='2'></rect>
+                <path d='M7 11V7a5 5 0 0 1 10 0v4'></path>
+            </svg>` 
+            else return `
+            <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'>
+                <rect x='3' y='11' width='18' height='11' rx='2' ry='2'></rect>
+                <path d='M7 11V7a5 5 0 0 1 9.9-1'></path>
+            </svg>`;
+        }
+        
+        let networks = [];
+        let currentPage = 0;
+        const itemsPerPage = 4;
+        
+        function handleScanSuccess(data) {
+            enableInputs();
+            networks = data.networks;
+            currentPage = 0;
+
+            // 检查是否已存在WiFi列表div
+            let listDiv = document.querySelector('.wifi-list');
+            if (!listDiv) {
+                // 不存在则创建
+                listDiv = document.createElement('div');
+                listDiv.className = 'wifi-list';
+                const pageInfo = document.getElementById('pageInfo');
+                pageInfo.parentNode.insertBefore(listDiv, pageInfo.nextSibling);
+            } else {
+                // 已存在则清空内容
+                listDiv.innerHTML = '';
+            }
+
+            // 替换手动输入的SSID输入框为列表
+            const manualInput = document.getElementById('manualssid');
+            const label = document.querySelector('label[for="manualssid"]');
+            label.textContent = '选择WiFi:';
+            document.querySelector('.pagination-inline').style.display = 'flex';
+
+            renderPage();
+
+            // 添加分页事件
+            document.getElementById('prev').onclick = () => {
+                if (currentPage > 0) {
+                    currentPage--;
+                    renderPage();
+                }
+            };
+            document.getElementById('next').onclick = () => {
+                if (currentPage < Math.ceil(networks.length / itemsPerPage) - 1) {
+                    currentPage++;
+                    renderPage();
+                }
+            };
+        }
+        
+        function renderPage() {
+            const listDiv = document.querySelector('.wifi-list');
+            if (!listDiv) return;
+
+            // 清屏
+            listDiv.innerHTML = '';
+            // 获取当前页的项目
+            const pageItems = networks.slice(currentPage * itemsPerPage, 
+                                             currentPage * itemsPerPage + itemsPerPage);
+
+            for (let i = 0; i < itemsPerPage; i++) {
+                const network = pageItems[i];
+                const item = document.createElement('div');
+                item.className = 'wifi-item';
+                if (network) {
+                    item.innerHTML = `${getSecureIcon(network.secure)} ${getSignalIcon(network.rssi)}  ${network.ssid}`;
+                    item.onclick = () => {
+                        document.querySelectorAll('.wifi-item').forEach(i => i.classList.remove('selected'));
+                        item.classList.add('selected');
+                        document.getElementById('manualssid').value = network.ssid;
+                    };
+                }
+                // 不足的部分留空
+                listDiv.appendChild(item);
+            }
+            const totalPages = Math.ceil(networks.length / itemsPerPage);
+            document.getElementById('pageText').textContent = `第 ${currentPage + 1} 页 / 共 ${totalPages} 页`;
+            document.getElementById('prev').disabled = currentPage === 0;
+            document.getElementById('next').disabled = currentPage >= totalPages - 1;
+        }
+        
+        // 连接WiFi按钮
+        document.getElementById("wifiForm").addEventListener("submit", function (e) {
+            e.preventDefault(); // 阻止表单默认提交
+            const ssid = document.getElementById("manualssid").value.trim();
+            const password = document.getElementById("password").value.trim();
+            if (!ssid) {
+                alert("请输入WiFi名称(SSID)");
+                return;
+            }
+            if (!password) {
+                alert("请输入密码");
+                return;
+            }
+            if (password.length < 8) {
+                alert("密码至少8位");
+                return;
+            }
+            disableInputs();
+            document.getElementById("loading").classList.remove("hidden");
+            document.querySelector(".container").style.opacity = "0.5";
+            fetch("/wifi_set", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: "ssid=" + encodeURIComponent(ssid) + "&password=" + encodeURIComponent(password)
+            })
+            .then(response => {
+                if (response.ok) {
+                    document.body.innerHTML = `
+                        <head>
+                            <meta charset='UTF-8'>
+                            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+                            <title>WiFi配置</title>
+                            <style>
+                                p {
+                                    color: var(--cyan);
+                                    font-size: 1.08em;
+                                    animation: pulse 1.5s infinite;
+                                }
+                                @keyframes pulse {
+                                    0%, 100% { opacity: 1; }
+                                    50% { opacity: 0.3; }
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <web-styles></web-styles>
+                            <div class="container">
+                                <h1>WiFi信息已保存</h1>
+                                <p>设备正在重启，请稍候...</p>
+                            </div>
+                        </body>
+                    `;
+                } else {
+                    enableInputs();
+                    document.getElementById("loading").classList.add("hidden");
+                    document.querySelector(".container").style.opacity = "1";
+                    alert("连接请求失败，请重试");
+                }
+            })
+            .catch(error => {
+                enableInputs();
+                document.getElementById("loading").classList.add("hidden");
+                document.querySelector(".container").style.opacity = "1";
+                console.error("连接请求失败:", error);
+                alert("连接请求失败，请重试");
+            });
+        });
+
+        // 添加WiFi扫描的轮询函数
+        function pollScan(retry = 0) {
+            if (retry > 10) {
+                enableInputs();
+                document.getElementById("loading").classList.add("hidden");
+                document.querySelector(".container").style.opacity = "1";
+                alert("扫描超时，请重试");
+                return;
+            }
+            setTimeout(() => {
+                fetch("/wifi_scan")
+                    .then(response => {
+                        if (response.status === 202) {
+                            pollScan(retry + 1);
+                            return;
+                        }
+                        document.getElementById("loading").classList.add("hidden");
+                        document.querySelector(".container").style.opacity = "1";
+                        if (response.status !== 200) {
+                            enableInputs();
+                            alert("扫描失败");
+                            return;
+                        }
+                        response.text().then(text => {
+                            try {
+                                const data = JSON.parse(text);
+                                if (data.status === 'done' && Array.isArray(data.networks)) {
+                                    handleScanSuccess(data);
+                                } else {
+                                    alert("扫描失败：无效响应");
+                                }
+                            } catch (error) {
+                                console.error("JSON解析失败:", error);
+                                console.log("响应内容:", text);
+                                alert("解析响应失败，请检查后端响应格式");
+                            }
+                        });
+                    })
+                    .catch(error => {
+                        enableInputs();
+                        console.error("轮询失败:", error);
+                        document.getElementById("loading").classList.add("hidden");
+                        document.querySelector(".container").style.opacity = "1";
+                        alert("扫描失败，请重试");
+                    });
+            }, 1000);  // 每1秒轮询一次
+        }
+
+        // 修改扫描附近WiFi的事件监听器，使用轮询
+        document.getElementById("scanBtn").addEventListener("click", function (e) {
+            disableInputs();
+            document.getElementById("loading").classList.remove("hidden");
+            document.querySelector(".container").style.opacity = "0.5";
+            fetch("/wifi_scan")
+                .then(response => {
+                    if (response.status === 202) {
+                        pollScan();
+                        return;
+                    }
+                    document.getElementById("loading").classList.add("hidden");
+                    document.querySelector(".container").style.opacity = "1";
+                    if (response.status !== 200) {
+                        enableInputs();
+                        alert("扫描失败");
+                        return;
+                    }
+                    response.text().then(text => {
+                        try {
+                            const data = JSON.parse(text);
+                            if (data.status === 'done' && Array.isArray(data.networks)) {
+                                handleScanSuccess(data);
+                            } else {
+                                alert("扫描失败：无效响应");
+                            }
+                        } catch (error) {
+                            console.error("JSON解析失败:", error);
+                            console.log("响应内容:", text);
+                            alert("解析响应失败，请检查后端响应格式");
+                        }
+                    });
+                })
+                .catch(error => {
+                    enableInputs();
+                    console.error("扫描失败:", error);
+                    document.getElementById("loading").classList.add("hidden");
+                    document.querySelector(".container").style.opacity = "1";
+                    alert("扫描失败,请重试");
+                });
+        });
+
+        // 检查连接WiFi输入
+        document.getElementById("wifiForm").addEventListener("submit", function (e) {
+            const ssid = document.getElementById("manualssid").value.trim();
+            const password = document.getElementById("password").value.trim();
+            if (!ssid) {
+                alert("请输入WiFi名称(SSID)");
+                e.preventDefault();
+                return;
+            }
+            if (!password) {
+                alert("请输入密码");
+                e.preventDefault();
+                return;
+            }
+            if (password.length < 8) {
+                alert("密码至少8位");
+                e.preventDefault();
+                return;
+            }
+        });
+    </script>
+</body>
+
+</html>
+
+)rawliteral";
+
+
 
 
 const unsigned char favicon_ico[] PROGMEM = {

@@ -69,11 +69,15 @@ void setup() {
     startButtonTask();
 
     // 欢迎消息
-    lcdText("Wireless 1602A",1);
-    lcdText("2025/11/18",2);
+    String ver = String(PROJECT_VERSION) + "  " +String(BUILD_VERSION);
+    lcdText(ver,1);
+    lcdText(BUILD_TIMESTAMP,2);
 
     LOG_SYSTEM_INFO("Wireless 1602A by Kulib");
-    LOG_SYSTEM_INFO("2025/11/18");
+    LOG_SYSTEM_INFO("Build Information:");
+    LOG_SYSTEM_INFO("  Firmware Version: %s", PROJECT_VERSION);
+    LOG_SYSTEM_INFO("  Build version: %s", BUILD_VERSION);
+    LOG_SYSTEM_INFO("  Build Timestamp: %s \n", BUILD_TIMESTAMP);
     LOG_SYSTEM_INFO("开始初始化...");
 
     // 挂载 SPIFFS
@@ -103,7 +107,7 @@ void setup() {
         listDir("/", 0);    // 打印根目录文件
     }
 
-    delay(300);  // 缩短延迟，快速进入主界面
+    delay(300);
     init_jwt();  // 初始化JWT
     wifiinit();  // 初始化WiFi配置（非阻塞，后台连接）
     initMenu();  // 初始化菜单系统（立即进入主界面）
@@ -112,7 +116,7 @@ void setup() {
 void loop(){
     if (inConfigMode) {
         dnsServer.processNextRequest();  // 处理劫持DNS请求
-        AP_server.handleClient();
+        apServer.handleClient();
     }
 
     if(wifiConnectionState == WIFI_CONNECTED && WiFi.status() != WL_CONNECTED) {

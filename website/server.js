@@ -40,6 +40,61 @@ app.listen(PORT, () => {
     console.log(`测试服务器已启动: http://localhost:${PORT}`);
 });
 
+app.get('/wifi',(req, res) => {
+    console.log('access /wifi');
+});
+
+app.post('/wifi_set',(req, res) => {
+    console.log('access /wifi_set');
+    const {ssid, password} = req.body;
+    console.log('ssid:', ssid);
+    console.log('password:', password);
+    res.status(200).json({ 
+        success: true 
+    });
+});
+
+let inScan = false;
+let testCount = 0;
+app.get('/wifi_scan',(req, res) => {
+    console.log('access /wifi_scan');
+    if(!inScan){
+        inScan = true;
+        res.status(202).json({
+            status: 'scanning'
+        })
+        testCount += 1;
+    }
+    else{
+        if(testCount < 2){
+            res.status(202).json({
+            status: 'scanning'
+            })
+            testCount += 1;
+        }
+        else{
+            inScan = false;
+            testCount = 0;
+            res.status(200).json({
+                status: 'done',
+                networks: [
+                    { ssid: 'Network_1', rssi: -40, secure: true },
+                    { ssid: 'Network_2', rssi: -70, secure: false },
+                    { ssid: 'Network_3', rssi: -60, secure: true },
+                    { ssid: 'Network_4', rssi: -80, secure: true },
+                    { ssid: 'Network_5', rssi: -40, secure: true },
+                    { ssid: 'Network_6', rssi: -70, secure: false },
+                    { ssid: 'Network_7', rssi: -60, secure: true },
+                    { ssid: 'Network_8', rssi: -80, secure: true },
+                    { ssid: 'Network_9', rssi: -40, secure: true },
+                    { ssid: 'Network_10', rssi: -70, secure: false },
+                    { ssid: 'Network_11', rssi: -60, secure: true }
+                ]
+            });
+        }
+    }
+});
+
 app.get('/index.html', (req, res) => {
     console.log('access /');
 });

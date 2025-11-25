@@ -9,7 +9,6 @@
 #include "ota_manager.h"
 #include "memory_utils.h"
 #include "logger.h"
-#include "web_component.h"
 #include "web_pages.h"
 
 #include <esp_ota_ops.h>
