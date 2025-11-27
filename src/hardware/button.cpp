@@ -20,6 +20,14 @@ volatile bool currentButtonState[buttonCount] = { false };
 static unsigned long lastButtonResponseTime[buttonCount] = { 0 };
 static unsigned long globalButtonDelayUntil = 0;
 
+void initButtonsPin(){
+    setInput(BUTTEN_UP_PIN);
+    setInput(BUTTEN_DOWN_PIN);
+    setInput(BUTTEN_LEFT_PIN);
+    setInput(BUTTEN_RIGHT_PIN);
+    setInput(BUTTEN_CENTER_PIN);
+}
+
 // 扫描按键是否按下
 void scanButtonsTask(void *pvParameters) {
     while (true) {

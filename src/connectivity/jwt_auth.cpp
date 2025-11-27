@@ -1,89 +1,34 @@
 #include "jwt_auth.h"
 #include "utils/logger.h"
 
+extern QWeatherAuthConfigManager qweatherAuthConfigManager;
+
 // API参数
-char apiHost[128] = "";     // API地址
-char kid[64] = "";          // Key ID
-char projectID[64] = "";   // 项目ID
-char base64Key[256] = "";  // Base64编码的PKCS#8私钥
-char location[32] = "";     // LocationID
-char cityName[64] = "";    // 地名
+static char apiHost[128] = "";     // API地址
+static char kid[64] = "";          // Key ID
+static char projectID[64] = "";   // 项目ID
+static char base64Key[256] = "";  // Base64编码的PKCS#8私钥
+static char location[32] = "";     // LocationID
+static char cityName[64] = "";    // 地名
 
 // 32字节 Ed25519 seed
 uint8_t seed32[32] = {}; 
 
 // 初始化 JWT 配置
-void init_jwt() {
-    if (!SPIFFS.begin(true)) {
-        LOG_JWT_ERROR("SPIFFS 初始化失败");
-        return;
-    }
-
-    if (!SPIFFS.exists("/jwt_config.txt")) {
-        LOG_JWT_WARN("JWT 配置文件不存在");
-        return;
-    }
-
-    File file = SPIFFS.open("/jwt_config.txt", "r");
-    if (!file) {
-        LOG_JWT_ERROR("打开 JWT 配置文件失败");
-        return;
-    }
-
-    // 读取配置文件的前五行
-    file.readBytesUntil('\n', apiHost, sizeof(apiHost));
-    file.readBytesUntil('\n', kid, sizeof(kid));
-    file.readBytesUntil('\n', projectID, sizeof(projectID));
-    file.readBytesUntil('\n', base64Key, sizeof(base64Key));
-    file.readBytesUntil('\n', location, sizeof(location));
-
-    // 移除所有字段的换行符和空白字符
-    for (int i = 0; i < sizeof(apiHost); i++) {
-        if (apiHost[i] == '\n' || apiHost[i] == '\r' || apiHost[i] == ' ' || apiHost[i] == '\t') {
-            apiHost[i] = '\0';
-            break;
-        }
-    }
-    
-    for (int i = 0; i < sizeof(kid); i++) {
-        if (kid[i] == '\n' || kid[i] == '\r' || kid[i] == ' ' || kid[i] == '\t') {
-            kid[i] = '\0';
-            break;
-        }
-    }
-    
-    for (int i = 0; i < sizeof(projectID); i++) {
-        if (projectID[i] == '\n' || projectID[i] == '\r' || projectID[i] == ' ' || projectID[i] == '\t') {
-            projectID[i] = '\0';
-            break;
-        }
-    }
-    
-    for (int i = 0; i < sizeof(base64Key); i++) {
-        if (base64Key[i] == '\n' || base64Key[i] == '\r' || base64Key[i] == ' ' || base64Key[i] == '\t') {
-            base64Key[i] = '\0';
-            break;
-        }
-    }
-    
-    for (int i = 0; i < sizeof(location); i++) {
-        if (location[i] == '\n' || location[i] == '\r' || location[i] == ' ' || location[i] == '\t') {
-            location[i] = '\0';
-            break;
-        }
-    }
-
-    // 读取地名
-    file.readBytesUntil('\n', cityName, sizeof(cityName));
-
-    // 移除换行符和空白字符
-    for (int i = 0; i < sizeof(cityName); i++) {
-        if (cityName[i] == '\n' || cityName[i] == '\r') {
-            cityName[i] = '\0';
-            break;
-        }
-    }
-    file.close();
+void loadJwtConfig() {
+    qweatherAuthConfigManager.loadConfig();
+    strncpy(apiHost, qweatherAuthConfigManager.getApiHost().c_str(), sizeof(apiHost) - 1);
+    apiHost[sizeof(apiHost) - 1] = '\0';
+    strncpy(kid,  qweatherAuthConfigManager.getKId().c_str(), sizeof(kid) - 1);
+    kid[sizeof(kid) - 1] = '\0';
+    strncpy(projectID, qweatherAuthConfigManager.getProjectID().c_str(), sizeof(projectID) - 1);
+    projectID[sizeof(projectID) - 1] = '\0';
+    strncpy(base64Key, qweatherAuthConfigManager.getBase64Key().c_str(), sizeof(base64Key) - 1);
+    base64Key[sizeof(base64Key) - 1] = '\0';
+    strncpy(location, qweatherAuthConfigManager.getLocation().c_str(), sizeof(location) - 1);
+    location[sizeof(location) - 1] = '\0';
+    strncpy(cityName, qweatherAuthConfigManager.getCityName().c_str(), sizeof(cityName) - 1);
+    cityName[sizeof(cityName) - 1] = '\0';
 
     LOG_JWT_INFO("JWT 配置已加载");
     LOG_JWT_DEBUG("apiHost: %s", apiHost);

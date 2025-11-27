@@ -18,6 +18,8 @@ InterfaceState currentState = STATE_MENU;
 WiFiConnectionState currentWiFiState = WIFI_IDLE;
 tm currentTimeInfo;
 
+extern WifiConfigManager wifiConfigManager;
+
 void _enterWirelessScreen(){
     LOG_MENU_INFO("Entering Wireless Screen");
     inMenuMode = false;
@@ -29,7 +31,7 @@ void _enterWirelessScreen(){
     }
     // WiFi 已连接时，显示连接信息
     else{
-        lcdText("SSID:" + savedSSID ,1);
+        lcdText("SSID:" + wifiConfigManager.getSSID(),1);
         lcdText("IP:" + WiFi.localIP().toString(),2);
     }
 }
@@ -84,7 +86,7 @@ void _setupWebSetting(){
 
 void _connectInfo(){
     if (WiFi.status() == WL_CONNECTED) {
-        lcdText("SSID:" + savedSSID, 1);
+        lcdText("SSID:" + wifiConfigManager.getSSID(), 1);
         lcdText("IP:" + WiFi.localIP().toString(), 2);
     } 
     else {
@@ -474,7 +476,7 @@ void _menuTask(void* parameter) {
                     // 每隔10分钟更新一次天气数据
                     if (!isReadyToDisplay || millis() - lastWeatherUpdate > 10*60*1000) {
                         if (millis() - lastWeatherFail > 15*1000) { // 失败后15秒再试
-                            init_jwt();
+                            loadJwtConfig();
                             LOG_MENU_INFO("Fetching weather data...");
                             if(fetchWeatherData()) {
                                 isReadyToDisplay = true;

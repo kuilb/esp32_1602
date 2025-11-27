@@ -20,7 +20,8 @@ const char* Logger::modulePrefixes[LOG_MODULE_MAX] = {
     "NETWORK",
     "MEMORY",
     "RGB",
-    "DISPLAY"
+    "DISPLAY",
+    "CONFIG"
 };
 
 // 日志级别前缀定义

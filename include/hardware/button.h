@@ -36,6 +36,8 @@ struct ButtonState {
 extern const int buttonCount;                    /**< 按钮数量 */
 extern volatile bool buttonJustPressed[];        /**< 按钮是否刚刚被按下标志数组 */
 
+void initButtonsPin();                          /**< 初始化按钮引脚为输入模式 */
+
 /**
  * @brief 检查按钮是否可以响应，防抖和节流控制
  *

@@ -3,6 +3,8 @@
 #include "logger.h"
 
 // 天气服务，API接口通过ESP32向云端获取JSON数据
+extern QWeatherAuthConfigManager qweatherAuthConfigManager;
+
 bool weatherSynced = false;
 String currentWeather = "N/A";
 String currentTemp = "--C";
@@ -21,31 +23,30 @@ unsigned int interface_num = 0; // 当前显示的界面编号
 void updateWeatherScreen() {
     if(interface_num == 0){
         lcdResetCursor();
-        extern char cityName[64];
-        if (cityName[0] != '\0' && strlen(cityName) > 0) {
-            lcdText(cityName, 1); // 第一行显示配置地名
+        if (currentCity != "N/A" && currentCity.length() > 0) {
+            lcdText(currentCity.c_str(), 1); // 第一行显示配置地名
         } else {
             lcdText("N/A", 1);
         }
 
         lcdSetCursor(16); 
         
-        // 安全地获取天气图标，确保指针不为空
-        uint8_t* leftIcon = getWeatherLeftIcon(currentWeather);
-        uint8_t* rightIcon = getWeatherRightIcon(currentWeather);
+        // 获取天气图标
+        uint8_t* leftIcon = WeatherIcons::getLeftIcon(currentWeather);
+        uint8_t* rightIcon = WeatherIcons::getRightIcon(currentWeather);
         
         if (leftIcon && rightIcon) {
             lcdCreateChar(0, leftIcon);
             lcdCreateChar(1, rightIcon);
-            lcdCreateChar(2, tempIcon);
-            lcdCreateChar(3, celsius);
+            lcdCreateChar(2, SystemIcons::tempIcon);
+            lcdCreateChar(3, SystemIcons::celsius);
 
             lcdDisCustom(0);
             lcdDisCustom(1);
             lcdDisCustom(2);
             lcdPrint(currentTemp);
             lcdDisCustom(3);
-            lcdPrint(" Feel" + feelsLike);
+            lcdPrint(" Fel " + feelsLike);
             lcdDisCustom(3);
         } else {
             // 如果天气图标获取失败，显示空白
@@ -58,7 +59,7 @@ void updateWeatherScreen() {
         lcdResetCursor();
         
         // 安全地获取风向图标
-        uint8_t* windIcon = getWindIcon(windDir);
+        uint8_t* windIcon = WindIcons::getIcon(windDir);
         
         if (windIcon) {
             lcdCreateChar(4, windIcon);
@@ -111,7 +112,7 @@ bool fetchWeatherData() {
     }
 
     // 检查 API 配置是否完整
-    if (strlen(apiHost) == 0 || strlen(base64Key) == 0 || strlen(kid) == 0 || strlen(projectID) == 0) {
+    if (!qweatherAuthConfigManager.checkApiConfigValid()) {
         LOG_WEATHER_ERROR("Missing API configuration");
         lcdText("No API config", 1);
         lcdText("Use web config", 2);
@@ -120,7 +121,7 @@ bool fetchWeatherData() {
     }
 
     // 检查城市配置是否为空
-    if (!location || strlen(location) == 0) {
+    if (!qweatherAuthConfigManager.checkLocationConfigValid()) {
         LOG_WEATHER_ERROR("Missing city/location configuration");
         lcdText("No City Set", 1);
         lcdText("Use Web Config", 2);
@@ -135,18 +136,12 @@ bool fetchWeatherData() {
     lcdText("Updating weather", 1);
     lcdText("Please wait...", 2);
 
-    // 去掉 apiHost 和 location 前后空格
-    String hostStr = String(apiHost);
-    hostStr.trim();
-    String locStr = String(location);
-    locStr.trim();
-
     // 生成 JWT
-    String jwtToken = generate_jwt(kid, projectID, seed32);
+    String jwtToken = generate_jwt(qweatherAuthConfigManager.getKId(), qweatherAuthConfigManager.getProjectID(), seed32);
     LOG_WEATHER_DEBUG("JWT token: " + jwtToken);
 
     // 拼接 URL
-    String url = "https://" + hostStr + "/v7/weather/now?location=" + locStr;
+    String url = "https://" + qweatherAuthConfigManager.getApiHost() + "/v7/weather/now?location=" + qweatherAuthConfigManager.getLocation();
     LOG_WEATHER_DEBUG("Final Request URL: %s", url.c_str());
     
     HTTPClient http;
@@ -269,7 +264,7 @@ bool fetchWeatherData() {
     }
 
     // 成功解析，赋值天气数据
-    currentCity = String(location);
+    currentCity = qweatherAuthConfigManager.getCityName();
     
     // 安全地获取天气数据，避免空值
     if (doc["now"]["text"].is<String>()) {

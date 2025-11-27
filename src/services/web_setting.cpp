@@ -1,5 +1,7 @@
 #include "web_setting.h"
 
+extern QWeatherAuthConfigManager qweatherAuthConfigManager;
+
 WebServer settingServer(80);
 volatile bool isConfigDone = false;
 volatile bool isKeyDone = false;
@@ -214,32 +216,6 @@ void webSettingHandleRoot() {
     settingServer.sendContent_P(index_html, len2);
 }
 
-
-// 保存 JWT 配置信息
-bool saveJWTConfig(const String& apiHost,
-                   const String& kid,
-                   const String& projectID,
-                   const String& privateKey) {
-
-    File file = SPIFFS.open("/jwt_config.txt", "w");
-    if (!file) {
-        LOG_WEATHER_ERROR("Failed to save JWT config - cannot open file");
-        return false;
-    }
-
-    if (!file.println(apiHost) || !file.println(kid) || !file.println(projectID) || !file.println(privateKey)) {
-        LOG_WEATHER_ERROR("Failed to save config - write failed");
-        file.close();
-        return false;
-    }
-
-    file.flush();
-    file.close();
-
-    LOG_WEATHER_INFO("JWT configuration saved successfully");
-    return true;
-}
-
 // 处理上传的 JWT 配置信息 POST + application/json
 void webSettingHandleSet() {
     if (settingServer.method() != HTTP_POST) {
@@ -277,43 +253,6 @@ void webSettingHandleSet() {
     kid.trim();
     project.trim();
     privateKey.trim();
-
-    // 简单有效性校验：不能为空
-    if (apiHost.length() == 0 || kid.length() == 0 || project.length() == 0 || privateKey.length() == 0) {
-        settingServer.send(400, "application/json; charset=utf-8", "{\"error\":\"参数不能为空\"}");
-        return;
-    }
-    // 检测apiHost是否有效
-    auto isValidApiHost = [](const String& host)->bool{
-        // 简单检测：必须包含点且不含空格
-        if (host.indexOf(' ') >= 0) return false;
-        if (host.indexOf('.') <= 0) return false;
-        return true;
-    };
-    if (!isValidApiHost(apiHost)) {
-        settingServer.send(400, "application/json; charset=utf-8", "{\"error\":\"无效的 apiHost\"}");
-        LOG_WEB_WARN("Invalid apiHost: %s", apiHost.c_str());
-        return;
-    }
-
-    auto isValidID = [](const String& s)->bool{
-        if (s.length() != 10) return false;
-        for (size_t i = 0; i < s.length(); ++i) {
-            char c = s.charAt(i);
-            if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))) return false;
-        }
-        return true;
-    };
-    if (!isValidID(kid)) {
-        settingServer.send(400, "application/json; charset=utf-8", "{\"error\":\"无效的凭据 ID\"}");
-        LOG_WEB_WARN("Invalid kID: %s", kid.c_str());
-        return;
-    }
-    if (!isValidID(project)) {
-        settingServer.send(400, "application/json; charset=utf-8", "{\"error\":\"无效的项目 ID\"}");
-        LOG_WEB_WARN("Invalid projectID: %s", project.c_str());
-        return;
-    }
     
     // Validate base64 PKCS#8 Ed25519 private key using jwt_auth helper
     if (!validate_base64_ed25519_key(privateKey.c_str())) {
@@ -322,6 +261,13 @@ void webSettingHandleSet() {
         return;
     }
 
+    if(!qweatherAuthConfigManager.setAuth(apiHost, kid, project, privateKey)){
+        settingServer.send(500, "application/json; charset=utf-8", "{\"error\":\""+ qweatherAuthConfigManager.getLastQWeatherErrorString() +"\"}");
+        LOG_WEB_ERROR("Failed to save JWT config");
+        return;
+    }
+    loadJwtConfig();
+
     // 打印到串口DEBUG等级日志
     LOG_WEATHER_DEBUG("==== Configuration received ====");
     LOG_WEATHER_DEBUG("API Host: " + apiHost);
@@ -329,21 +275,15 @@ void webSettingHandleSet() {
     LOG_WEATHER_DEBUG("projectID: " + project);
     LOG_WEATHER_DEBUG("private key length: " + String(privateKey.length()));
 
-    // 保存失败
-    if (!saveJWTConfig(apiHost, kid, project, privateKey)) {
-        settingServer.send(500, "application/json; charset=utf-8", "{\"error\":\"保存配置失败\"}");
-        return;
-    }
-
     // 保存成功
     settingServer.send(200, "application/json; charset=utf-8", "{\"ok\":true}");
 }
 
 void webSettingHandleGetApiInfo() {
     String json = "{";
-    json += "\"apiHost\":\"" + String(apiHost) + "\",";
-    json += "\"kID\":\"" + String(kid) + "\",";
-    json += "\"projectID\":\"" + String(projectID) + "\",";
+    json += "\"apiHost\":\"" + qweatherAuthConfigManager.getApiHost() + "\",";
+    json += "\"kID\":\"" + qweatherAuthConfigManager.getKId() + "\",";
+    json += "\"projectID\":\"" + qweatherAuthConfigManager.getProjectID() + "\",";
     json += "\"privateKey\":" + String(isKeyDone ? "true" : "false");
     json += "}";
     settingServer.send(200, "application/json; charset=utf-8", json);
@@ -376,18 +316,17 @@ void webSettingHandleCitySearch() {
 String fetchCitySearchResult(String& location) {
     location.trim();
 
-    // 读取API配置
-    String varApiHost = apiHost;
-    varApiHost.trim();
-    String varKid = kid;
-    varKid.trim();
-    String varProjectID = projectID;
-    varProjectID.trim();
-    String varBase64Key = base64Key;
-    varBase64Key.trim();
+    if(!qweatherAuthConfigManager.checkApiConfigValid()){
+        LOG_WEATHER_ERROR("API configuration missing for city search");
+        settingServer.send(500, "text/html; charset=utf-8", "{\"error\":\"API配置缺失，无法进行城市搜索\"}");
+        return " ";
+    }
 
+    String varApiHost = qweatherAuthConfigManager.getApiHost();
+    String varKid = qweatherAuthConfigManager.getKId();
+    String varProjectID = qweatherAuthConfigManager.getProjectID();
+    String varBase64Key = qweatherAuthConfigManager.getBase64Key();
     String jwtToken;
-    jwtToken.trim();
     
     // 确保先生成seed32
     generateSeed32();
@@ -607,66 +546,13 @@ void webSettingHandleSetLocation() {
     }
     
     // 保存到配置文件（追加或覆盖）
-    if (SPIFFS.exists("/jwt_config.txt")) {
-        File file = SPIFFS.open("/jwt_config.txt", "r");
-        String host = "", kid = "", project = "", key = "", oldloc = "";
-        if (file) {
-            host = file.readStringUntil('\n'); host.trim();
-            kid = file.readStringUntil('\n'); kid.trim();
-            project = file.readStringUntil('\n'); project.trim();
-            key = file.readStringUntil('\n'); key.trim();
-            oldloc = file.readStringUntil('\n'); oldloc.trim();         // 旧locationID
-            file.close();
-        }
-        else{
-            LOG_WEATHER_ERROR("Failed to read existing config file for updating location");
-            settingServer.send(500, "application/json; charset=utf-8", "{\"error\":\"无法读取现有配置文件\"}");
-            return;
-        }
+    qweatherAuthConfigManager.setLocation(locid, cityname);
+    
+    locid = qweatherAuthConfigManager.getLocation().c_str();
+    cityname = qweatherAuthConfigManager.getCityName().c_str();
 
-        // 重新写入，LocationID和地名
-        file = SPIFFS.open("/jwt_config.txt", "w");
-        if (file) {
-            file.println(host);
-            file.println(kid);
-            file.println(project);
-            file.println(key);
-            file.println(locid);    // 新增一行保存LocationID
-            file.println(cityname); // 新增一行保存地名
-            file.close();
-        }
-        else{
-            LOG_WEATHER_ERROR("Failed to open config file for writing new location");
-            settingServer.send(500, "application/json; charset=utf-8", "{\"error\":\"无法保存新的配置文件\"}");
-            return;
-        }
-    }
+    loadJwtConfig();
 
-    // 重新读入地名和ID，并重置weatherSynced
-    extern char location[32];
-    extern char cityName[64];
-    extern bool weatherSynced;
-    if (SPIFFS.exists("/jwt_config.txt")) {
-        File file = SPIFFS.open("/jwt_config.txt", "r");
-        if (file) {
-            file.readStringUntil('\n'); // host
-            file.readStringUntil('\n'); // kid
-            file.readStringUntil('\n'); // project
-            file.readStringUntil('\n'); // key
-            String newLoc = file.readStringUntil('\n'); newLoc.trim();
-            String newCity = file.readStringUntil('\n'); newCity.trim();
-            strncpy(location, newLoc.c_str(), sizeof(location) - 1);
-            location[sizeof(location) - 1] = '\0';  // 确保null结尾
-            strncpy(cityName, newCity.c_str(), sizeof(cityName) - 1);
-            cityName[sizeof(cityName) - 1] = '\0';  // 确保null结尾
-            file.close();
-        }
-        else{
-            LOG_WEATHER_ERROR("Failed to read config file to update location");
-            settingServer.send(500, "application/json; charset=utf-8", "{\"error\":\"无法读取配置文件以更新位置\"}");
-            return;
-        }
-    }
     weatherSynced = false;
     isReadyToDisplay = false;
 

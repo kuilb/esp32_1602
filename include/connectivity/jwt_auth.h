@@ -12,14 +12,7 @@
 
 #include "mydefine.h"
 #include "myheader.h"
-
-extern char apiHost[128];          /**< API 地址 */
-extern char kid[64];               /**< Key ID */
-extern char projectID[64];         /**< 项目 ID */
-extern char base64Key[256];        /**< Base64 编码的 PKCS#8 私钥 */
-
-extern char location[32];          /**< LocationID */
-extern char cityName[64];          /**< 城市名称 */
+#include "qweather_auth_config_manager.h"
 
 extern uint8_t seed32[32];         /**< 32 字节 Ed25519 种子 */
 
@@ -27,7 +20,7 @@ extern uint8_t seed32[32];         /**< 32 字节 Ed25519 种子 */
  * @brief 初始化 JWT 配置
  * @details 从 SPIFFS 文件系统加载 JWT 配置文件，读取 API 地址、Key ID 等参数
  */
-void init_jwt();
+void loadJwtConfig();
 
 /**
  * @brief 生成 seed32

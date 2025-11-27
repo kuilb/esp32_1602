@@ -23,6 +23,7 @@
 #include "logger.h"
 #include "button.h"
 #include "wifi_config.h"
+#include "wifi_config_manager.h"
 
 /** @brief 表示是否准备好显示 */
 extern volatile bool isReadyToDisplay;

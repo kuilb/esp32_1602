@@ -1,15 +1,14 @@
 #include "wifi_config.h"
 #include <lwip/dns.h>
 
+extern WifiConfigManager wifiConfigManager;
+
 // 配网模式使用的 Web 服务器（监听端口 80）
 WebServer apServer(80);
 
 // DNS 服务器用于强制门户
 DNSServer dnsServer;
 const byte DNS_PORT = 53;
-
-// 保存的 WiFi SSID 和密码（初始化为空字符串）
-String savedSSID = "", savedPassword = "";
 
 // 当前是否处于配网模式的标志位
 bool inConfigMode = false;
@@ -23,55 +22,12 @@ String scanResult = "";
 
 // 保存WiFi信息
 void _saveWiFiCredentials(const String& ssid, const String& password) {
-	File file = SPIFFS.open("/wifi.txt", "w");
-	if (!file) {
-			LOG_WIFI_ERROR("保存WiFi信息失败, 无法打开文件");
-			lcdText("Save WiFi Fail", 1);
-			lcdText("Check FS/Retry", 2);
-			return;
-	}
-	if (!file.println(ssid)) {
-			LOG_WIFI_ERROR("保存WiFi信息失败, 写入SSID失败");
-			lcdText("Save WiFi Fail", 1);
-			lcdText("Write Err", 2);
-			file.close();
-			return;
-	}
-	if (!file.println(password)) {
-			LOG_WIFI_ERROR("保存WiFi信息失败, 写入密码失败");
-			lcdText("Save WiFi Fail", 1);
-			lcdText("Write Err", 2);
-			file.close();
-			return;
-	}
-	file.flush();
-	file.close();
+	wifiConfigManager.setSSID(ssid);
+	wifiConfigManager.setPassword(password);
 
 	LOG_WIFI_INFO("WiFi config saved, restarting...");
 	lcdText("Config Saved", 1);
 	lcdText("Restarting...", 2);
-}
-
-// 加载WiFi信息
-void _loadWiFiCredentials() {
-		if (!SPIFFS.exists("/wifi.txt")) {
-				savedSSID = "";
-				savedPassword = "";
-				return;
-		}
-		File file = SPIFFS.open("/wifi.txt", "r");
-		if (file) {
-				savedSSID = file.readStringUntil('\n');
-				LOG_WIFI_DEBUG("Loaded SSID: %s", savedSSID.c_str());
-				savedSSID.trim();
-				savedPassword = file.readStringUntil('\n');
-				savedPassword.trim();
-				file.close();
-		} else {
-				LOG_WIFI_ERROR("Failed to open WiFi config file for reading");
-				savedSSID = "";
-				savedPassword = "";
-		}
 }
 
 void wifiConfigHandler(){
@@ -210,7 +166,7 @@ void wifiConnectTask(void* parameter) {
 		
 		updateColor(CRGB::Blue);  // 连接中蓝灯
 		
-		WiFi.begin(savedSSID.c_str(), savedPassword.c_str());
+		WiFi.begin(wifiConfigManager.getSSID().c_str(), wifiConfigManager.getPassword().c_str());
 		
 		unsigned long startTime = millis();
 		int fadeStep = 2;
@@ -244,7 +200,7 @@ void wifiConnectTask(void* parameter) {
 				WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), dns1, dns2);
 				LOG_WIFI_INFO("DNS set to 223.5.5.5 and 1.1.1.1");
 
-				LOG_WIFI_INFO("connected: %s", savedSSID.c_str());
+				LOG_WIFI_INFO("connected: %s", wifiConfigManager.getSSID().c_str());
 				LOG_WIFI_INFO("IP: %s", WiFi.localIP().toString().c_str());
 				LOG_WIFI_INFO("TCP server started on port %d", CONNECT_PORT);
 
@@ -272,16 +228,14 @@ void wifiConnectTask(void* parameter) {
 }
 
 void connectToWiFi() {
-		_loadWiFiCredentials();
-
-		if (savedSSID == "") {
-				LOG_WIFI_WARN("config not found");
-				wifiConnectionState = WIFI_FAILED;
-				updateColor(CRGB::Red);  		// 无配置红灯
-				return;
+		if(wifiConfigManager.getSSID() == ""){
+			LOG_WIFI_WARN("config not found");
+			wifiConnectionState = WIFI_FAILED;
+			updateColor(CRGB::Red);  		// 无配置红灯
+			return;
 		}
 
-		LOG_WIFI_INFO("will connect to: %s", savedSSID.c_str());
+		LOG_WIFI_INFO("will connect to: %s", wifiConfigManager.getSSID());
 
 		// 设置连接中状态
 		wifiConnectionState = WIFI_CONNECTING;

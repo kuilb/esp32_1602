@@ -1,13 +1,33 @@
 import datetime
 import os
+import sys
 
 # 应用版本号
-PROJECT_VERSION = "1.0.2"
-IS_RELEASE_MODE = True
+PROJECT_VERSION = "1.0.3"
+IS_RELEASE_MODE = False
 IS_DEVELOPER_TEST = False
 
 # 构建时间戳
 BUILD_TIMESTAMP = datetime.datetime.now()
+
+def parse_arguments():
+    """解析命令行参数"""
+    global IS_RELEASE_MODE, IS_DEVELOPER_TEST
+    
+    # 获取命令行参数
+    if len(sys.argv) > 1:
+        version = sys.argv[1]
+        if version == "release":
+            IS_RELEASE_MODE = True
+            print("Set to release mode")
+        elif version == "debug":
+            IS_RELEASE_MODE = False
+            print("Set to debug mode")
+        else:
+            print(f"Unknown parameter: {version}")
+    else:
+        # 默认行为
+        print("No version parameter provided")
 
 # 读取或生成构建版本号
 def get_build_number():
@@ -58,6 +78,9 @@ def generate_version(build_number):
 
 # 主函数
 if __name__ == "__main__":
+    # 解析命令行参数
+    parse_arguments()
+    
     # 获取构建号
     build_number = get_build_number()
 

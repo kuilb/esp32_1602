@@ -72,6 +72,14 @@ inline void setLcdBrightness(uint8_t duty) {
 
 // 初始化 LCD 显示模块
 void lcdInit(){
+    setOutput(LCD_RS);
+    setOutput(LCD_E);
+    setOutput(LCD_D4);
+    setOutput(LCD_D5);
+    setOutput(LCD_D6);
+    setOutput(LCD_D7);
+    setOutput(LCD_BLA);
+    
     _initLcdBacklightPwm(255);           // 默认亮度 255
 
     _gpioWrite(0x33,CMD);               // 设置LCD进入8位模式

@@ -15,8 +15,8 @@
 #include "menu.h"
 #include "button.h"
 #include "clock.h"
-#include "weathertrans.h"
 #include "jwt_auth.h"
+#include "./ui/icons.h"
 
 extern bool weatherSynced;              /**< 天气是否已同步的标志 */
 extern unsigned long lastWeatherUpdate; /**< 最后天气更新的时间戳 */
