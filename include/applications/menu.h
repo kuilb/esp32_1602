@@ -10,20 +10,24 @@
 #ifndef MENU_H
 #define MENU_H
 
-#include "myheader.h"
-#include "lcd_driver.h"
-#include "network.h"
-#include "wifi_config.h"
-#include "button.h"
-#include "clock.h"
-#include "badappleplayer.h"
-#include "weather.h"
-#include "web_setting.h"
-#include "about.h"
-#include "logger.h"
-#include "button.h"
-#include "wifi_config.h"
-#include "wifi_config_manager.h"
+#include "./applications/clock.h"
+#include "./applications/badappleplayer.h"
+#include "./applications/weather.h"
+#include "./applications/about.h"
+
+#include "./connectivity/network.h"
+#include "./connectivity/wifi_config.h"
+
+#include "./hardware/lcd_driver.h"
+#include "./hardware/button.h"
+#include "./hardware/button.h"
+
+#include "./services/wifi_config_manager.h"
+#include "./services/web_setting.h"
+
+#include "./ui/icons.h"
+#include "./ui/animations.h"
+#include "./utils/logger.h"
 
 /** @brief 表示是否准备好显示 */
 extern volatile bool isReadyToDisplay;

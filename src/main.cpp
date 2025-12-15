@@ -1,22 +1,23 @@
-#include "myheader.h"
 #include "mydefine.h"
-#include "kanamap.h"
-#include "lcd_driver.h"
-#include "wifi_config.h"
-#include "rgb_led.h"
-#include "network.h"
-#include "protocol.h"
-#include "playbuffer.h"
-#include "button.h"
-#include "menu.h"
-#include "clock.h"
-#include "jwt_auth.h"
-#include "utils/logger.h"
-#include "config_manager.h"
-#include "wifi_config_manager.h"
-#include "qweather_auth_config_manager.h"
-#include <DNSServer.h>
-using namespace std;
+
+#include "./applications/menu.h"
+#include "./applications/clock.h"
+
+#include "./connectivity/wifi_config.h"
+#include "./connectivity/network.h"
+#include "./connectivity/jwt_auth.h"
+
+#include "./hardware/button.h"
+#include "./hardware/lcd_driver.h"
+#include "./hardware/rgb_led.h"
+
+#include "./services/kanamap.h"
+#include "./services/protocol.h"
+#include "./services/playbuffer.h"
+#include "./services/wifi_config_manager.h"
+#include "./services/qweather_auth_config_manager.h"
+
+#include "./utils/logger.h"
 
 WifiConfigManager wifiConfigManager("/wifi_config.txt");
 QWeatherAuthConfigManager qweatherAuthConfigManager("/qweather_auth_config.txt");

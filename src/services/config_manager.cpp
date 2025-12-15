@@ -1,4 +1,4 @@
-#include "config_manager.h"
+#include "./services/config_manager.h"
 
 bool ConfigManager::isSPIFFSInitialized = false;
 
@@ -26,38 +26,100 @@ bool ConfigManager::readFile(String& configContent) {
         return false;
     }
 
+    size_t fileSize = file.size();
+    LOG_CONFIG_DEBUG("Reading file: %s, size: %d bytes", configFilePath.c_str(), fileSize);
+    
+    if (fileSize == 0) {
+        LOG_CONFIG_WARN("Config file is empty: %s", configFilePath.c_str());
+        file.close();
+        configContent = "";
+        lastError = Error::ReadError;
+        return false;
+    }
+
+    // 尝试读取文件内容
+    configContent = "";
+    configContent.reserve(fileSize + 1);
+    
+    // 方法1: 使用readString
     configContent = file.readString();
+    
+    // 如果readString失败,尝试逐字节读取
+    if (configContent.length() == 0) {
+        LOG_CONFIG_WARN("readString failed, trying byte-by-byte read");
+        file.seek(0);  // 重置文件指针
+        
+        char buffer[fileSize + 1];
+        size_t bytesRead = file.readBytes(buffer, fileSize);
+        buffer[bytesRead] = '\0';
+        configContent = String(buffer);
+        
+        LOG_CONFIG_DEBUG("Byte-by-byte read: %d bytes", bytesRead);
+    }
+    
     file.close();
-    LOG_CONFIG_VERBOSE("Config read: %s", configContent.c_str());
+    LOG_CONFIG_VERBOSE("Config read (%d bytes): %s", configContent.length(), configContent.c_str());
+    
+    if (configContent.length() == 0) {
+        LOG_CONFIG_ERROR("Failed to read content from file: %s", configFilePath.c_str());
+        lastError = Error::ReadError;
+        return false;
+    }
+    
     return true;
 }
 
 bool ConfigManager::writeFile(const String& configContent) {
-    if(!SPIFFS.exists(configFilePath)) {
-        lastError = Error::FileNotFound;
-        LOG_CONFIG_INFO("Config file does not exist, it will be created: %s", configFilePath.c_str());
-        listDir("/", 0); // 列出根目录以帮助调试
+    LOG_CONFIG_VERBOSE("Writing config (%d bytes): %s", configContent.length(), configContent.c_str());
+    
+    // 删除旧文件(如果存在)
+    if(SPIFFS.exists(configFilePath)) {
+        LOG_CONFIG_DEBUG("Removing existing file: %s", configFilePath.c_str());
+        SPIFFS.remove(configFilePath);
+        delay(50);  // 等待Flash完成删除操作
     }
 
-    File file = SPIFFS.open(configFilePath, "w");
+    File file = SPIFFS.open(configFilePath, "w", true);  // create if not exists
     if (!file) {
         lastError = Error::WriteError;
         LOG_CONFIG_ERROR("Failed to open config file for writing: %s", configFilePath.c_str());
         return false;
     }
 
-    LOG_CONFIG_VERBOSE("Writing config: %s", configContent.c_str());
     size_t written = file.print(configContent);
+    file.flush();  // 确保数据完全写入Flash
     file.close();
+    
+    delay(100);  // 等待Flash完成写入操作
 
-    if (written == configContent.length()) {
-        LOG_CONFIG_INFO("Config saved: %s", configFilePath.c_str());
-        return true;
+    if (written != configContent.length()) {
+        lastError = Error::WriteError;
+        LOG_CONFIG_ERROR("Failed to write complete config to file: %s (wrote %d/%d bytes)", 
+                        configFilePath.c_str(), written, configContent.length());
+        return false;
     }
-
-    lastError = Error::WriteError;
-    LOG_CONFIG_ERROR("Failed to write complete config to file: %s", configFilePath.c_str());
-    return false;
+    
+    // 验证写入
+    if (!SPIFFS.exists(configFilePath)) {
+        lastError = Error::WriteError;
+        LOG_CONFIG_ERROR("File verification failed: file not found after write: %s", configFilePath.c_str());
+        return false;
+    }
+    
+    // 验证文件大小
+    File verifyFile = SPIFFS.open(configFilePath, "r");
+    if (verifyFile) {
+        size_t actualSize = verifyFile.size();
+        verifyFile.close();
+        if (actualSize != configContent.length()) {
+            lastError = Error::WriteError;
+            LOG_CONFIG_ERROR("File size mismatch: expected %d, got %d", configContent.length(), actualSize);
+            return false;
+        }
+    }
+    
+    LOG_CONFIG_INFO("Config saved successfully: %s (%d bytes)", configFilePath.c_str(), written);
+    return true;
 }
 
 // 打印目录
@@ -71,15 +133,16 @@ void ConfigManager::listDir(const char* dirname, uint8_t levels) {
     }
     if(!root.isDirectory()) {
         LOG_SYSTEM_ERROR("Not a directory: %s", dirname);
+        root.close();
         return;
     }
 
     File file = root.openNextFile();
     while(file) {
-        // 检查 file.name() 是否为空指针
         const char* fileName = file.name();
         if (!fileName) {
             LOG_SYSTEM_WARN("File has no name, skipping");
+            file.close();
             file = root.openNextFile();
             continue;
         }
@@ -92,8 +155,10 @@ void ConfigManager::listDir(const char* dirname, uint8_t levels) {
         } else {
             LOG_SYSTEM_DEBUG("  FILE: %s\tSIZE: %d", fileName, file.size());
         }
+        file.close();
         file = root.openNextFile();
-    } 
+    }
+    root.close();
 }
 
 // 初始化 SPIFFS
@@ -104,16 +169,34 @@ bool ConfigManager::initSPIFFS() {
     }
 
     LOG_CONFIG_INFO("Initializing SPIFFS...");
-    if (!SPIFFS.begin(true)) {
-        LOG_CONFIG_ERROR("SPIFFS mount failed, try formatting");
-        SPIFFS.format();
-        if (!SPIFFS.begin()) {
+    
+    // 先尝试正常挂载(不自动格式化)
+    bool mounted = SPIFFS.begin(false);
+    
+    if (!mounted) {
+        LOG_CONFIG_WARN("SPIFFS mount failed, formatting...");
+        // 如果挂载失败,进行格式化
+        if (!SPIFFS.format()) {
+            LOG_CONFIG_ERROR("SPIFFS format failed");
+            return false;
+        }
+        
+        delay(100);  // 等待Flash完成格式化
+        
+        // 重新挂载
+        if (!SPIFFS.begin(false)) {
             LOG_CONFIG_ERROR("SPIFFS mount failed after format");
             return false;
         }
     }
+    
     LOG_CONFIG_INFO("SPIFFS mounted successfully");
-    listDir("/", 0);    // 打印根目录文件
+    LOG_CONFIG_INFO("Total: %d bytes, Used: %d bytes", SPIFFS.totalBytes(), SPIFFS.usedBytes());
+    
+    // 打印文件列表
+    LOG_CONFIG_INFO("Checking SPIFFS files...");
+    listDir("/", 0);
+    
     isSPIFFSInitialized = true;
     return true;
 }
@@ -132,6 +215,8 @@ String ConfigManager::getLastErrorString(Error error) const {
             return "Read error";
         case Error::WriteError:
             return "Write error";
+        case Error::InvalidData:
+            return "Invalid data";
         default:
             return "Unknown error";
     }

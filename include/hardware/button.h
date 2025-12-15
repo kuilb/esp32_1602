@@ -10,12 +10,11 @@
 #ifndef BUTTON_H
 #define BUTTON_H
 
-#include "myheader.h"
 #include "mydefine.h"
-#include "network.h"
-#include "button.h"
-#include "menu.h"
-#include "logger.h"
+#include "./connectivity/network.h"
+#include "./hardware/button.h"
+#include "./applications/menu.h"
+#include "./utils/logger.h"
 
 /**
  * @brief 按钮状态结构体

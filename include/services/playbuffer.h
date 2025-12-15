@@ -1,9 +1,8 @@
 #ifndef PLAYBUFFER_H
 #define PLAYBUFFER_H
 
-#include "myheader.h"
-#include "protocol.h"
-#include "network.h"
+#include "./services/protocol.h"
+#include "./connectivity/network.h"
 
 /**
  * @brief 帧数据结构体，包含帧内容和帧间隔时间（毫秒）

@@ -12,9 +12,8 @@
 #ifndef ABOUT_H
 #define ABOUT_H
 
-#include "mydefine.h"
-#include "button.h"
-#include "menu.h"
+#include "./hardware/button.h"
+#include "./applications/menu.h"
 
 /**
  * @brief 显示创建者信息

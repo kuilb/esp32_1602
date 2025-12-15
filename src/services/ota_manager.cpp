@@ -1,7 +1,4 @@
 #include "services/ota_manager.h"
-#include "logger.h"
-#include "lcd_driver.h"
-#include "rgb_led.h"
 
 int OTAManager::progress = 0;
 String OTAManager::lastError = "";

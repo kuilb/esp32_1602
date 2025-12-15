@@ -1,8 +1,8 @@
 #include <unity.h>
 #include <Arduino.h>
 #include <SPIFFS.h>
-#include "lcd_driver.h"
-#include "config_manager.h"
+#include "../../include/hardware/lcd_driver.h"
+#include "../../include/services/config_manager.h"
 #include "../common/test_init.h"  // 引入共享的测试初始化
 
 // 测试辅助类 - 暴露 protected 方法

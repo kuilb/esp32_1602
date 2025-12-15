@@ -1,4 +1,4 @@
-#include "wifi_config_manager.h"
+#include "./services/wifi_config_manager.h"
 
 WifiConfigManager::WifiConfigManager(const String& configFilePath) : ConfigManager(configFilePath), ssid(""), password("") {
     LOG_CONFIG_INFO("WifiConfigManager initialized with config file: %s", configFilePath.c_str());
@@ -16,6 +16,12 @@ bool WifiConfigManager::init() {
             if(saveConfig()) return true;
             return false;
         }
+        else if(lastError == Error::InvalidData){
+            // 配置为空或无效,但配置管理器本身工作正常,返回 true
+            // WiFi 连接层会检查 SSID 是否为空并适当处理
+            LOG_CONFIG_INFO("WiFi config is empty, waiting for user configuration via web interface");
+            return true;
+        }
         else{
             LOG_CONFIG_ERROR("Failed to load WiFi config with error: %s", getLastErrorString(lastError).c_str());
             return false;
@@ -31,11 +37,18 @@ bool WifiConfigManager::loadConfig() {
         LOG_CONFIG_WARN("Failed to read WiFi config file");
         return false;
     }
+
+    if (configContent.length() == 0) {
+        LOG_CONFIG_WARN("WiFi config file is empty");
+        setLastError(Error::InvalidData);  // 文件存在但为空,属于无效数据
+        return false;
+    }
     
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, configContent);
     if (error) {
         LOG_CONFIG_ERROR("Failed to parse WiFi config JSON: %s", error.c_str());
+        setLastError(Error::InvalidData);  // JSON 解析失败,属于无效数据
         return false;
     }
 
@@ -44,8 +57,8 @@ bool WifiConfigManager::loadConfig() {
 
     // 验证 SSID 不为空(password 可以为空,用于开放网络)
     if(ssid.length() == 0) {
-        LOG_CONFIG_WARN("WiFi config has empty SSID, treating as invalid config");
-        setLastError(Error::FileNotFound);  // 设置为文件未找到,触发创建默认配置
+        LOG_CONFIG_WARN("WiFi config has empty SSID, waiting for user configuration");
+        setLastError(Error::InvalidData);  // SSID 为空,属于无效数据而非文件不存在
         return false;
     }
 
@@ -63,7 +76,8 @@ bool WifiConfigManager::saveConfig() {
     serializeJson(doc, jsonString);
 
     if(writeFile(jsonString)){
-        LOG_CONFIG_INFO("WiFi config saved successfully" +  jsonString);
+        LOG_CONFIG_INFO("WiFi config saved successfully");
+        LOG_CONFIG_DEBUG("WiFi config content: %s", jsonString.c_str());
         return true;
     }
     else{

@@ -1,5 +1,4 @@
-#include "clock.h"
-#include "utils/logger.h"
+#include "./applications/clock.h"
 
 // 时间同步相关变量
 static unsigned long timeSyncStartTime = 0;

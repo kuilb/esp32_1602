@@ -1,7 +1,7 @@
 #ifndef KANAMAP_H
 #define KANAMAP_H
 
-#include "myheader.h"
+#include <Arduino.h>
 
 /**
  * @brief 假名映射表大小

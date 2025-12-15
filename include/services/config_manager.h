@@ -8,8 +8,10 @@
 #ifndef CONFIG_MANAGER_H
 #define CONFIG_MANAGER_H
 
-#include "myheader.h"
-#include "logger.h"
+#include <ArduinoJson.h>
+#include <SPIFFS.h>
+
+#include "./utils/logger.h"
 
 /**
  * @class ConfigManager
@@ -31,6 +33,7 @@ public:
         FileNotFound,       ///< 文件未找到
         ReadError,          ///< 读取错误
         WriteError,         ///< 写入错误
+        InvalidData,        ///< 数据无效(文件存在但内容无效)
         UnknownError        ///< 未知错误
     };
 protected:

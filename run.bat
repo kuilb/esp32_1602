@@ -4,10 +4,10 @@ if errorlevel 3 (
     python .\script\set_version.py release
     pio run -e esp32s3-1602
     python .\script\set_version.py debug
-    pio run -e esp32s3-1602-debug
+    pio run -e esp32s3-1602-dev
 ) else if errorlevel 2 (
     python .\script\set_version.py debug
-    pio run -e esp32s3-1602-debug
+    pio run -e esp32s3-1602-dev
 ) else if errorlevel 1 (
     python .\script\set_version.py release
     pio run -e esp32s3-1602
@@ -21,7 +21,7 @@ if errorlevel 2 (
 ) else (
     choice /c rd /n /m "upload release/debug?(r/d):"
         if errorlevel 2 (
-            pio run -e esp32s3-1602-debug --target upload
+            pio run -e esp32s3-1602-dev --target upload
         ) else (
             pio run -e esp32s3-1602 --target upload
         )

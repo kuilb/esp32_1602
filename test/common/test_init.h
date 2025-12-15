@@ -3,8 +3,8 @@
 
 #include <Arduino.h>
 #include <SPIFFS.h>
-#include "logger.h"
-#include "lcd_driver.h"
+#include "../../include/utils/logger.h"
+#include "../../include/hardware/lcd_driver.h"
 
 /**
  * @brief 全局测试初始化 - 在所有测试开始前调用一次

@@ -1,4 +1,4 @@
-#include "kanamap.h"
+#include "./services/kanamap.h"
 
 // 假名映射数组
 const int kanaMapSize = 1000;

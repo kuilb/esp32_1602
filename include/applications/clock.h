@@ -10,10 +10,10 @@
 #ifndef CLOCK_H
 #define CLOCK_H
 
-#include "myheader.h"
-#include "lcd_driver.h"
-#include "menu.h"
-#include "button.h"
+#include "./hardware/lcd_driver.h"
+#include "./applications/menu.h"
+#include "./hardware/button.h"
+#include "./utils/logger.h"
 
 extern struct tm localTimeInfo;  /**< 本地时间信息结构体 */
 

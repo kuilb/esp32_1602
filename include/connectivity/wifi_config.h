@@ -10,15 +10,17 @@
 #ifndef WIFI_CONFIG_H
 #define WIFI_CONFIG_H
 
-#include "lcd_driver.h"
-#include "mydefine.h"
-#include "rgb_led.h"
-#include "myheader.h"
-#include "network.h"
-#include "web_pages.h"
-#include "wifi_config_manager.h"
+#include <WebServer.h>
+#include <DNSServer.h>
 
-extern WebServer apServer;                     /**< 配网模式使用的 Web 服务器 */
+#include "mydefine.h"
+#include "./hardware/lcd_driver.h"
+#include "./hardware/rgb_led.h"
+#include "./connectivity/network.h"
+#include "./services/web_pages.h"
+#include "./services/wifi_config_manager.h"
+
+extern WebServer apServer;                      /**< 配网模式使用的 Web 服务器 */
 extern DNSServer dnsServer;                     /**< DNS 服务器用于强制门户 */
 
 enum WifiScanState {

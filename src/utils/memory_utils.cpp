@@ -1,5 +1,4 @@
-#include "utils/memory_utils.h"
-#include "utils/logger.h"
+#include "./utils/memory_utils.h"
 
 // 安全的内存分配
 uint8_t* MemoryManager::safeMalloc(size_t size, const char* name) {

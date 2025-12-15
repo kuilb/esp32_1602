@@ -3,8 +3,8 @@ import os
 import sys
 
 # 应用版本号
-PROJECT_VERSION = "1.0.3"
-IS_RELEASE_MODE = False
+PROJECT_VERSION = "1.0.4"
+IS_RELEASE_MODE = True
 IS_DEVELOPER_TEST = False
 
 # 构建时间戳

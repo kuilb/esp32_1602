@@ -10,9 +10,12 @@
 #ifndef JWT_AUTH_H
 #define JWT_AUTH_H
 
+#include <sodium.h>
+#include <ArduinoJson.h>
+
 #include "mydefine.h"
-#include "myheader.h"
-#include "qweather_auth_config_manager.h"
+#include "./services/qweather_auth_config_manager.h"
+#include "./utils/logger.h"
 
 extern uint8_t seed32[32];         /**< 32 字节 Ed25519 种子 */
 

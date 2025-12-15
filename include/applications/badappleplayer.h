@@ -13,12 +13,12 @@
 #ifndef BADAPPLEPLAYER_H
 #define BADAPPLEPLAYER_H
 
-#include "myheader.h"
-#include "menu.h"
-#include "button.h"
-#include "kanamap.h"
-#include "logger.h"
+#include <SPIFFS.h>
 
+#include "./applications/menu.h"
+#include "./hardware/button.h"
+#include "./services/kanamap.h"
+#include "./utils/logger.h"
 
 /**
  * @struct LyricLine

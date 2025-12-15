@@ -1,5 +1,4 @@
-#include "lcd_driver.h"
-#include <esp_timer.h>
+#include "./hardware/lcd_driver.h"
 
 int lcdCursor = 0;  // 当前光标位置，全局变量 0~31
 
@@ -211,7 +210,7 @@ void _nextCursor(){
 }
 
 // 写入一字节的自定义字符
-void lcdCreateChar(int slot, uint8_t data[8]){
+void lcdCreateChar(int slot, const uint8_t data[8]){
     if (slot < 0 || slot > 7) return;       // 限制 slot 范围
 
     int cgram_addr = 0x40 | (slot << 3);    // CGRAM 写入起始地址

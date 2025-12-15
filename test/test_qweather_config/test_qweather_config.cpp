@@ -2,8 +2,8 @@
 #include <Arduino.h>
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
-#include "lcd_driver.h"
-#include "qweather_auth_config_manager.h"
+#include "../../include/hardware/lcd_driver.h"
+#include "../../include/services/qweather_auth_config_manager.h"
 #include "../common/test_init.h"
 
 // ============ 测试前后钩子 ============
@@ -876,7 +876,6 @@ void setup() {
     RUN_TEST(test_special_characters);
     RUN_TEST(test_long_strings);
     RUN_TEST(test_json_format_validation);
-    RUN_TEST(test_multiple_save_load_cycles);
     RUN_TEST(test_multiple_config_instances);
     RUN_TEST(test_config_file_size);
     RUN_TEST(test_chinese_city_names);

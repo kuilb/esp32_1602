@@ -1,4 +1,4 @@
-#include "about.h"
+#include "./applications/about.h"
 
 enum NavigationResult {
     NAV_NONE,      // 无按键

@@ -1,5 +1,4 @@
-#include "wifi_config.h"
-#include <lwip/dns.h>
+#include "./connectivity/wifi_config.h"
 
 extern WifiConfigManager wifiConfigManager;
 

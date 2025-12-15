@@ -2,8 +2,8 @@
 #include <Arduino.h>
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
-#include "lcd_driver.h"
-#include "wifi_config_manager.h"
+#include "../../include/hardware/lcd_driver.h"
+#include "../../include/services/wifi_config_manager.h"
 #include "../common/test_init.h"
 
 // ============ 测试前后钩子 ============

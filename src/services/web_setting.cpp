@@ -1,4 +1,4 @@
-#include "web_setting.h"
+#include "./services/web_setting.h"
 
 extern QWeatherAuthConfigManager qweatherAuthConfigManager;
 

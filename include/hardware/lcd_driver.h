@@ -10,10 +10,11 @@
 #ifndef LCD_DRIVER_H
 #define LCD_DRIVER_H
 
-#include "myheader.h"
+#include <Arduino.h>
+
 #include "mydefine.h"
-#include "kanamap.h"
-#include "logger.h"
+#include "./services/kanamap.h"
+#include "./utils/logger.h"
 
 // ==============================
 // LCD 显示命令定义
@@ -68,7 +69,7 @@ void lcdResetCursor();
  * @param[in] slot 自定义字符槽位编号, 范围 0~7
  * @param[in] data 包含 8 字节点阵数据的数组, 每字节对应字符的一行像素
  */
-void lcdCreateChar(int slot, uint8_t data[8]);
+void lcdCreateChar(int slot, const uint8_t data[8]);
 
 /**
  * @brief 显示自定义字符

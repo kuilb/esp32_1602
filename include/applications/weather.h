@@ -10,13 +10,16 @@
 #ifndef WEATHER_H
 #define WEATHER_H
 
-#include "myheader.h"
-#include "lcd_driver.h"
-#include "menu.h"
-#include "button.h"
-#include "clock.h"
-#include "jwt_auth.h"
+#include <zlib_turbo.h>
+
+#include "./applications/menu.h"
+#include "./applications/clock.h"
+#include "./connectivity/jwt_auth.h"
+#include "./hardware/lcd_driver.h"
+#include "./hardware/button.h"
 #include "./ui/icons.h"
+#include "./utils/memory_utils.h"
+#include "./utils/logger.h"
 
 extern bool weatherSynced;              /**< 天气是否已同步的标志 */
 extern unsigned long lastWeatherUpdate; /**< 最后天气更新的时间戳 */

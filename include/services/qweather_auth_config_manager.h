@@ -7,8 +7,9 @@
 
 #ifndef QWEATHER_AUTH_CONFIG_MANAGER_H
 #define QWEATHER_AUTH_CONFIG_MANAGER_H
-#include "config_manager.h"
-#include "logger.h"
+
+#include "./services/config_manager.h"
+#include "./utils/logger.h"
 
 /**
  * @class QWeatherAuthConfigManager

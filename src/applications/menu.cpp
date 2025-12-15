@@ -1,4 +1,4 @@
-#include "menu.h"
+#include "./applications/menu.h"
 
 // 前置声明
 void _displayMenu(const Menu* menu, int menuIndex, int scrollOffset);
@@ -19,6 +19,10 @@ WiFiConnectionState currentWiFiState = WIFI_IDLE;
 tm currentTimeInfo;
 
 extern WifiConfigManager wifiConfigManager;
+
+static auto wifianim = Animations::getAnimation("wifi_searching");
+static auto spinneranim = Animations::getAnimation("spinner");
+static auto wronganim = Animations::getAnimation("wrong");
 
 void _enterWirelessScreen(){
     LOG_MENU_INFO("Entering Wireless Screen");
@@ -176,6 +180,16 @@ int scrollOffset = -1;      // 当前显示窗口起始项，-1为状态栏
 // 初始化
 void initMenu() {
     if(inConfigMode) return; // 配置模式不启动菜单任务
+
+    // 注册动画
+    Animations::registerAnimation(*wifianim);
+    Animations::registerAnimation(*spinneranim);
+    Animations::registerAnimation(*wronganim);
+
+    Animations::setEnable("wifi_searching", true);
+    Animations::setEnable("spinner", true);
+    Animations::setEnable("wrong", true);
+
     xTaskCreate(_menuTask, "_menuTask", 16384, NULL, 1, &_menuTaskHandle);
 }
 
@@ -192,36 +206,53 @@ void _displayMenu(const Menu* menu, int menuIndex, int scrollOffset) {
             
             if (displayIndex == -1) {
                 // 显示状态栏（虚拟项-1）
-                String statusLine = "";
                 
                 // 根据WiFi连接状态显示不同内容
                 switch (wifiConnectionState) {
                     case WIFI_CONNECTING:
-                        statusLine = "W:connecting";
+                        lcdCreateChar(0, wifianim->frames[wifianim->currentFrame]);
+                        lcdDisCustom(0);
+                        lcdCreateChar(1, spinneranim->frames[spinneranim->currentFrame]);
+                        lcdDisCustom(1);
+                        lcdPrint("              "); // 填充剩余空间
                         break;
                     case WIFI_CONNECTED:
-                        statusLine = "W:OK ";
+                        lcdCreateChar(0, SystemIcons::getIcon("wifi" ));
+                        lcdDisCustom(0);
+                        lcdPrint("         "); // 填充剩余空间
                         if(timeSyncState == TIME_SYNC_IN_PROGRESS){
-                            statusLine += "T:Syncing...";
+                            lcdCreateChar(1, SystemIcons::getIcon("clock"));
+                            lcdDisCustom(1);
+                            lcdCreateChar(2, spinneranim->frames[spinneranim->currentFrame]);
+                            lcdDisCustom(2);
+                            lcdPrint("    "); // 填充剩余空间
                         } else if (timeSyncState == TIME_SYNC_SUCCESS) {
-                            strftime(timeBuf, sizeof(timeBuf), " %H:%M", &localTimeInfo);
-                            statusLine += "T:OK " + String(timeBuf);
+                            lcdCreateChar(1, SystemIcons::getIcon("clock"));
+                            lcdDisCustom(1);
+                            strftime(timeBuf, sizeof(timeBuf), "%H:%M", &localTimeInfo);
+                            lcdPrint(timeBuf);
                         } else if(timeSyncState == TIME_SYNC_FAILED){
-                            statusLine += "T:Failed";
+                            lcdCreateChar(1, SystemIcons::getIcon("clock"));
+                            lcdDisCustom(1);
+                            lcdCreateChar(2, wronganim->frames[wronganim->currentFrame]);
+                            lcdDisCustom(2);
+                            lcdPrint("    "); // 填充剩余空间
                         }
                         break;
                     case WIFI_FAILED:
-                        statusLine = "W:can't connect";
+                        lcdCreateChar(0, SystemIcons::getIcon("wifi" ));
+                        lcdDisCustom(0);
+                        lcdCreateChar(1, wronganim->frames[wronganim->currentFrame]);
+                        lcdDisCustom(1);
+                        lcdPrint("             "); // 填充剩余空间
                         break;
                     case WIFI_IDLE:
-                        statusLine = "W:idle";
+                        lcdPrint("W:idle          ");
                         break;
                     default:
-                        statusLine = "offline mode";
+                        lcdPrint("offline mode    ");
                         break;
                 }
-                
-                lcdText(statusLine, i + 1);  // 状态栏始终没有光标
             } else if (displayIndex >= 0 && displayIndex < menu->itemCount) {
                 // 显示正常菜单项
                 String itemName = menu->items[displayIndex].name;
@@ -439,10 +470,14 @@ void _menuTask(void* parameter) {
     static unsigned long lastDisplayUpdate = 0;
 
     while (true) {
+        // 持续更新动画
+        Animations::update();
+        
         if (inMenuMode) {
             switch (currentState) {
                 case STATE_MENU:
                     _handleMenuInterface();
+                    if(scrollOffset == -1 && Animations::getNeedToUpdate()) isDisplayNeedsUpdate = true;
                     break;
 
                 case STATE_CLOCK:

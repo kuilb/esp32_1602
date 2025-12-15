@@ -1,7 +1,7 @@
 #ifndef MYDEFINE_H
 #define MYDEFINE_H
 
-#include "myheader.h"
+#include <Arduino.h>
 
 /**
  * @brief 将指定 GPIO 引脚配置为输出模式
@@ -34,13 +34,13 @@ inline void setInput(int pin) {
 // LCD 引脚定义
 // ==============================
 
-#define LCD_RS              9   ///< LCD RS
-#define LCD_E               10  ///< LCD E
-#define LCD_D4              11  ///< LCD D4
-#define LCD_D5              12  ///< LCD D5
-#define LCD_D6              13  ///< LCD D6
-#define LCD_D7              14  ///< LCD D7
-#define LCD_BLA             8   ///< LCD 背光
+#define LCD_RS              1   ///< LCD RS
+#define LCD_E               2  ///< LCD E
+#define LCD_D4              3  ///< LCD D4
+#define LCD_D5              4  ///< LCD D5
+#define LCD_D6              5  ///< LCD D6
+#define LCD_D7              6  ///< LCD D7
+#define LCD_BLA             7   ///< LCD 背光
 
 // ==============================
 // PWM 参数定义（LCD 背光）
@@ -56,17 +56,17 @@ inline void setInput(int pin) {
 // 按键引脚定义（带方向语义）
 // ==============================
 
-#define BUTTEN_UP_PIN           17  ///< 上按键
-#define BUTTEN_DOWN_PIN         18  ///< 下按键
-#define BUTTEN_LEFT_PIN         6   ///< 左按键
-#define BUTTEN_RIGHT_PIN        4   ///< 右按键
-#define BUTTEN_CENTER_PIN       5   ///< 中按键
+#define BUTTEN_UP_PIN           12  ///< 上按键
+#define BUTTEN_DOWN_PIN         13  ///< 下按键
+#define BUTTEN_LEFT_PIN         9   ///< 左按键
+#define BUTTEN_RIGHT_PIN        11   ///< 右按键
+#define BUTTEN_CENTER_PIN       10   ///< 中按键
 
 // ==============================
 // 板载外设
 // ==============================
 
-#define RGB_PIN             35  ///< 板载 RGB 灯
+#define RGB_PIN             8  ///< 板载 RGB 灯
 
 // ==============================
 // 系统参数设置

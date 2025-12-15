@@ -7,9 +7,11 @@
 
 #ifndef WIFI_CONFIG_MANAGER_H
 #define WIFI_CONFIG_MANAGER_H
-#include "config_manager.h"
-#include "logger.h"
+
 #include <ArduinoJson.h>
+
+#include "./services/config_manager.h"
+#include "./utils/logger.h"
 
 /**
  * @class WifiConfigManager

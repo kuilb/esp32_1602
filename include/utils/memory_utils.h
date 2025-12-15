@@ -1,7 +1,9 @@
 #ifndef MEMORY_UTILS_H
 #define MEMORY_UTILS_H
 
-#include "myheader.h"
+#include <Arduino.h>
+
+#include "./utils/logger.h"
 
 /**
  * @brief 内存管理辅助类，提供统一的内存分配和错误处理

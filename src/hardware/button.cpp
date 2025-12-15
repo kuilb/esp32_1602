@@ -1,6 +1,4 @@
-#include "button.h"
-
-
+#include "./hardware/button.h"
 
 ButtonState buttons[] = {
     {BUTTEN_UP_PIN,     "UP",     false, 0},

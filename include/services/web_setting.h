@@ -1,15 +1,14 @@
 #ifndef WEB_SETTING_H
 #define WEB_SETTING_H
 
-#include "myheader.h"
-#include "lcd_driver.h"
-#include "jwt_auth.h"
-#include "menu.h"
-#include "logger.h"
-#include "ota_manager.h"
-#include "memory_utils.h"
-#include "logger.h"
-#include "web_pages.h"
+#include "./hardware/lcd_driver.h"
+#include "./connectivity/jwt_auth.h"
+#include "./applications/menu.h"
+#include "./utils/logger.h"
+#include "./services/ota_manager.h"
+#include "./utils/memory_utils.h"
+#include "./utils/logger.h"
+#include "./services/web_pages.h"
 
 #include <esp_ota_ops.h>
 

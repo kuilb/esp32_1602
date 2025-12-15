@@ -1,6 +1,4 @@
-#include "weather.h"
-#include "memory_utils.h"
-#include "logger.h"
+#include "./applications/weather.h"
 
 // 天气服务，API接口通过ESP32向云端获取JSON数据
 extern QWeatherAuthConfigManager qweatherAuthConfigManager;

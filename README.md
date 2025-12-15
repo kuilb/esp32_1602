@@ -6,22 +6,18 @@
 
 ## 最新Release信息
 
-- Version: **1.0.3(10A021)**
-- 发布日期: **2025/11/27**
-- 概要: 实现配置管理器框架并添加完整测试套件
+- Version: **1.0.4(10A031)**
+- 发布日期: **2025/12/16**
+- 概要: 重构include路径并添加动画支持
 ### 更新内容
-- 新功能: 新增配置管理器基类(ConfigManager)，提供统一的配置文件读写接口
-- 新功能: 实现WiFi配置管理器(WifiConfigManager)，支持SSID和密码的持久化存储
-- 新功能: 实现和风天气认证配置管理器(QWeatherAuthConfigManager)，管理API认证信息和位置配置
-- 重构: 重构web_setting.cpp，使用QWeatherAuthConfigManager替代原有的配置文件操作
-- 重构: 添加统一的图标定义和工具函数(icons.h/cpp)
-- 重构: 配置文件改用JSON存储
-- 重构: 配置文件操作添加详细的错误处理和错误信息返回
-
-- 新功能: 添加测试初始化框架(test_init.h)，提供统一的测试环境管理
-- 新功能: ConfigManager基类测试(10个测试用例)
-- 新功能: WiFiConfigManager测试(20个测试用例)
-- 新功能: QWeatherAuthConfigManager测试(30个测试用例)
+- 重构: 更新了各个源文件的include路径，改为使用相对路径。
+- 新功能: 引入了动画系统，支持多种动画（WiFi 搜索、加载旋- 转、错误、时钟）。
+- 新功能: 增强了菜单显示功能，利用动画展示 WiFi 连接状态和时间同步状态。
+- 优化: 改进了配置管理器，增加了更好的错误处理和日志记录。
+- 添加: 为新的动画系统添加了测试。
+- 重构: 适配新PCB，修改了 ESP32-S3 的IO接口。
+- 适配: 适配新PCB，Pio开发板、改为自定义板。
+- 适配: 适配新的16MB Flash，修改了分区表。
 
 
 ---
@@ -89,7 +85,7 @@
   pio run -e esp32s3-1602
   ```
 
-#### 2. Debug 环境 (`esp32s3-1602-debug`)
+#### 2. Debug 环境 (`esp32s3-1602-dev`)
 
 - **优化级别**：-O0（无优化）
 - **日志级别**：VERBOSE
@@ -98,7 +94,7 @@
 - **编译命令**：
   ```powershell
   python .\script\set_version.py debug
-  pio run -e esp32s3-1602-debug
+  pio run -e esp32s3-1602-dev
   ```
 
 ### 快速开始
@@ -210,7 +206,7 @@ pio test -f test_qweather_config
 编译成功后，固件位于：
 ```
 .pio/build/esp32s3-1602/firmware.bin
-.pio/build/esp32s3-1602-debug/firmware.bin
+.pio/build/esp32s3-1602-dev/firmware.bin
 ```
 
 ---
@@ -355,7 +351,7 @@ AA 55 09 00 64 01 00 0A 0A 00 11 0E 00 00
 - 2025-11-22 (v1.0.1): 将web完全前后端分离并增强健壮性
 - 2025-11-25 (v1.0.2): 重构WiFi配置处理并改进版本管理
 - 2025-11-27 (v1.0.3): 实现配置管理器框架并添加完整测试套件
-
+- 2025-12-16 (v1.0.4): 重构include路径并添加动画支持
 > Notes: 上述日志为本仓库近期主要改动的概览，更多细节请参阅 commit MSG和各个模块的注释。
 
 ---

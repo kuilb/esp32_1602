@@ -10,9 +10,13 @@
 #ifndef OTA_MANAGER_H
 #define OTA_MANAGER_H
 
-#include "myheader.h"
 #include <Update.h>
 #include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+
+#include "./utils/logger.h"
+#include "./hardware/lcd_driver.h"
+#include "./hardware/rgb_led.h"
 
 /**
  * @brief OTA 升级结果枚举

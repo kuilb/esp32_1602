@@ -1,4 +1,4 @@
-#include "badappleplayer.h"
+#include "./applications/badappleplayer.h"
 
 const LyricLine* _getLyricForFrame(int currentFrame) {
     const LyricLine* last = NULL;

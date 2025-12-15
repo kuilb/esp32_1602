@@ -1,11 +1,12 @@
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 
-#include "myheader.h"
-#include "lcd_driver.h"
-#include "kanamap.h"
-#include "menu.h"
-#include "logger.h"
+#include "esp_task_wdt.h"
+
+#include "./hardware/lcd_driver.h"
+#include "./services/kanamap.h"
+#include "./applications/menu.h"
+#include "./utils/logger.h"
 
 /**
  * @brief 解析并显示接收到的数据帧内容

@@ -1,5 +1,4 @@
-#include "jwt_auth.h"
-#include "utils/logger.h"
+#include "./connectivity/jwt_auth.h"
 
 extern QWeatherAuthConfigManager qweatherAuthConfigManager;
 

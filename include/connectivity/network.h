@@ -10,10 +10,14 @@
 #ifndef NETWORK_H
 #define NETWORK_H
 
+#include <Arduino.h>
+#include <WiFi.h>
+#include <deque>
+#include <vector>
+
 #include "mydefine.h"
-#include "rgb_led.h"
-#include "myheader.h"
-#include "protocol.h"
+#include "./hardware/rgb_led.h"
+#include "./services/protocol.h"
 
 /**
  * @brief 外部变量声明，用于网络模块间共享
