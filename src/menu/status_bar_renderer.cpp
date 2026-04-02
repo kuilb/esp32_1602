@@ -28,9 +28,7 @@ static bool _shouldShowSpinner() {
     if (timeSyncState == TIME_SYNC_IN_PROGRESS && wifiConnectionState == WIFI_CONNECTED) {
         return true;
     }
-    return wifiConnectionState == WIFI_CONNECTING
-        || wifiConnectionState == WIFI_DISCONNECTED
-        || wifiConnectionState == WIFI_IDLE;
+    return wifiConnectionState == WIFI_CONNECTING;
 }
 
 static bool _shouldShowWifiSearching() {

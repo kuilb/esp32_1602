@@ -28,6 +28,8 @@ static void _handleMenuInterface();
 static void _handleMenuState();
 static void _handleUnknownInterfaceState();
 static void _dispatchCurrentInterfaceState();
+static MenuState _getMenuStateFromPtr(const Menu* menu);
+static MenuState _getParentMenuState(MenuState childState);
 
 typedef void (*InterfaceHandler)();
 
@@ -234,6 +236,61 @@ const Menu* _getMenuByState(MenuState state) {
     return NULL;
 }
 
+static MenuState _getMenuStateFromPtr(const Menu* menu) {
+    if (menu == nullptr) {
+        return MENU_NONE;
+    }
+
+    for (int i = MENU_MAIN; i <= MENU_ABOUT; ++i) {
+        if (menu == &allMenus[i]) {
+            return static_cast<MenuState>(i);
+        }
+    }
+
+    return MENU_NONE;
+}
+
+static MenuState _getParentMenuState(MenuState childState) {
+    switch (childState) {
+        case MENU_WIFI_CONFIG:
+            return MENU_SETTINGS;
+        case MENU_SETTINGS:
+        case MENU_ABOUT:
+            return MENU_MAIN;
+        case MENU_MAIN:
+            return MENU_MAIN;
+        default:
+            return MENU_MAIN;
+    }
+}
+
+void menuHandleBackAction() {
+    // 非菜单页面（含无线显示/应用页面）统一回主菜单。
+    if (!inMenuMode) {
+        inMenuMode = true;
+        currentState = STATE_MENU;
+        s_menuContext.currentMenu = &allMenus[MENU_MAIN];
+        s_menuContext.menuCursor = 0;
+        s_menuContext.scrollOffset = -1;
+        s_menuContext.isDisplayNeedsUpdate = true;
+        globalButtonDelay(FIRST_TIME_DELAY);
+        LOG_MENU_INFO("Power short press: return to main menu");
+        return;
+    }
+
+    // 菜单内返回上一级。
+    const MenuState currentMenuState = _getMenuStateFromPtr(s_menuContext.currentMenu);
+    const MenuState targetMenuState = _getParentMenuState(currentMenuState);
+
+    s_menuContext.currentMenu = &allMenus[targetMenuState];
+    s_menuContext.menuCursor = 0;
+    s_menuContext.scrollOffset = (targetMenuState == MENU_MAIN) ? -1 : 0;
+    s_menuContext.isDisplayNeedsUpdate = true;
+    currentState = STATE_MENU;
+    globalButtonDelay(FIRST_TIME_DELAY);
+    LOG_MENU_INFO("Power short press: back to menu state=%d", static_cast<int>(targetMenuState));
+}
+
 static void _syncMenuNavigationState() {
     MenuNavigationContext context = {
         s_menuContext.currentMenu,
@@ -368,12 +425,17 @@ TaskHandle_t _menuTaskHandle = NULL;
 void _menuTask(void* parameter) {
     // 菜单后台任务：维护状态栏缓存、动画更新与状态分发。
     while (!shouldExitTasks) {
+        if (powerKeyOverlayActive) {
+            vTaskDelay(pdMS_TO_TICKS(20));
+            continue;
+        }
+
         statusBarRendererTick();
         
         if (inMenuMode) {
             _dispatchCurrentInterfaceState();
         }
-        vTaskDelay(pdMS_TO_TICKS(20));  // 20ms 刷新，进一步降低渲染与总线压力
+        vTaskDelay(pdMS_TO_TICKS(50));  // 50ms 轮询，进一步降低主菜单空闲功耗与发热
     }
     
     // 任务退出清理

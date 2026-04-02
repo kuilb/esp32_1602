@@ -19,6 +19,28 @@ WiFiConnectionState wifiConnectionState = WIFI_IDLE;
 static TaskHandle_t wifiConnectTaskHandle = nullptr;
 static TaskHandle_t timeSyncTaskHandle = nullptr;
 
+void ensureTimeSyncTaskRunning() {
+	if (timeSyncTaskHandle != nullptr) {
+		return;
+	}
+
+	BaseType_t rc = xTaskCreate(
+		timeSyncTask,
+		"TimeSyncTask",
+		4096,
+		&timeSyncTaskHandle,
+		1,
+		&timeSyncTaskHandle
+	);
+
+	if (rc != pdPASS) {
+		LOG_WIFI_ERROR("Failed to create TimeSyncTask (rc=%ld)", static_cast<long>(rc));
+		timeSyncTaskHandle = nullptr;
+	} else {
+		LOG_WIFI_INFO("TimeSyncTask started");
+	}
+}
+
 // 扫描状态
 WifiScanState wifiScanState = WIFI_SCAN_IDLE;
 String scanResult = "";
@@ -247,11 +269,7 @@ void wifiConnectTask(void* parameter) {
 		WiFi.setSleep(true);
 
 		// 创建后台时间同步任务（initNtpTimeSync 移到后台任务中，避免阻塞）
-		if (timeSyncTaskHandle == nullptr) {
-			xTaskCreate(timeSyncTask, "TimeSyncTask", 4096, &timeSyncTaskHandle, 1, &timeSyncTaskHandle);
-		} else {
-			LOG_WIFI_DEBUG("TimeSyncTask already running, skip create.");
-		}
+		ensureTimeSyncTaskRunning();
 	} else {
 			wifiConnectionState = WIFI_FAILED;
 			// 关闭射频，防止 WiFi 底层在后台继续自动尝试连接

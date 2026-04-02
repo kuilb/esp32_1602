@@ -62,4 +62,9 @@ void connectToWiFi();
  */
 void wifiinit();
 
+/**
+ * @brief 确保后台时间同步任务正在运行（可重复调用）
+ */
+void ensureTimeSyncTaskRunning();
+
 #endif

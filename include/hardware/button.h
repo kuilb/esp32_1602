@@ -52,6 +52,7 @@ struct ButtonState {
  */
 extern const int buttonCount;                    /**< 按钮数量 */
 extern volatile bool buttonJustPressed[];        /**< 按钮是否刚刚被按下标志数组 */
+extern volatile bool powerKeyOverlayActive;      /**< 电源键长按进度覆盖层是否处于激活状态 */
 
 void initButtonsPin();                          /**< 初始化按钮引脚为输入模式 */
 

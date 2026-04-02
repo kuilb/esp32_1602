@@ -1,5 +1,7 @@
 #include "mydefine.h"
 
+#include <esp32-hal-cpu.h>
+
 #include "./menu/menu.h"
 #include "./applications/clock.h"
 
@@ -117,6 +119,9 @@ void setup() {
         initTime(false);  // 正常启动时初始化时间
         LOG_SYSTEM_INFO("Normal boot");
     }
+
+    // 尽早初始化 LCD，启动阶段立即关闭光标/闪烁，避免上电后长时间可见闪烁光标。
+    lcdInit();
     
     buzzerInit();
     initBQ27421(BATTERY_DESIGN_CAPACITY_MAH);  // 初始化燃料计芯片
@@ -130,7 +135,6 @@ void setup() {
     initrgb();
 
     initKanaMap();  // 初始化假名表
-    lcdInit();
 
     // 网络模块互斥锁先初始化，避免后续多任务并发访问 WiFiClient
     initNetwork();
@@ -178,6 +182,7 @@ void setup() {
     lcdClear();
     loadJwtConfig();  // 初始化JWT
     wifiinit();  // 初始化WiFi配置（非阻塞，后台连接）
+    ensureTimeSyncTaskRunning(); // 启动期兜底：确保自动校时任务被拉起
     initMenu();  // 初始化菜单系统（立即进入主界面）
     
     // 所有初始化完成后，启动自动背光调节后台任务（避免与WiFi初始化冲突）
@@ -199,6 +204,11 @@ void loop(){
         apServer.handleClient();
     }
 
+    if (powerKeyOverlayActive) {
+        vTaskDelay(pdMS_TO_TICKS(20));
+        return;
+    }
+
     // WiFi 状态自愈：在少数情况下可能出现“已拿到 IP 但 WiFi.status() 尚未更新为 WL_CONNECTED”的瞬间
     // 这里以 localIP!=0.0.0.0 作为更可靠的“已联通”信号，避免误判触发重连并把状态错误置为 DISCONNECTED
     const bool hasIp = (WiFi.localIP() != IPAddress(0, 0, 0, 0));
@@ -207,6 +217,7 @@ void loop(){
 
     if (isStaConnected || hasIp) {
         wifiConnectionState = WIFI_CONNECTED;
+        ensureTimeSyncTaskRunning();
     }
 
     if (wifiConnectionState == WIFI_CONNECTED && !isStaConnected && !hasIp) {
@@ -220,10 +231,41 @@ void loop(){
         wifiConnectionState = WIFI_DISCONNECTED;
         connectToWiFi();  // 尝试重新连接WiFi
     }
-    
-    acceptClientIfNew();
-    receiveClientData();
-    tryDisplayCachedFrames();
-    
-    vTaskDelay(pdMS_TO_TICKS(5));  // 主循环降频，降低空转与抢占压力
+
+    static unsigned long lastAcceptPollMs = 0;
+    const unsigned long nowMs = millis();
+    const bool hasStreamWork = clientConnected || !frameCache.empty();
+
+    static unsigned long lastBusyMs = 0;
+    static int currentCpuFreqMHz = 240;
+    const bool interactiveBusy = inConfigMode || hasStreamWork || !inMenuMode;
+    if (interactiveBusy) {
+        lastBusyMs = nowMs;
+    }
+
+    // 纯菜单待机持续一段时间后降频，减少发热；有交互/流量时立即恢复。
+    const bool allowLowPower = inMenuMode && !inConfigMode && !hasStreamWork && (nowMs - lastBusyMs >= 3000);
+    const int targetCpuFreqMHz = allowLowPower ? 160 : 240;
+    if (targetCpuFreqMHz != currentCpuFreqMHz) {
+        if (setCpuFrequencyMhz(targetCpuFreqMHz)) {
+            currentCpuFreqMHz = targetCpuFreqMHz;
+            LOG_SYSTEM_INFO("CPU frequency -> %d MHz", currentCpuFreqMHz);
+        }
+    }
+
+    // 空闲态下将 accept 轮询降到 100ms，显著降低无效网络检查带来的占用。
+    if (hasStreamWork || (nowMs - lastAcceptPollMs >= 200)) {
+        acceptClientIfNew();
+        lastAcceptPollMs = nowMs;
+    }
+
+    if (hasStreamWork) {
+        receiveClientData();
+        tryDisplayCachedFrames();
+        const bool stillBusy = clientConnected || !frameCache.empty();
+        vTaskDelay(pdMS_TO_TICKS(stillBusy ? 8 : 15));
+    } else {
+        // 主菜单空闲态进一步降频，降低发热。
+        vTaskDelay(pdMS_TO_TICKS(inMenuMode ? 80 : 40));
+    }
 }

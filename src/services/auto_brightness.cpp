@@ -1,5 +1,8 @@
 #include "./services/auto_brightness.h"
 
+#include "./menu/menu.h"
+#include "./connectivity/network.h"
+
 // ==================== 全局变量定义 ====================
 bool isAutoBrightnessEnabled = true;
 float smoothedLux = 0.0;
@@ -255,14 +258,15 @@ void printAutoBrightnessInfo() {
 static void _autoBrightnessTask(void* parameter) {
     LOG_DISPLAY_INFO("Auto brightness task started");
     
-    const TickType_t updateInterval = pdMS_TO_TICKS(300);  // 300ms更新间隔
-    
     while (true) {
         // 如果任务被禁用，等待后继续检查
         if (!isAutoBrightnessActive()) {
             vTaskDelay(pdMS_TO_TICKS(1000));  // 禁用时1秒检查一次
             continue;
         }
+
+        const bool menuIdle = inMenuMode && !clientConnected;
+        const TickType_t updateInterval = menuIdle ? pdMS_TO_TICKS(1200) : pdMS_TO_TICKS(300);
         
         // 更新背光亮度
         updateAutoBrightness();

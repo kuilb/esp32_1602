@@ -15,6 +15,12 @@ static unsigned long s_lastTimeSyncRetryAfterFailureMs = 0;
 
 static const unsigned long TIME_SYNC_RETRY_AFTER_FAILURE_MS = 15000;
 
+static inline bool _isWiFiReadyForTimeSync() {
+    const bool statusConnected = (WiFi.status() == WL_CONNECTED);
+    const bool hasIp = (WiFi.localIP() != IPAddress(0, 0, 0, 0));
+    return statusConnected || hasIp;
+}
+
 void initTime(bool isSleepWakeup) {
     // 启用外部32.768kHz晶振
     rtc_clk_32k_enable(true);
@@ -96,7 +102,7 @@ void initTime(bool isSleepWakeup) {
 void initNtpTimeSync() {
     LOG_TIME_DEBUG("initNtpTimeSync called, checking WiFi status...");
     
-    if (WiFi.status() != WL_CONNECTED) {
+    if (!_isWiFiReadyForTimeSync()) {
         LOG_TIME_ERROR("WiFi not connected, cannot sync time");
         return;
     }
@@ -127,7 +133,7 @@ void initNtpTimeSync() {
 // 更新时间同步状态
 void updateTimeSync() {
     // 仅在“进行中 + WiFi 已连接”时更新，其他状态静默返回，避免高频噪音日志。
-    if (timeSyncState != TIME_SYNC_IN_PROGRESS || WiFi.status() != WL_CONNECTED) {
+    if (timeSyncState != TIME_SYNC_IN_PROGRESS || !_isWiFiReadyForTimeSync()) {
         return;
     }
     
@@ -176,7 +182,7 @@ void timeSyncTask(void* parameter) {
     LOG_TIME_DEBUG("Starting time sync loop...");
     
     while (!shouldExitTasks) {
-        const bool wifiReady = (WiFi.status() == WL_CONNECTED);
+        const bool wifiReady = _isWiFiReadyForTimeSync();
         const unsigned long now = millis();
 
         if (!wifiReady) {

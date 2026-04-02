@@ -17,6 +17,55 @@ volatile bool currentButtonState[buttonCount] = { false };
 // 全局按钮防抖变量
 static unsigned long lastButtonResponseTime[buttonCount] = { 0 };
 static unsigned long globalButtonDelayUntil = 0;
+static const unsigned long POWER_KEY_PROGRESS_START_MS = 300;
+static const unsigned long POWER_KEY_SLEEP_TRIGGER_MS = 1800;
+
+volatile bool powerKeyOverlayActive = false;
+
+// 休眠进度条字符：按 5x8 点阵从左到右填充 0~5 列。
+static const uint8_t kSleepBarGlyphs[6][8] = {
+    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // 0/5
+    {0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10}, // 1/5
+    {0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18}, // 2/5
+    {0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C}, // 3/5
+    {0x1E, 0x1E, 0x1E, 0x1E, 0x1E, 0x1E, 0x1E, 0x1E}, // 4/5
+    {0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F}  // 5/5(黑块)
+};
+
+static void _prepareSleepBarGlyphs() {
+    for (int slot = 0; slot <= 5; ++slot) {
+        lcdCreateChar(slot, kSleepBarGlyphs[slot]);
+    }
+}
+
+static void _renderSleepProgress(uint8_t percent) {
+    if (percent > 100) percent = 100;
+
+    lcdText("Hold to sleep   ", 1);
+
+    _prepareSleepBarGlyphs();
+
+    // 进度条铺满第2行16字符；按 5 像素字符宽 + 1 像素字间空隙计算总进度。
+    const int barSlots = 16;
+    const int cellCols = 5;
+    const int gapCols = 1;
+    const int totalVirtualCols = barSlots * cellCols + (barSlots - 1) * gapCols;
+    const int filledVirtualCols = (percent * totalVirtualCols) / 100;
+
+    lcdSetCursor(16);
+    for (int slot = 0; slot < barSlots; ++slot) {
+        const int cellStart = slot * (cellCols + gapCols);
+        int fillInCell = filledVirtualCols - cellStart;
+        if (fillInCell < 0) fillInCell = 0;
+        if (fillInCell > cellCols) fillInCell = cellCols;
+
+        if (fillInCell == 0) {
+            lcdDisChar(' ');
+        } else {
+            lcdDisCustom(fillInCell); // 1~5，对应部分填充到满黑块
+        }
+    }
+}
 
 
 void initButtonsPin(){
@@ -57,19 +106,75 @@ void scanButtonsTask(void *pvParameters) {
             btn.lastState = currentState;
         }
         
-        // 检测 GPIO0 的状态
-        static bool readytoSleep = false;
-        bool powerKeyState = digitalRead(BUTTON_POWER_PIN);
-        if (!readytoSleep && powerKeyState == HIGH) {  // 按下电源键（高电平）
+        // 电源键：
+        // - 按住 >=300ms 显示休眠进度条覆盖层
+        // - 持续按住直到进度满触发休眠
+        // - 提前松开恢复之前界面
+        // - <300ms 短按执行“返回上一级/主菜单”
+        static bool powerKeyLastState = false;
+        static bool powerKeySleepTriggered = false;
+        static bool powerKeyOverlayStarted = false;
+        static unsigned long powerKeyPressStartMs = 0;
+
+        const bool powerKeyState = (digitalRead(BUTTON_POWER_PIN) == HIGH);
+        if (powerKeyState && !powerKeyLastState) {
+            powerKeyPressStartMs = now;
+            powerKeySleepTriggered = false;
+            powerKeyOverlayStarted = false;
+            powerKeyOverlayActive = false;
             LOG_BUTTON_DEBUG("Power key pressed");
-            readytoSleep = true;
-        }
-        if(readytoSleep && powerKeyState == LOW) {  // 松开电源键（回到低电平）
-            LOG_BUTTON_DEBUG("Power key released, entering deep sleep");
-            enterDeepSleep();
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10));  // 扫描频率10ms
+        if (powerKeyState) {
+            const unsigned long pressDurationMs = now - powerKeyPressStartMs;
+
+            if (!powerKeyOverlayStarted && pressDurationMs >= POWER_KEY_PROGRESS_START_MS) {
+                powerKeyOverlayStarted = true;
+                powerKeyOverlayActive = true;
+                lcdPushOverlayFrame();
+                lcdClear();
+                _renderSleepProgress(0);
+                LOG_BUTTON_INFO("Power key hold: show sleep progress");
+            }
+
+            if (powerKeyOverlayStarted && !powerKeySleepTriggered) {
+                unsigned long progressElapsed = pressDurationMs - POWER_KEY_PROGRESS_START_MS;
+                unsigned long progressWindow = POWER_KEY_SLEEP_TRIGGER_MS - POWER_KEY_PROGRESS_START_MS;
+                uint8_t percent = (progressWindow == 0)
+                    ? 100
+                    : static_cast<uint8_t>(min(100UL, (progressElapsed * 100UL) / progressWindow));
+
+                _renderSleepProgress(percent);
+
+                if (pressDurationMs >= POWER_KEY_SLEEP_TRIGGER_MS) {
+                    powerKeySleepTriggered = true;
+                    powerKeyOverlayActive = false;
+                    LOG_BUTTON_INFO("Power key hold complete, entering deep sleep");
+                    enterDeepSleep();
+                }
+            }
+        }
+
+        if (!powerKeyState && powerKeyLastState) {
+            const unsigned long pressDurationMs = now - powerKeyPressStartMs;
+
+            if (powerKeyOverlayStarted && !powerKeySleepTriggered) {
+                lcdPopOverlayFrame();
+                powerKeyOverlayActive = false;
+                LOG_BUTTON_INFO("Power key released before sleep, restore previous UI");
+            } else if (!powerKeyOverlayStarted && pressDurationMs >= DEBOUNCE_TIME) {
+                LOG_BUTTON_INFO("Power key short press detected, back action");
+                menuHandleBackAction();
+            }
+
+            powerKeySleepTriggered = false;
+            powerKeyOverlayStarted = false;
+            powerKeyOverlayActive = false;
+        }
+
+        powerKeyLastState = powerKeyState;
+
+        vTaskDelay(pdMS_TO_TICKS(20));  // 扫描频率20ms，降低空闲功耗
     }
     
     // 任务退出，不清理句柄（将在深度睡眠后自然清除）
@@ -120,7 +225,7 @@ void handleButtonsTask(void *pvParameters) {
             xSemaphoreGive(clientMutex);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
     
     // 任务退出清理

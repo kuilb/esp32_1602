@@ -89,6 +89,14 @@ void initMenu();
 /** @brief 在主 loop() 中调用, 如果 inMenuMode 为 true, 执行菜单处理逻辑 */
 void handleMenuInterface();
 
+/**
+ * @brief 处理“返回上一级”动作
+ * @details
+ * - 菜单内：返回父菜单（例如 WIFI_CONFIG -> SETTINGS -> MAIN）
+ * - 非菜单界面（如无线显示/应用界面）：回到主菜单
+ */
+void menuHandleBackAction();
+
 extern volatile bool inMenuMode;        /**< 菜单模式标志 */
 extern TaskHandle_t _menuTaskHandle;    /**< 菜单任务句柄 */
 

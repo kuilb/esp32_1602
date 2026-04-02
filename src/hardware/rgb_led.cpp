@@ -36,7 +36,7 @@ void _rgbTask(void* pvParameters) {
       lastColor = currentColor;
       lastBrightness = currentBrightness;
     }
-    vTaskDelay(pdMS_TO_TICKS(50));  // 低频检查，减少后台轮询负载
+    vTaskDelay(pdMS_TO_TICKS(200));  // 进一步降频，降低待机唤醒次数
   }
 }
 

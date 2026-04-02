@@ -139,4 +139,14 @@ void lcdSetCursor(int changecursor);
  */
 uint8_t lcdRenderDiff(const uint8_t ddram32[32], const uint8_t cgram8x8[8][8], const bool cgramUsed[8]);
 
+/**
+ * @brief 保存当前LCD帧，用于临时覆盖显示（如休眠进度条）
+ */
+void lcdPushOverlayFrame();
+
+/**
+ * @brief 恢复最近一次保存的LCD帧
+ */
+void lcdPopOverlayFrame();
+
 #endif

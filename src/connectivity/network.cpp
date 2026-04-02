@@ -210,6 +210,23 @@ void receiveClientData() {
                             LOG_NETWORK_WARN("Non-heartbeat packet too short (len=%u), dropped.", static_cast<unsigned int>(fullPacket.size()));
                             continue;
                         }
+
+                        // 菜单态不消费流媒体帧：直接丢弃，避免无意义解析/缓存导致发热。
+                        if (inMenuMode) {
+                            static uint32_t droppedInMenu = 0;
+                            static uint32_t lastMenuDropLogMs = 0;
+                            droppedInMenu++;
+                            gFramesDropped++;
+
+                            const uint32_t nowMs = millis();
+                            if ((uint32_t)(nowMs - lastMenuDropLogMs) >= 2000) {
+                                LOG_NETWORK_INFO("Dropping stream frames in menu mode (count=%u)", static_cast<unsigned int>(droppedInMenu));
+                                droppedInMenu = 0;
+                                lastMenuDropLogMs = nowMs;
+                            }
+                            continue;
+                        }
+
                         uint16_t frameInterval = _parseFrameInterval(fullPacket);
 
                         // 一律入队，让显示侧消费；避免在收包路径直接渲染导致 TCP 缓冲被拖慢引发丢包/卡顿

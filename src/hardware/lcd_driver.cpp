@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <Arduino.h>
+#include "esp_rom_sys.h"
 
 // Forward declaration: used by helpers before the definition below
 inline void _gpioWrite(int data, int mode);
@@ -55,6 +56,20 @@ static LcdFrameState s_pendingFrame = {
     {false}
 };
 
+static LcdFrameState s_overlayBackupFrame = {
+    false,
+    {
+        0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+        0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+        0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+        0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20
+    },
+    {{0}},
+    {false}
+};
+static int s_overlayBackupCursor = 0;
+static bool s_overlayBackupValid = false;
+
 static inline void _writeCgramSlot(uint8_t slot, const uint8_t data[LCD_CGRAM_ROWS]) {
     if (slot >= LCD_CGRAM_SLOTS || data == nullptr) return;
 
@@ -105,18 +120,12 @@ static inline uint8_t _flushPendingFrame() {
 
 //触发E引脚
 inline void _triggerE(){
-    uint64_t start = esp_timer_get_time();
-    while (esp_timer_get_time() - start < 15) {}
-
+    // 使用 ROM 级微秒延时，避免高频轮询 systimer 造成中断压力。
+    esp_rom_delay_us(3);
     GPIO.out |= (1 << LCD_E);
-
-    start = esp_timer_get_time();
-    while (esp_timer_get_time() - start < 15) {}
-
+    esp_rom_delay_us(3);
     GPIO.out &= ~(1 << LCD_E);
-
-    start = esp_timer_get_time();
-    while (esp_timer_get_time() - start < 15) {}
+    esp_rom_delay_us(3);
 }
 
 // 写入一个数据或指令
@@ -143,6 +152,13 @@ inline void _gpioWrite(int data,int mode){
     if (data & 0x01) value |= (1 << LCD_D4);
     GPIO.out = (GPIO.out & ~mask) | value;
     _triggerE();
+
+    // HD44780 指令执行时间：普通指令/数据写入约 37us，清屏/归位需约 1.52ms。
+    if (mode == CMD && (data == 0x01 || data == 0x02)) {
+        esp_rom_delay_us(1600);
+    } else {
+        esp_rom_delay_us(40);
+    }
 }
 
 
@@ -203,18 +219,29 @@ void lcdInit(){
     setOutput(LCD_BLA);
     setOutput(LCD_CTL);
 
-    _gpioWrite(0x33,CMD);               // 设置LCD进入8位模式
+    // 等待 LCD 上电稳定，避免早期指令丢失导致初始化不完整（如光标闪烁未关闭）。
+    delay(50);
+
+    _gpioWrite(0x33,CMD);               // 强制 8-bit 初始化序列（兼容上电未知状态）
+    delay(5);
+    _gpioWrite(0x33,CMD);
     delay(5);
     _gpioWrite(0x32,CMD);               // 设置LCD切换为4位模式
     delay(5);
-    _gpioWrite(0x06,CMD);               // 设定向右写入字符，设置屏幕内容不滚动
+    _gpioWrite(0x28,CMD);               // 4-bit, 2-line, 5x8
     delay(5);
-    _gpioWrite(0x0C,CMD);               // 开启屏幕显示，关闭光标显示，关闭光标闪烁
-    delay(5);
-    _gpioWrite(0x28,CMD);               // 设定数据总线为四位，显示2行字符，使用5*8字符点阵
+    _gpioWrite(0x08,CMD);               // 先关闭显示，避免初始化过程可见闪烁
     delay(5);
     _gpioWrite(0x01,CMD);               // 清屏并将地址指针归位
     delay(5);
+    _gpioWrite(0x06,CMD);               // 设定向右写入字符，设置屏幕内容不滚动
+    delay(5);
+    _gpioWrite(0x0C,CMD);               // 开启显示，关闭光标显示，关闭光标闪烁
+    delay(5);
+
+    // 保险：再次写入显示控制，确保 C/B 位被明确清零。
+    _gpioWrite(0x0C, CMD);
+    delay(2);
 
     _initLcdBacklightPwm(0);           // 默认亮度 0
     _initLcdContrastPwm(96);         // 默认对比度 96
@@ -495,4 +522,25 @@ uint8_t lcdRenderDiff(const uint8_t ddram32[32], const uint8_t cgram8x8[8][8], c
     s_pendingFrame.valid = true;
 
     return updatedCells;
+}
+
+void lcdPushOverlayFrame() {
+    std::memcpy(&s_overlayBackupFrame, &s_pendingFrame, sizeof(LcdFrameState));
+    s_overlayBackupCursor = lcdCursor;
+    s_overlayBackupValid = true;
+}
+
+void lcdPopOverlayFrame() {
+    if (!s_overlayBackupValid) {
+        return;
+    }
+
+    lcdRenderDiff(s_overlayBackupFrame.ddram, s_overlayBackupFrame.cgram, s_overlayBackupFrame.cgramUsed);
+    lcdCursor = s_overlayBackupCursor;
+    if (lcdCursor >= 0 && lcdCursor < LCD_DDRAM_SIZE) {
+        lcdSetCursor(lcdCursor);
+    }
+
+    std::memcpy(&s_pendingFrame, &s_overlayBackupFrame, sizeof(LcdFrameState));
+    s_overlayBackupValid = false;
 }
