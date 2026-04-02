@@ -15,7 +15,7 @@
 #include "./hardware/button.h"
 #include "./hardware/lcd_driver.h"
 #include "./hardware/rgb_led.h"
-#include "./applications/menu.h"
+#include "./menu/menu.h"
 #include "./utils/logger.h"
 #include "./services/time_manager.h"
 

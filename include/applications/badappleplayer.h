@@ -16,7 +16,7 @@
 #include <SPIFFS.h>
 #include "./applications/bad_apple_melody.h"
 
-#include "./applications/menu.h"
+#include "./menu/menu.h"
 #include "./hardware/button.h"
 #include "./services/kanamap.h"
 #include "./utils/logger.h"

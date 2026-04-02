@@ -81,7 +81,6 @@ void acceptClientIfNew() {
         if (clientMutex != nullptr && xSemaphoreTake(clientMutex, pdMS_TO_TICKS(25)) == pdTRUE) {
             client = server.accept();
             if (client) {
-                setCpuFrequencyMhz(240);  // 有客户端连接时提升频率以保证性能
                 clientConnected = true;
                 // 低延迟：关闭 Nagle，减少小包合并带来的额外等待
                 client.setNoDelay(true);
@@ -274,7 +273,6 @@ void receiveClientData() {
                 clientConnected = false;
                 xSemaphoreGive(clientMutex);
             }
-            setCpuFrequencyMhz(80); // 无客户端连接时降频以节省功耗
             LOG_NETWORK_INFO("Client connection timed out.");
         }
 
@@ -287,7 +285,6 @@ void receiveClientData() {
             clientConnected = false;
             xSemaphoreGive(clientMutex);
         }
-        setCpuFrequencyMhz(80);  // 无客户端连接时降频以节省功耗
         LOG_NETWORK_INFO("Client disconnected.");
     }
 }

@@ -36,7 +36,7 @@ void _rgbTask(void* pvParameters) {
       lastColor = currentColor;
       lastBrightness = currentBrightness;
     }
-    vTaskDelay(pdMS_TO_TICKS(10));  // 10ms 检查一次
+    vTaskDelay(pdMS_TO_TICKS(50));  // 低频检查，减少后台轮询负载
   }
 }
 
@@ -48,8 +48,8 @@ void initrgb(){
   updateColor(CRGB::Blue);
   updateBrightness(128);
 
-  // RGB任务 - 提高优先级确保及时响应
-  xTaskCreatePinnedToCore(_rgbTask, "RGB Task", 2048, NULL, 3, NULL, 1);
+  // RGB 任务保持低优先级，避免抢占 UI/网络相关工作。
+  xTaskCreatePinnedToCore(_rgbTask, "RGB Task", 2048, NULL, 1, NULL, 0);
 
   LOG_RGB_INFO("RGB LED initialized successfully.");
 }

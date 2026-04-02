@@ -124,7 +124,7 @@ inline void setInputPullUp(int pin) {
 #define BUTTON_DEBOUNCE_DELAY 150       ///< 按钮软件消抖延迟（单位：毫秒）
 #define FIRST_TIME_DELAY    300         ///< 首次启动延迟时间（单位：毫秒）
 
-#define TIME_SYNC_TIMEOUT   10000       ///< 时间同步超时时间（单位：毫秒）
+#define TIME_SYNC_TIMEOUT   30000       ///< 时间同步超时时间（单位：毫秒）
 #define TIME_SYNC_RETRY_INTERVAL 1000   ///< 时间同步重试间隔（单位：毫秒）
 #define GMT_OFFSET_HOUR     8           ///< GMT 偏移（时间），北京时间为 UTC+8
 

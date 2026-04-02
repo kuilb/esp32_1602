@@ -55,7 +55,7 @@ void lcdInit();
  * @param[in] ltext 要显示的文本内容
  * @param[in] line 显示的行号（1 表示第一行，2 表示第二行）
  */
-void lcdText(String ltext,int line);
+void lcdText(const String& ltext,int line);
 
 /**
  * @brief 将 LCD 光标重置到屏幕左上角 (0,0)，并重置全局光标位置变量
@@ -110,7 +110,14 @@ void lcdDisChar(char text);
  * @details 将字符串中的每个字符依次显示在 LCD 上，光标自动移动，支持连续显示文本，适合用于输出多字符信息
  * @param[in] s 要显示的字符串
  */
-void lcdPrint(String s);
+void lcdPrint(const String& s);
+
+/**
+ * @brief 显示 C 风格字符串
+ * @details 避免临时 String 构造，降低堆分配与拷贝开销
+ * @param[in] s 以 '\0' 结尾的字符串
+ */
+void lcdPrint(const char* s);
 
 /**
  * @brief 设置 LCD 光标位置

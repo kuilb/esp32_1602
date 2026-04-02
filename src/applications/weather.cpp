@@ -16,6 +16,83 @@ String pressure = "";
 String obsTime = "";
 unsigned long lastWeatherUpdate = 0;
 unsigned int interface_num = 0; // 当前显示的界面编号
+static bool s_weatherIsNewInterface = false;
+static bool s_weatherReadyToDisplay = false;
+static unsigned long s_lastWeatherFail = 0;
+
+static bool _ensureWeatherTimeSynced() {
+    if (!(timeSyncState == TIME_SYNC_SUCCESS) && !(getRtcTime().tv_sec > 1765967312)) { // 2025-12-17 18:40 GMT+8
+        lcdText("Try time sync", 1);
+        lcdText("Please wait", 2);
+        updateTimeSync();
+        if (timeSyncState != TIME_SYNC_SUCCESS) {
+            LOG_WEATHER_WARN("Time not synced yet, cannot display weather");
+            lcdText("Time not synced", 1);
+            lcdText("", 2);
+            delay(500);
+            return false;
+        }
+    }
+    return true;
+}
+
+void enterWeatherInterface() {
+    s_weatherIsNewInterface = true;
+    currentState = STATE_WEATHER;
+}
+
+void handleWeatherInterface() {
+    if (!_ensureWeatherTimeSynced()) {
+        currentState = STATE_MENU;
+        globalButtonDelay(FIRST_TIME_DELAY);
+        return;
+    }
+
+    // 每隔10分钟更新一次天气数据
+    if (!s_weatherReadyToDisplay || millis() - lastWeatherUpdate > 10 * 60 * 1000) {
+        if (millis() - s_lastWeatherFail > 15 * 1000) { // 失败后15秒再试
+            loadJwtConfig();
+            LOG_WEATHER_INFO("Fetching weather data...");
+            if (fetchWeatherData()) {
+                s_weatherReadyToDisplay = true;
+                lastWeatherUpdate = millis();
+            } else {
+                LOG_WEATHER_WARN("Failed to fetch weather data");
+                s_weatherReadyToDisplay = false;
+                s_lastWeatherFail = millis();
+            }
+        }
+    }
+
+    if (s_weatherIsNewInterface) {
+        s_weatherIsNewInterface = false;
+        if (s_weatherReadyToDisplay) {
+            updateWeatherScreen();
+        }
+    }
+
+    if (isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)) {
+        LOG_WEATHER_INFO("Exit weather interface to menu");
+        currentState = STATE_MENU;
+        globalButtonDelay(FIRST_TIME_DELAY);
+        return;
+    }
+
+    if (!s_weatherReadyToDisplay) {
+        lcdText("No Data", 1);
+        lcdText(" ", 2);
+        return;
+    }
+
+    if (isButtonReadyToRespond(LEFT, BUTTON_DEBOUNCE_DELAY)) {
+        interface_num = (interface_num + 3) % 4; // 切换到上一个界面
+        updateWeatherScreen();
+    }
+    if (isButtonReadyToRespond(RIGHT, BUTTON_DEBOUNCE_DELAY)) {
+        interface_num = (interface_num + 1) % 4; // 切换到下一个界面
+        updateWeatherScreen();
+    }
+}
 
 // 只负责显示天气信息
 void updateWeatherScreen() {

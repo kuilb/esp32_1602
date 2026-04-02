@@ -11,6 +11,9 @@ RTC_DATA_ATTR uint64_t sleep_enter_rtc_time = 0;  // 睡眠时的RTC计数器值
 TimeSyncState timeSyncState = TIME_SYNC_IDLE;   //< 当前时间同步状态
 unsigned long timeSyncStartTime = 0;        //< 时间同步开始时间
 unsigned long lastTimeSyncAttempt = 0;      //< 上次时间同步尝试时间
+static unsigned long s_lastTimeSyncRetryAfterFailureMs = 0;
+
+static const unsigned long TIME_SYNC_RETRY_AFTER_FAILURE_MS = 15000;
 
 void initTime(bool isSleepWakeup) {
     // 启用外部32.768kHz晶振
@@ -123,8 +126,8 @@ void initNtpTimeSync() {
 
 // 更新时间同步状态
 void updateTimeSync() {
-    if (timeSyncState == TIME_SYNC_SUCCESS || WiFi.status() != WL_CONNECTED) {
-        LOG_TIME_WARN("Time sync not in progress or already successful, or WiFi not connected");
+    // 仅在“进行中 + WiFi 已连接”时更新，其他状态静默返回，避免高频噪音日志。
+    if (timeSyncState != TIME_SYNC_IN_PROGRESS || WiFi.status() != WL_CONNECTED) {
         return;
     }
     
@@ -132,8 +135,9 @@ void updateTimeSync() {
     
     // 检查超时
     if (now - timeSyncStartTime > TIME_SYNC_TIMEOUT) {
-        LOG_TIME_WARN("Sync timeout after 10 seconds");
+        LOG_TIME_WARN("Sync timeout after %lu seconds", TIME_SYNC_TIMEOUT / 1000UL);
         timeSyncState = TIME_SYNC_FAILED;
+        s_lastTimeSyncRetryAfterFailureMs = now;
         return;
     }
     
@@ -171,15 +175,38 @@ void timeSyncTask(void* parameter) {
     vTaskDelay(pdMS_TO_TICKS(500));
     LOG_TIME_DEBUG("Starting time sync loop...");
     
-    // 在后台任务中初始化NTP同步，避免阻塞WiFi连接任务
-    initNtpTimeSync();
-    
-    int attempts = 0;
-    while (timeSyncState != TIME_SYNC_SUCCESS && !shouldExitTasks && attempts < 10) {
-        attempts++;
-        LOG_TIME_DEBUG("Time sync attempt #%d", attempts);
-        updateTimeSync();
-        vTaskDelay(pdMS_TO_TICKS(1000));  // 每秒检查一次
+    while (!shouldExitTasks) {
+        const bool wifiReady = (WiFi.status() == WL_CONNECTED);
+        const unsigned long now = millis();
+
+        if (!wifiReady) {
+            // 掉线后恢复到空闲，等待重连后再发起同步。
+            if (timeSyncState == TIME_SYNC_IN_PROGRESS || timeSyncState == TIME_SYNC_FAILED) {
+                timeSyncState = TIME_SYNC_IDLE;
+            }
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
+
+        if (timeSyncState == TIME_SYNC_SUCCESS) {
+            // 已同步后低频巡检，降低后台开销。
+            vTaskDelay(pdMS_TO_TICKS(10000));
+            continue;
+        }
+
+        if (timeSyncState == TIME_SYNC_IDLE) {
+            initNtpTimeSync();
+        } else if (timeSyncState == TIME_SYNC_IN_PROGRESS) {
+            updateTimeSync();
+        } else if (timeSyncState == TIME_SYNC_FAILED) {
+            // 失败后退避重试，保证“自动同步”可持续恢复。
+            if (now - s_lastTimeSyncRetryAfterFailureMs >= TIME_SYNC_RETRY_AFTER_FAILURE_MS) {
+                LOG_TIME_WARN("Retrying NTP sync after previous failure...");
+                timeSyncState = TIME_SYNC_IDLE;
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
     
     if (shouldExitTasks) {

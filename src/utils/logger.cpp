@@ -4,6 +4,7 @@
 LogLevel Logger::globalLogLevel = LOG_LEVEL_INFO;
 LogLevel Logger::moduleLogLevels[LOG_MODULE_MAX];
 bool Logger::initialized = false;
+SemaphoreHandle_t Logger::logMutex = nullptr;
 
 // 模块前缀定义
 const char* Logger::modulePrefixes[LOG_MODULE_MAX] = {
@@ -47,6 +48,7 @@ void Logger::init(LogLevel defaultLevel) {
     }
     
     initialized = true;
+    logMutex = xSemaphoreCreateMutex();
     
     Serial.begin(115200);
     while (!Serial && millis() < 3000) {
@@ -61,14 +63,26 @@ void Logger::init(LogLevel defaultLevel) {
 
 void Logger::setGlobalLevel(LogLevel level) {
     globalLogLevel = level;
-    Serial.printf("[LOGGER] Global log level set to: %s\n", levelPrefixes[level]);
+    if (xPortInIsrContext()) {
+        return;
+    }
+    if (logMutex != nullptr && xSemaphoreTake(logMutex, pdMS_TO_TICKS(20)) == pdTRUE) {
+        Serial.printf("[LOGGER] Global log level set to: %s\n", levelPrefixes[level]);
+        xSemaphoreGive(logMutex);
+    }
 }
 
 void Logger::setModuleLevel(LogModule module, LogLevel level) {
     if (module < LOG_MODULE_MAX) {
         moduleLogLevels[module] = level;
-        Serial.printf("[LOGGER] Module %s log level set to: %s\n", 
-                     modulePrefixes[module], levelPrefixes[level]);
+        if (xPortInIsrContext()) {
+            return;
+        }
+        if (logMutex != nullptr && xSemaphoreTake(logMutex, pdMS_TO_TICKS(20)) == pdTRUE) {
+            Serial.printf("[LOGGER] Module %s log level set to: %s\n", 
+                         modulePrefixes[module], levelPrefixes[level]);
+            xSemaphoreGive(logMutex);
+        }
     }
 }
 
@@ -114,6 +128,9 @@ const char* Logger::getLevelPrefix(LogLevel level) {
 
 void Logger::log(LogModule module, LogLevel level, const char* format, ...) {
     if (!shouldLog(module, level)) return;
+    if (xPortInIsrContext()) return;
+    if (logMutex == nullptr) return;
+    if (xSemaphoreTake(logMutex, pdMS_TO_TICKS(20)) != pdTRUE) return;
     
     // 打印时间戳
     printTimestamp();
@@ -135,6 +152,8 @@ void Logger::log(LogModule module, LogLevel level, const char* format, ...) {
     if (strlen(buffer) > 0 && buffer[strlen(buffer) - 1] != '\n') {
         Serial.println();
     }
+
+    xSemaphoreGive(logMutex);
 }
 
 void Logger::log(LogModule module, LogLevel level, const String& message) {

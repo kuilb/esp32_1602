@@ -17,27 +17,90 @@ uint32_t mask, value;
 // 自定义字符槽位自动管理
 static int currentCharSlot = 0;     // 当前自动分配的槽位 (0~7)
 
+static constexpr uint8_t LCD_DDRAM_SIZE = 32;
+static constexpr uint8_t LCD_CGRAM_SLOTS = 8;
+static constexpr uint8_t LCD_CGRAM_ROWS = 8;
+
 // ==============================
 // 差分刷新缓存
 // ==============================
-static bool lastFrameValid = false;
-static uint8_t lastDdram[32] = {
-    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
-    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
-    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
-    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20
+typedef struct LcdFrameState {
+    bool valid;
+    uint8_t ddram[LCD_DDRAM_SIZE];
+    uint8_t cgram[LCD_CGRAM_SLOTS][LCD_CGRAM_ROWS];
+    bool cgramUsed[LCD_CGRAM_SLOTS];
+} LcdFrameState;
+
+static LcdFrameState s_hwFrame = {
+    false,
+    {
+        0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+        0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+        0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+        0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20
+    },
+    {{0}},
+    {false}
 };
-static uint8_t lastCgram[8][8] = {{0}};
-static bool lastCgramUsed[8] = {false};
+
+static LcdFrameState s_pendingFrame = {
+    false,
+    {
+        0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+        0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+        0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+        0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20
+    },
+    {{0}},
+    {false}
+};
+
+static inline void _writeCgramSlot(uint8_t slot, const uint8_t data[LCD_CGRAM_ROWS]) {
+    if (slot >= LCD_CGRAM_SLOTS || data == nullptr) return;
+
+    int cgramAddr = 0x40 | (slot << 3);
+    _gpioWrite(cgramAddr, CMD);
+    for (uint8_t i = 0; i < LCD_CGRAM_ROWS; ++i) {
+        _gpioWrite(data[i], CHR);
+    }
+}
 
 static inline bool _isCustomCode(uint8_t code) {
     return code <= 7;
 }
 
+static inline void _setHardwareCursor(uint8_t pos) {
+    if (pos >= LCD_DDRAM_SIZE) return;
+
+    const uint8_t col = pos % 16;
+    const uint8_t rowBase = (pos < 16) ? 0x00 : 0x40;
+    _gpioWrite(0x80 | (rowBase + col), CMD);
+}
+
 static inline void _writeCharAt(uint8_t pos, uint8_t code) {
     if (pos >= 32) return;
-    lcdSetCursor(pos);
+    _setHardwareCursor(pos);
     _gpioWrite(static_cast<int>(code), CHR);
+}
+
+static inline void _queueCharAt(uint8_t pos, uint8_t code) {
+    if (pos >= LCD_DDRAM_SIZE) return;
+    s_pendingFrame.ddram[pos] = code;
+}
+
+static inline void _rebuildPendingCgramUsageFromDdram() {
+    std::memset(s_pendingFrame.cgramUsed, 0, sizeof(s_pendingFrame.cgramUsed));
+    for (uint8_t pos = 0; pos < LCD_DDRAM_SIZE; ++pos) {
+        const uint8_t code = s_pendingFrame.ddram[pos];
+        if (_isCustomCode(code)) {
+            s_pendingFrame.cgramUsed[code] = true;
+        }
+    }
+}
+
+static inline uint8_t _flushPendingFrame() {
+    _rebuildPendingCgramUsageFromDdram();
+    return lcdRenderDiff(s_pendingFrame.ddram, s_pendingFrame.cgram, s_pendingFrame.cgramUsed);
 }
 
 //触发E引脚
@@ -161,6 +224,15 @@ void lcdInit(){
         delay(10);
     }
 
+    s_hwFrame.valid = false;
+    s_pendingFrame.valid = false;
+    std::memset(s_hwFrame.ddram, 0x20, LCD_DDRAM_SIZE);
+    std::memset(s_pendingFrame.ddram, 0x20, LCD_DDRAM_SIZE);
+    std::memset(s_hwFrame.cgram, 0, sizeof(s_hwFrame.cgram));
+    std::memset(s_pendingFrame.cgram, 0, sizeof(s_pendingFrame.cgram));
+    std::memset(s_hwFrame.cgramUsed, 0, sizeof(s_hwFrame.cgramUsed));
+    std::memset(s_pendingFrame.cgramUsed, 0, sizeof(s_pendingFrame.cgramUsed));
+
     LOG_LCD_INFO("LCD initialized");
 }
 
@@ -216,12 +288,13 @@ String convertUTF8ToKana(const String& text) {
 }
 
 // 显示函数(用于简单显示/调试，支持日语假名)
-void lcdText(String ltext,int line){
+void lcdText(const String& ltext,int line){
     // 设置行地址
+    int rowStart = 0;
     if (line == 1)
-        _gpioWrite(LCD_line1, CMD);
+        rowStart = 0;
     else if (line == 2)
-        _gpioWrite(LCD_line2, CMD);
+        rowStart = 16;
     else
         return;     // 非法行号，直接返回
 
@@ -229,14 +302,16 @@ void lcdText(String ltext,int line){
     String convertedText = convertUTF8ToKana(ltext);
     
     int tsize = convertedText.length();
-    for(int size = 0; size < 16; size++){     //逐字写入
-        if(size > tsize - 1){
-            _gpioWrite(0x20, CHR);       //若字符串长度小于16，则填充空格
+    for(int size = 0; size < 16; size++){     // 逐字写入待渲染缓冲
+        uint8_t code = 0x20;
+        if (size <= tsize - 1) {
+            code = static_cast<uint8_t>(convertedText[size]);
         }
-        else{
-            _gpioWrite(int(convertedText[size]), CHR); //转换成RAW编码后写入
-        }
+        _queueCharAt(static_cast<uint8_t>(rowStart + size), code);
     }
+
+    lcdCursor = rowStart;
+    _flushPendingFrame();
 }
 
 // 设置光标位置
@@ -264,45 +339,34 @@ void lcdSetCursor(int changecursor){
 
 void lcdResetCursor(){
     // LOG_LCD_VERBOSE("Reset LCD cursor");
-    lcdSetCursor(0);    // 回到屏幕起点
+    lcdCursor = 0;
 }
 
 // 清除LCD屏幕内容
 void lcdClear(){
-    _gpioWrite(0x01, CMD);  // 发送清屏命令
-    delay(2);               // 清屏需要较长时间
-    lcdResetCursor();       // 重置光标到左上角
-    
-    // 重置差分刷新缓存状态
-    lastFrameValid = false;
-    std::memset(lastDdram, 0x20, 32);  // 清屏后所有位置都是空格
-    std::memset(lastCgram, 0, sizeof(lastCgram));
-    std::memset(lastCgramUsed, 0, sizeof(lastCgramUsed));
+    std::memset(s_pendingFrame.ddram, 0x20, LCD_DDRAM_SIZE);
+    std::memset(s_pendingFrame.cgram, 0, sizeof(s_pendingFrame.cgram));
+    std::memset(s_pendingFrame.cgramUsed, 0, sizeof(s_pendingFrame.cgramUsed));
+
+    _flushPendingFrame();
+    lcdResetCursor();
 }
 
 // 光标向后移动一格
 void _nextCursor(){
-    if (lcdCursor >= 32) {
+    if (lcdCursor >= LCD_DDRAM_SIZE) {
         LOG_LCD_WARN("LCD cursor out of bounds: " + String(lcdCursor));
-        lcdSetCursor(33);   //将光标设置为显示区域外
+        lcdCursor = LCD_DDRAM_SIZE;   // 将光标设置为显示区域外
+        return;
     }
-    lcdSetCursor(lcdCursor+1);
+    lcdCursor += 1;
 }
 
 // 写入一字节的自定义字符（手动指定槽位）
 void lcdCreateChar(int slot, const uint8_t data[8]){
     if (slot < 0 || slot > 7) return;       // 限制 slot 范围
 
-    int cgram_addr = 0x40 | (slot << 3);    // CGRAM 写入起始地址
-    _gpioWrite(cgram_addr, CMD);           // 设置 CGRAM 地址（指令模式）
-
-    // 连续写入 8 字节点阵数据
-    for (int i = 0; i < 8; i++) {
-        _gpioWrite(data[i], CHR);          // 字符数据（数据模式）
-    }
-
-    // 设置回 DDRAM 当前光标对应位置
-    lcdSetCursor(lcdCursor);                // 将光标设置回当前显示位置
+    std::memcpy(s_pendingFrame.cgram[slot], data, 8);
 }
 
 // 写入一字节的自定义字符并立即显示(自动分配槽位)
@@ -310,7 +374,9 @@ int lcdCreateCharAuto(const uint8_t data[8]){
     int slotToUse = currentCharSlot;
     
     lcdCreateChar(slotToUse, data);
-    lcdDisCustom(slotToUse);
+    _queueCharAt(static_cast<uint8_t>(lcdCursor), static_cast<uint8_t>(slotToUse));
+    _nextCursor();
+    _flushPendingFrame();
     
     currentCharSlot = (currentCharSlot + 1) % 8;  // 循环使用 0~7
     
@@ -329,61 +395,104 @@ void lcdResetCharSlot(){
 // 显示自定义字符
 void lcdDisCustom(int index){
     if (index < 0 || index > 7) return;  // 只能是 0~7 槽
-        _gpioWrite(index, CHR);         // 写入字符数据（模式 1 表示数据模式）
-
+    _queueCharAt(static_cast<uint8_t>(lcdCursor), static_cast<uint8_t>(index));
     _nextCursor();
+    _flushPendingFrame();
 }
 
 // 显示普通字符
 void lcdDisChar(char text){             //显示函数
-        _gpioWrite(int(text),CHR);     //直接写入
-        _nextCursor();
+    _queueCharAt(static_cast<uint8_t>(lcdCursor), static_cast<uint8_t>(text));
+    _nextCursor();
+    _flushPendingFrame();
 }
 
 // 连续显示整段的普通字符，不清除其他的内容，注意越界
-void lcdPrint(String s) {
+void lcdPrint(const String& s) {
     for (unsigned int i = 0; i < s.length(); i++) {
-        lcdDisChar(s[i]);
+        _queueCharAt(static_cast<uint8_t>(lcdCursor), static_cast<uint8_t>(s[i]));
+        _nextCursor();
     }
+    _flushPendingFrame();
+}
+
+void lcdPrint(const char* s) {
+    if (s == nullptr) {
+        return;
+    }
+    while (*s != '\0') {
+        _queueCharAt(static_cast<uint8_t>(lcdCursor), static_cast<uint8_t>(*s));
+        _nextCursor();
+        ++s;
+    }
+    _flushPendingFrame();
 }
 
 uint8_t lcdRenderDiff(const uint8_t ddram32[32], const uint8_t cgram8x8[8][8], const bool cgramUsed[8]) {
     uint8_t updatedCells = 0;
     bool slotChanged[8] = {false};
+    bool effectiveUsed[8] = {false};
+    const int logicalCursor = lcdCursor;
+
+    // 统一“槽位是否被使用”的判断：外部传入标记 + DDRAM 中实际引用。
+    for (uint8_t pos = 0; pos < LCD_DDRAM_SIZE; ++pos) {
+        const uint8_t code = ddram32[pos];
+        if (_isCustomCode(code)) {
+            effectiveUsed[code] = true;
+        }
+    }
+    if (cgramUsed != nullptr) {
+        for (uint8_t slot = 0; slot < LCD_CGRAM_SLOTS; ++slot) {
+            effectiveUsed[slot] = effectiveUsed[slot] || cgramUsed[slot];
+        }
+    }
 
     // 先更新本帧用到的 CGRAM 槽位（仅当点阵变化时才写）
     for (int slot = 0; slot < 8; slot++) {
-        if (!cgramUsed[slot]) continue;
+        if (!effectiveUsed[slot]) continue;
 
-        const bool needWrite = (!lastFrameValid) || (!lastCgramUsed[slot]) || (std::memcmp(lastCgram[slot], cgram8x8[slot], 8) != 0);
+        const bool needWrite = (!s_hwFrame.valid)
+            || (!s_hwFrame.cgramUsed[slot])
+            || (std::memcmp(s_hwFrame.cgram[slot], cgram8x8[slot], 8) != 0);
         if (needWrite) {
-            lcdCreateChar(slot, cgram8x8[slot]);
-            std::memcpy(lastCgram[slot], cgram8x8[slot], 8);
+            _writeCgramSlot(slot, cgram8x8[slot]);
+            std::memcpy(s_hwFrame.cgram[slot], cgram8x8[slot], 8);
             slotChanged[slot] = true;
         }
-        lastCgramUsed[slot] = true;
+        s_hwFrame.cgramUsed[slot] = true;
     }
 
     // DDRAM 差分写入：字符码变化 or 该位置引用的自定义槽位刚被重写
-    for (uint8_t pos = 0; pos < 32; pos++) {
+    for (uint8_t pos = 0; pos < LCD_DDRAM_SIZE; pos++) {
         const uint8_t code = ddram32[pos];
-        const bool changed = (!lastFrameValid) || (lastDdram[pos] != code);
+        const bool changed = (!s_hwFrame.valid) || (s_hwFrame.ddram[pos] != code);
         const bool affectedBySlot = _isCustomCode(code) && slotChanged[code];
         if (changed || affectedBySlot) {
             _writeCharAt(pos, code);
-            lastDdram[pos] = code;
+            s_hwFrame.ddram[pos] = code;
             if (updatedCells < 255) updatedCells++;
         }
     }
 
     // 更新 lastCgramUsed：未使用的槽位标记为 false（下帧若再次使用可正确触发写入）
     for (int slot = 0; slot < 8; slot++) {
-        if (!cgramUsed[slot]) {
-            lastCgramUsed[slot] = false;
+        if (!effectiveUsed[slot]) {
+            s_hwFrame.cgramUsed[slot] = false;
         }
     }
 
-    lastFrameValid = true;
+    s_hwFrame.valid = true;
+
+    // 提交结束后将光标恢复到逻辑光标位置（若仍在显示区）。
+    if (logicalCursor >= 0 && logicalCursor < LCD_DDRAM_SIZE) {
+        lcdSetCursor(logicalCursor);
+    }
+
+    // 同步待渲染缓冲，保证统一差分路径与直接差分路径一致。
+    std::memcpy(s_pendingFrame.ddram, ddram32, LCD_DDRAM_SIZE);
+    std::memcpy(s_pendingFrame.cgram, cgram8x8, sizeof(s_pendingFrame.cgram));
+    std::memcpy(s_pendingFrame.cgramUsed, effectiveUsed, sizeof(s_pendingFrame.cgramUsed));
+    s_pendingFrame.valid = true;
 
     return updatedCells;
 }

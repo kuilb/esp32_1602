@@ -1,5 +1,7 @@
 #include "./services/config_manager.h"
 
+static const char* kAutoBrightnessConfigPath = "/auto_brightness_config.txt";
+
 bool ConfigManager::isSPIFFSInitialized = false;
 
 ConfigManager::ConfigManager(const String& configFilePath) : configFilePath(configFilePath) {
@@ -228,4 +230,83 @@ void ConfigManager::clearLastError() {
 
 void ConfigManager::setLastError(Error error) {
     lastError = error;
+}
+
+bool ConfigManager::saveAutoBrightnessEnabled(bool enabled) {
+    if (!isSPIFFSInitialized && !initSPIFFS()) {
+        LOG_CONFIG_ERROR("Failed to init SPIFFS before saving auto brightness config");
+        return false;
+    }
+
+    JsonDocument doc;
+    doc["enabled"] = enabled;
+
+    String jsonString;
+    serializeJson(doc, jsonString);
+
+    if (SPIFFS.exists(kAutoBrightnessConfigPath)) {
+        SPIFFS.remove(kAutoBrightnessConfigPath);
+    }
+
+    File file = SPIFFS.open(kAutoBrightnessConfigPath, "w", true);
+    if (!file) {
+        LOG_CONFIG_ERROR("Failed to open auto brightness config for write: %s", kAutoBrightnessConfigPath);
+        return false;
+    }
+
+    size_t written = file.print(jsonString);
+    file.flush();
+    file.close();
+
+    if (written != jsonString.length()) {
+        LOG_CONFIG_ERROR("Failed to write full auto brightness config (%u/%u)",
+            static_cast<unsigned int>(written),
+            static_cast<unsigned int>(jsonString.length()));
+        return false;
+    }
+
+    LOG_CONFIG_INFO("Auto brightness config saved: enabled=%s", enabled ? "true" : "false");
+    return true;
+}
+
+bool ConfigManager::loadAutoBrightnessEnabled(bool& enabled) {
+    if (!isSPIFFSInitialized && !initSPIFFS()) {
+        LOG_CONFIG_ERROR("Failed to init SPIFFS before loading auto brightness config");
+        return false;
+    }
+
+    if (!SPIFFS.exists(kAutoBrightnessConfigPath)) {
+        LOG_CONFIG_INFO("Auto brightness config not found, keep current default");
+        return false;
+    }
+
+    File file = SPIFFS.open(kAutoBrightnessConfigPath, "r");
+    if (!file) {
+        LOG_CONFIG_ERROR("Failed to open auto brightness config for read: %s", kAutoBrightnessConfigPath);
+        return false;
+    }
+
+    String content = file.readString();
+    file.close();
+
+    if (content.length() == 0) {
+        LOG_CONFIG_WARN("Auto brightness config is empty");
+        return false;
+    }
+
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, content);
+    if (error) {
+        LOG_CONFIG_ERROR("Failed to parse auto brightness config: %s", error.c_str());
+        return false;
+    }
+
+    if (!doc["enabled"].is<bool>()) {
+        LOG_CONFIG_WARN("Auto brightness config missing boolean field: enabled");
+        return false;
+    }
+
+    enabled = doc["enabled"].as<bool>();
+    LOG_CONFIG_INFO("Auto brightness config loaded: enabled=%s", enabled ? "true" : "false");
+    return true;
 }

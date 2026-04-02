@@ -12,7 +12,7 @@ void initSleepManager() {
     // 如果上次进入深睡时启用了 GPIO hold，唤醒后需要显式释放
     gpio_deep_sleep_hold_dis();
     gpio_hold_dis((gpio_num_t)BUTTON_POWER_PIN);
-    gpio_pullup_en((gpio_num_t)BUTTON_POWER_PIN);
+    gpio_pulldown_en((gpio_num_t)BUTTON_POWER_PIN);
     
     LOG_SYSTEM_DEBUG("Sleep manager initialized");
 }
@@ -95,27 +95,27 @@ void enterDeepSleep() {
     LOG_SLEEP_DEBUG("Sleep enter - System time: %ld.%06ld, RTC ticks: %llu", 
                     sleep_enter_time.tv_sec, sleep_enter_time.tv_usec, sleep_enter_rtc_time);
     
-    // 先释放GPIO hold并配置上拉
+    // 先释放GPIO hold并配置下拉
     gpio_hold_dis((gpio_num_t)BUTTON_POWER_PIN);  // 释放可能的锁定状态
-    gpio_pullup_en((gpio_num_t)BUTTON_POWER_PIN); // 启用内部上拉
-    delay(10);  // 等待上拉稳定
+    gpio_pulldown_en((gpio_num_t)BUTTON_POWER_PIN); // 启用内部下拉
+    delay(10);  // 等待下拉稳定
     
-    // 检查GPIO0引脚状态，确保是高电平（未按下）
+    // 检查电源键状态，确保为低电平（未按下）
     int pin_state = gpio_get_level((gpio_num_t)BUTTON_POWER_PIN);
     LOG_SLEEP_DEBUG("BUTTON_POWER_PIN state before sleep: %d", pin_state);
     
-    if (pin_state == 0) {
+    if (pin_state == 1) {
         LOG_SLEEP_WARN("Button is pressed, waiting for release...");
         // 等待按钮释放
-        while (gpio_get_level((gpio_num_t)BUTTON_POWER_PIN) == 0) {
+        while (gpio_get_level((gpio_num_t)BUTTON_POWER_PIN) == 1) {
             delay(50);
         }
         delay(100);  // 去抖动
         LOG_SLEEP_DEBUG("Button released");
     }
     
-    // 配置 GPIO0（BUTTON_POWER_PIN）为唤醒源
-    esp_sleep_enable_ext0_wakeup((gpio_num_t)BUTTON_POWER_PIN, LOW);  // 低电平唤醒
+    // 配置 BUTTON_POWER_PIN 为唤醒源（高电平按下唤醒）
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)BUTTON_POWER_PIN, HIGH);  // 高电平唤醒
 
     // 在深度睡眠期间保持GPIO配置
     gpio_hold_en((gpio_num_t)BUTTON_POWER_PIN);   // 锁定配置

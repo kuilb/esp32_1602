@@ -25,7 +25,7 @@ void initButtonsPin(){
     setInputPullDown(BUTTON_RIGHT_PIN);
     setInputPullDown(BUTTON_CENTER_PIN);
 
-    setInputPullUp(BUTTON_POWER_PIN);
+    setInputPullDown(BUTTON_POWER_PIN);
 }
 
 // 扫描按键是否按下
@@ -60,11 +60,11 @@ void scanButtonsTask(void *pvParameters) {
         // 检测 GPIO0 的状态
         static bool readytoSleep = false;
         bool powerKeyState = digitalRead(BUTTON_POWER_PIN);
-        if (!readytoSleep && powerKeyState == LOW) {  // 按下电源键
+        if (!readytoSleep && powerKeyState == HIGH) {  // 按下电源键（高电平）
             LOG_BUTTON_DEBUG("Power key pressed");
             readytoSleep = true;
         }
-        if(readytoSleep && powerKeyState == HIGH) {  // 松开电源键
+        if(readytoSleep && powerKeyState == LOW) {  // 松开电源键（回到低电平）
             LOG_BUTTON_DEBUG("Power key released, entering deep sleep");
             enterDeepSleep();
         }
@@ -136,13 +136,13 @@ void startButtonTask() {
     // 按键扫描
     xTaskCreatePinnedToCore(scanButtonsTask, 
         "Button Scan", 
-        4096, NULL, 1, 
-        &scanTaskHandle, 1);
+        6144, NULL, 1, 
+        &scanTaskHandle, 0);
 
     // 按键处理
     xTaskCreatePinnedToCore(handleButtonsTask, 
-        "Button Handle", 4096, NULL, 1, 
-        &handleTaskHandle, 1);
+        "Button Handle", 6144, NULL, 1, 
+        &handleTaskHandle, 0);
 }
 
 // 全局按钮防抖

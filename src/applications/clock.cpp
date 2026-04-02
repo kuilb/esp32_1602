@@ -1,5 +1,51 @@
 #include "./applications/clock.h"
 
+static bool s_clockIsNewInterface = false;
+static unsigned long s_lastClockDisplayUpdate = 0;
+
+static bool _ensureClockTimeSynced() {
+    if (!(timeSyncState == TIME_SYNC_SUCCESS) && !(getRtcTime().tv_sec > 1765967312)) { // 2025-12-17 18:40 GMT+8
+        lcdText("Try time sync", 1);
+        lcdText("Please wait", 2);
+        updateTimeSync();
+        if (timeSyncState != TIME_SYNC_SUCCESS) {
+            LOG_TIME_WARN("Time not synced yet, cannot display");
+            lcdText("Time not synced", 1);
+            lcdText("", 2);
+            delay(500);
+            return false;
+        }
+    }
+    return true;
+}
+
+void enterClockInterface() {
+    s_clockIsNewInterface = true;
+    currentState = STATE_CLOCK;
+}
+
+void handleClockInterface() {
+    // 先处理退出，避免在未同步时被前置校验“卡住”
+    if (isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)) {
+        LOG_TIME_INFO("Exit clock interface to menu");
+        currentState = STATE_MENU;
+        globalButtonDelay(FIRST_TIME_DELAY);
+        return;
+    }
+
+    if (!_ensureClockTimeSynced()) {
+        currentState = STATE_MENU;
+        globalButtonDelay(FIRST_TIME_DELAY);
+        return;
+    }
+
+    if (millis() - s_lastClockDisplayUpdate > 1000 || s_clockIsNewInterface) {
+        s_clockIsNewInterface = false;
+        updateClockScreen();
+        s_lastClockDisplayUpdate = millis();
+    }
+}
+
 void updateClockScreen() {
     // 检查NTP是否已同步，或RTC时间是否有效（晚于2025-12-17）
     bool timeValid = (timeSyncState == TIME_SYNC_SUCCESS) || (getRtcTime().tv_sec > 1765967312);

@@ -73,6 +73,20 @@ protected:
     static void listDir(const char* dirname, uint8_t levels);
 public:
     static bool isSPIFFSInitialized;  ///< SPIFFS初始化状态标志
+
+    /**
+     * @brief 保存自动亮度开关状态到SPIFFS
+     * @param enabled 自动亮度开关状态
+     * @return true 保存成功，false 保存失败
+     */
+    static bool saveAutoBrightnessEnabled(bool enabled);
+
+    /**
+     * @brief 从SPIFFS加载自动亮度开关状态
+     * @param enabled 输出参数，读取到的开关状态
+     * @return true 读取成功，false 读取失败或配置不存在
+     */
+    static bool loadAutoBrightnessEnabled(bool& enabled);
     
     /**
      * @brief 初始化SPIFFS文件系统

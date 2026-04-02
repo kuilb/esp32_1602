@@ -263,7 +263,6 @@ void wifiConnectTask(void* parameter) {
 	}
 	
 	// 任务完成，删除任务自身
-	setCpuFrequencyMhz(80);  // 降频至40MHz以节省功耗
 	vTaskDelay(pdMS_TO_TICKS(5));	//延迟5MS确保RGB灯状态更新
 	wifiConnectTaskHandle = nullptr;
 	vTaskDelete(NULL);

@@ -2,6 +2,8 @@
 #define LOGGER_H
 
 #include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 /**
  * @brief 日志级别枚举
@@ -49,6 +51,7 @@ private:
     static const char* modulePrefixes[LOG_MODULE_MAX];
     static const char* levelPrefixes[6];
     static bool initialized;
+    static SemaphoreHandle_t logMutex;
     
     static void printTimestamp();
     static const char* getModulePrefix(LogModule module);

@@ -13,7 +13,7 @@
 #define ABOUT_H
 
 #include "./hardware/button.h"
-#include "./applications/menu.h"
+#include "./menu/menu.h"
 
 /**
  * @brief 显示创建者信息

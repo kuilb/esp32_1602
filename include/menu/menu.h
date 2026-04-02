@@ -69,6 +69,20 @@ typedef struct Menu {
     int itemCount;                      /**< 内容数量 */
 } Menu;
 
+/** @brief 菜单上下文（导航与显示状态） */
+typedef struct MenuContext {
+    const Menu* currentMenu;            /**< 当前菜单指针 */
+    int menuCursor;                     /**< 当前光标在可见项中的索引 */
+    int scrollOffset;                   /**< 当前滚动偏移（主菜单可为 -1） */
+    bool isDisplayNeedsUpdate;          /**< 是否需要重绘菜单 */
+} MenuContext;
+
+extern const MenuItem mainMenuItems[];       /**< 主菜单项数组 */
+extern const MenuItem settingsMenuItems[];   /**< 设置菜单项数组 */
+extern const MenuItem wifiConfigMenuItems[]; /**< WiFi配置菜单项数组 */
+extern const MenuItem aboutMenuItems[];      /**< 关于菜单项数组 */
+extern Menu allMenus[];                      /**< 全量菜单注册表 */
+
 /** @brief 初始化菜单系统, 设置菜单的初始状态 */
 void initMenu();
 

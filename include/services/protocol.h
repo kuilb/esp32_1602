@@ -5,7 +5,7 @@
 
 #include "./hardware/lcd_driver.h"
 #include "./services/kanamap.h"
-#include "./applications/menu.h"
+#include "./menu/menu.h"
 #include "./utils/logger.h"
 
 /**

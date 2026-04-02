@@ -12,7 +12,7 @@
 
 #include <zlib_turbo.h>
 
-#include "./applications/menu.h"
+#include "./menu/menu.h"
 #include "./applications/clock.h"
 #include "./connectivity/jwt_auth.h"
 #include "./hardware/lcd_driver.h"
@@ -25,6 +25,8 @@ extern bool weatherSynced;              /**< 天气是否已同步的标志 */
 extern unsigned long lastWeatherUpdate; /**< 最后天气更新的时间戳 */
 extern unsigned int interface_num;      /**< 当前显示的界面编号 */
 
+void enterWeatherInterface();        /**< 进入天气界面 */
+void handleWeatherInterface();       /**< 处理天气界面状态机 */
 void updateWeatherScreen();             /**< 更新LCD上的天气显示 */
 bool fetchWeatherData();                /**< 获取天气数据 */
 

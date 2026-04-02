@@ -11,13 +11,15 @@
 #define CLOCK_H
 
 #include "./hardware/lcd_driver.h"
-#include "./applications/menu.h"
+#include "./menu/menu.h"
 #include "./hardware/button.h"
 #include "./utils/logger.h"
 #include "./services/time_manager.h"
 
 extern struct tm localTimeInfo;  /**< 本地时间信息结构体 */
 
+void enterClockInterface();          /**< 进入时钟界面 */
+void handleClockInterface();         /**< 处理时钟界面状态机 */
 void updateClockScreen();            /**< 更新LCD上的时钟显示 */
 
 #endif

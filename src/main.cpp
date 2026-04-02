@@ -1,6 +1,6 @@
 #include "mydefine.h"
 
-#include "./applications/menu.h"
+#include "./menu/menu.h"
 #include "./applications/clock.h"
 
 #include "./connectivity/wifi_config.h"
@@ -15,6 +15,7 @@
 
 #include "./hardware/opt3001.h"
 #include "./services/auto_brightness.h"
+#include "./services/config_manager.h"
 #include "./services/kanamap.h"
 #include "./services/protocol.h"
 #include "./services/playbuffer.h"
@@ -29,6 +30,32 @@
 
 WifiConfigManager wifiConfigManager("/wifi_config.txt");
 QWeatherAuthConfigManager qweatherAuthConfigManager("/qweather_auth_config.txt");
+
+static TaskHandle_t s_taskHealthMonitorHandle = nullptr;
+
+static void _logTaskStackIfLow(const char* taskName, TaskHandle_t handle, UBaseType_t thresholdWords) {
+    if (!taskName || handle == nullptr) {
+        return;
+    }
+
+    UBaseType_t highWater = uxTaskGetStackHighWaterMark(handle);
+    if (highWater <= thresholdWords) {
+        LOG_SYSTEM_WARN("Task stack low: %s highWater=%u words", taskName, static_cast<unsigned int>(highWater));
+    }
+}
+
+static void _taskHealthMonitorTask(void* parameter) {
+    (void)parameter;
+    while (!shouldExitTasks) {
+        _logTaskStackIfLow("_menuTask", _menuTaskHandle, 256);
+        _logTaskStackIfLow("Button Scan", scanTaskHandle, 256);
+        _logTaskStackIfLow("Button Handle", handleTaskHandle, 256);
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+
+    s_taskHealthMonitorHandle = nullptr;
+    vTaskDelete(NULL);
+}
 
 void fatalError(const char* msg){
     LOG_SYSTEM_ERROR("Fatal Error: %s", msg);
@@ -52,6 +79,15 @@ void setup() {
     #endif
     Logger::init(DEFAULT_LOG_LEVEL);  // 使用 platformio.ini 中定义的日志级别
 
+    // 在调试构建下限制高频模块日志，避免串口输出风暴触发中断看门狗。
+    if (DEFAULT_LOG_LEVEL >= LOG_LEVEL_DEBUG) {
+        Logger::setModuleLevel(LOG_MODULE_NETWORK, LOG_LEVEL_INFO);
+        Logger::setModuleLevel(LOG_MODULE_WIFI, LOG_LEVEL_INFO);
+        Logger::setModuleLevel(LOG_MODULE_DISPLAY, LOG_LEVEL_INFO);
+        Logger::setModuleLevel(LOG_MODULE_BATTERY, LOG_LEVEL_WARN);
+        Logger::setModuleLevel(LOG_MODULE_ALS, LOG_LEVEL_WARN);
+    }
+
     LOG_SYSTEM_INFO("Wireless 1602A by Kulib");
     LOG_SYSTEM_INFO("Build Information:");
     LOG_SYSTEM_INFO("  Firmware Version: %s", PROJECT_VERSION);
@@ -61,6 +97,11 @@ void setup() {
 
     esp_reset_reason_t resetReason = esp_reset_reason();
     LOG_SYSTEM_DEBUG("Reset reason: %d", (int)resetReason);
+    if (resetReason == ESP_RST_TASK_WDT) {
+        LOG_SYSTEM_WARN("Last reset reason: TASK_WDT (reason=6)");
+    } else if (resetReason == ESP_RST_INT_WDT) {
+        LOG_SYSTEM_WARN("Last reset reason: INT_WDT");
+    }
     if (resetReason == ESP_RST_PANIC) {
         LOG_SYSTEM_WARN("Last reset was PANIC. A core dump may be available in flash.");
     }
@@ -96,6 +137,9 @@ void setup() {
 
     startButtonTask();
 
+    // 低频任务健康监测：提前发现栈水位过低，便于排查WDT/栈破坏。
+    xTaskCreatePinnedToCore(_taskHealthMonitorTask, "TaskHealth", 3072, NULL, 1, &s_taskHealthMonitorHandle, 0);
+
     // 欢迎消息
     String ver = String(PROJECT_VERSION) + "  " +String(BUILD_VERSION);
     lcdText(ver,1);
@@ -117,6 +161,16 @@ void setup() {
         LOG_SYSTEM_ERROR("QWeather config manager initialization failed!");
         LOG_SYSTEM_ERROR("Last error: %s", qweatherAuthConfigManager.getLastErrorString(qweatherAuthConfigManager.getLastError()).c_str());
         fatalError("QWeather auth config init failed"); 
+    }
+
+    // 加载并应用自动亮度开关持久化状态（若配置不存在则保留默认行为）。
+    bool autoBrightnessEnabledPersisted = false;
+    if (ConfigManager::loadAutoBrightnessEnabled(autoBrightnessEnabledPersisted)) {
+        if (autoBrightnessEnabledPersisted) {
+            enableAutoBrightness();
+        } else {
+            disableAutoBrightness();
+        }
     }
 
     // buzzerPlayStartup();
@@ -151,14 +205,14 @@ void loop(){
     const bool isStaConnected = (WiFi.status() == WL_CONNECTED);
     static unsigned long lastWiFiReconnectAttemptMs = 0;
 
-    if (wifiConnectionState != WIFI_CONNECTING && (isStaConnected || hasIp)) {
+    if (isStaConnected || hasIp) {
         wifiConnectionState = WIFI_CONNECTED;
     }
 
     if (wifiConnectionState == WIFI_CONNECTED && !isStaConnected && !hasIp) {
         const unsigned long nowMs = millis();
         if (nowMs - lastWiFiReconnectAttemptMs < 3000) {
-            vTaskDelay(1);
+            vTaskDelay(pdMS_TO_TICKS(5));
             return;
         }
         lastWiFiReconnectAttemptMs = nowMs;
@@ -171,5 +225,5 @@ void loop(){
     receiveClientData();
     tryDisplayCachedFrames();
     
-    vTaskDelay(1);  // 1ms延时节流
+    vTaskDelay(pdMS_TO_TICKS(5));  // 主循环降频，降低空转与抢占压力
 }
