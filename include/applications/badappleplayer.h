@@ -14,6 +14,7 @@
 #define BADAPPLEPLAYER_H
 
 #include <SPIFFS.h>
+#include "./applications/bad_apple_melody.h"
 
 #include "./applications/menu.h"
 #include "./hardware/button.h"
@@ -89,6 +90,7 @@ const LyricLine lyrics[] = {
     {5983,  "すべてのことも",       "まだしらないの"},
     {6089,  "おもいまぶたを",       "あけたのならば"},
     {6192,  "すべてこわすの",       "ならくろになれ"},
+    {6320,  "Thanks for",           "Watching!"}
 };
 
 

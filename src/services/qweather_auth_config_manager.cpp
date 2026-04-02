@@ -4,11 +4,11 @@ QWeatherAuthConfigManager::QWeatherAuthConfigManager(const String& configFilePat
     : ConfigManager(configFilePath), 
     apiHost(""), kId(""), projectID(""), base64Key(""), location(""), cityName("") 
     {
-    LOG_CONFIG_INFO("QWeatherAuthConfigManager initialized with config file: %s", configFilePath.c_str());
+    LOG_CONFIG_DEBUG("QWeatherAuthConfigManager initialized with config file: %s", configFilePath.c_str());
 }
 
 QWeatherAuthConfigManager::~QWeatherAuthConfigManager() {
-    LOG_CONFIG_INFO("QWeatherAuthConfigManager destroyed");
+    LOG_CONFIG_DEBUG("QWeatherAuthConfigManager destroyed");
 }
 
 String QWeatherAuthConfigManager::getApiHost() {return apiHost;}
@@ -19,7 +19,6 @@ String QWeatherAuthConfigManager::getLocation() {return location;}
 String QWeatherAuthConfigManager::getCityName() {return cityName;}
 
 bool QWeatherAuthConfigManager::init() {
-    LOG_CONFIG_INFO("QWeatherAuthConfigManager init called");
     if(!loadConfig()){
         if(lastError == Error::FileNotFound){
             LOG_CONFIG_WARN("Config file not found, creating default config");
@@ -40,7 +39,7 @@ bool QWeatherAuthConfigManager::init() {
 }
 
 bool QWeatherAuthConfigManager::loadConfig() {
-    LOG_CONFIG_INFO("Loading QWeather auth config from file: %s", configFilePath.c_str());
+    LOG_CONFIG_DEBUG("Loading QWeather auth config from file: %s", configFilePath.c_str());
     String configContent;
     if (!readFile(configContent)) {
         LOG_CONFIG_WARN("Failed to read QWeather auth config file");

@@ -9,7 +9,6 @@ WifiConfigManager::~WifiConfigManager() {
 }
 
 bool WifiConfigManager::init() {
-    LOG_CONFIG_INFO("WifiConfigManager init called");
     if(!loadConfig()){
         if(lastError == Error::FileNotFound){
             LOG_CONFIG_WARN("Config file not found, creating default config");
@@ -31,7 +30,7 @@ bool WifiConfigManager::init() {
 }
 
 bool WifiConfigManager::loadConfig() {
-    LOG_CONFIG_INFO("Loading WiFi config from file: %s", configFilePath.c_str());
+    LOG_CONFIG_DEBUG("Loading WiFi config from file: %s", configFilePath.c_str());
     String configContent;
     if (!readFile(configContent)) {
         LOG_CONFIG_WARN("Failed to read WiFi config file");
@@ -62,12 +61,12 @@ bool WifiConfigManager::loadConfig() {
         return false;
     }
 
-    LOG_CONFIG_INFO("WiFi config loaded successfully - SSID: %s", ssid.c_str());
+    LOG_CONFIG_DEBUG("WiFi config loaded successfully - SSID: %s", ssid.c_str());
     return true;
 }
 
 bool WifiConfigManager::saveConfig() {
-    LOG_CONFIG_INFO("Saving WiFi config to file: %s", configFilePath.c_str());
+    LOG_CONFIG_DEBUG("Saving WiFi config to file: %s", configFilePath.c_str());
     JsonDocument doc;
     doc["ssid"] = ssid;
     doc["password"] = password;

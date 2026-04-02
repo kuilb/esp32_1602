@@ -190,11 +190,11 @@ bool ConfigManager::initSPIFFS() {
         }
     }
     
-    LOG_CONFIG_INFO("SPIFFS mounted successfully");
-    LOG_CONFIG_INFO("Total: %d bytes, Used: %d bytes", SPIFFS.totalBytes(), SPIFFS.usedBytes());
+    LOG_CONFIG_DEBUG("SPIFFS mounted successfully");
+    LOG_CONFIG_DEBUG("Total: %d bytes, Used: %d bytes", SPIFFS.totalBytes(), SPIFFS.usedBytes());
     
     // 打印文件列表
-    LOG_CONFIG_INFO("Checking SPIFFS files...");
+    LOG_CONFIG_DEBUG("Checking SPIFFS files...");
     listDir("/", 0);
     
     isSPIFFSInitialized = true;

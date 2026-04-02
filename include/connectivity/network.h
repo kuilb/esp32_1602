@@ -15,6 +15,9 @@
 #include <deque>
 #include <vector>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+
 #include "mydefine.h"
 #include "./hardware/rgb_led.h"
 #include "./services/protocol.h"
@@ -29,6 +32,30 @@ extern WiFiClient client;                   /**< 当前连接的客户端对象 
 extern bool clientConnected;                /**< 客户端连接状态标志 */
 extern std::vector<uint8_t> recvBuffer;     /**< 接收数据缓冲区 */
 extern unsigned long lastClientActivity;    /**< 上次客户端活动时间戳 */
+extern SemaphoreHandle_t clientMutex;       /**< client/server 互斥锁，避免多任务并发读写/关闭导致 lwIP 断言 */
+
+/**
+ * @brief 帧缓存元素
+ * @details
+ * - frameIntervalMs: 发送端期望的帧间隔（用于播放节流）
+ * - enqueueMs: 本机接收并入队的时间戳（用于限制真实显示延迟）
+ */
+struct FramePacket {
+	std::vector<uint8_t> data;
+	uint16_t frameIntervalMs;
+	uint32_t enqueueMs;
+};
+
+/**
+ * @brief 帧缓存队列（network.cpp 中定义，playbuffer.cpp 中消费）
+ */
+extern std::deque<FramePacket> frameCache;
+
+/**
+ * @brief 初始化网络模块内部资源（如互斥锁）
+ * @details 可安全重复调用；建议在创建会访问 client 的任务前调用。
+ */
+void initNetwork();
 
 /**
  * @brief 如果当前无客户端连接，则尝试接受新的客户端连接

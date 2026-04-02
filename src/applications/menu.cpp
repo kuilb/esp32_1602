@@ -1,4 +1,5 @@
 #include "./applications/menu.h"
+#include "./services/auto_brightness.h"
 
 // 前置声明
 void _displayMenu(const Menu* menu, int menuIndex, int scrollOffset);
@@ -6,12 +7,51 @@ bool _checkStateChanges();
 
 void _menuTask(void* parameter);
 
+// =====================
+// 内部辅助函数（仅本文件使用）
+// 目的：把“渲染/输入/滚动”拆开，降低嵌套与分支复杂度。
+// 说明：这里只做前置声明；实现放在全局变量/菜单表定义之后。
+// =====================
+
+static inline bool _isMainMenu(const Menu* menu);
+static int _readMenuButtonOnce();
+static void _formatStatusBarTime(char* outBuf, size_t outBufLen);
+static void _renderMainMenuStatusBar();
+static void _renderMenuItemLine(const Menu* menu, int menuItemIndex, int visibleIndex, int lcdLine);
+static void _followCursorToKeepVisible(const Menu* menu);
+static bool _shouldHideMenuItem(const Menu* menu, int menuItemIndex);
+static int _getVisibleMenuItemCount(const Menu* menu);
+static int _getActualMenuIndexFromVisible(const Menu* menu, int visibleIndex);
+static void _syncMenuNavigationState();
+static void _switchToMenu(const Menu* menu);
+static void _moveMenuCursorUp();
+static void _moveMenuCursorDown();
+static void _activateCurrentMenuItem();
+
+enum SettingsMenuIndex {
+    SETTINGS_ITEM_WEB = 0,
+    SETTINGS_ITEM_WIFI_CONFIG,
+    SETTINGS_ITEM_AUTO_BRIGHTNESS,
+    SETTINGS_ITEM_BRIGHTNESS,
+    SETTINGS_ITEM_BATTERY_INFO,
+    SETTINGS_ITEM_RESET_FUEL_IC,
+    SETTINGS_ITEM_REBOOT,
+    SETTINGS_ITEM_RETURN
+};
+
 // 菜单状态变量
 static bool isNewInterface = false;
 volatile bool inMenuMode = true;
 volatile bool isReadyToDisplay = false;
 static bool isDisplayNeedsUpdate = true;
 static TimeSyncState lastTimeSyncState = TIME_SYNC_IDLE;
+
+// 电量缓存（避免频繁I2C读取）
+static uint8_t cachedBatterySOC = 0;
+static int16_t cachedCurrentBattery_mA = 0;
+static uint16_t cachedBatteryVoltage_mV = 0;
+static unsigned long lastBatteryRead = 0;
+#define BATTERY_READ_INTERVAL 10000  // 10秒更新一次电量
 
 long lastWeatherFail = -15000;
 InterfaceState currentState = STATE_MENU;
@@ -73,6 +113,14 @@ void _enterBrightnessScreen() {
     delay(500);
 }
 
+void _toggleAutoBrightness() {
+    bool isEnabled = toggleAutoBrightness();
+    lcdText("Auto Brightness", 1);
+    lcdText(isEnabled ? "ON" : "OFF", 2);
+    LOG_SYSTEM_INFO("Auto brightness %s", isEnabled ? "enabled" : "disabled");
+    delay(500);
+}
+
 void _resetWifi(){
     inMenuMode = false;
     SPIFFS.remove("/wifi.txt");
@@ -81,6 +129,15 @@ void _resetWifi(){
     LOG_SYSTEM_INFO("WiFi config cleared, restarting...");
     delay(800);
     ESP.restart();
+}
+
+void _resetFuelGauge(){
+    // Perform the reset as a menu action (wrapper for the API call)
+    setBQ27421DesignCapacity(BATTERY_DESIGN_CAPACITY_MAH);
+    lcdText("Fuel gauge reset", 1);
+    lcdText("Back to Menu", 2);
+    LOG_SYSTEM_INFO("Fuel gauge design capacity set to %d mAh", BATTERY_DESIGN_CAPACITY_MAH);
+    delay(500);
 }
 
 void _setupWebSetting(){
@@ -121,6 +178,39 @@ void _playBadAppleWrapper() {
     playBadAppleFromFileRaw("/badapple.bin");
 }
 
+void _enterBatteryInfoScreen() {
+    // 使用 unsigned long，避免 millis() 溢出时比较错误
+    unsigned long lastBatteryUpdate = millis() - 10000; // 强制首次更新
+    while(true){
+        // 注意：必须是 millis() - last >= interval
+        if(millis() - lastBatteryUpdate >= 10000 && isfuelICConnected){
+            readBatteryInfo();
+            uint16_t voltage = readVoltage();
+            int16_t current = readAverageCurrent();
+            uint8_t soc = readStateOfCharge();
+            uint16_t remainingCap = readRemainingCapacity();
+
+            lcdText("" + String(voltage) + "mV " + String(current) + "mA", 1);
+            lcdText(String(soc) + "% " + String(remainingCap) + "mAh", 2);
+
+            lastBatteryUpdate = millis();
+        }
+        if(isButtonReadyToRespond(CENTER)){
+            currentState = STATE_MENU;
+            return;
+        }
+        vTaskDelay(10 / portTICK_PERIOD_MS);
+    }
+}
+
+void _rebootSystem(){
+    lcdText("Rebooting...", 1);
+    lcdText("", 2);
+    LOG_SYSTEM_INFO("System rebooting...");
+    delay(400);
+    ESP.restart();
+}
+
 const MenuItem mainMenuItems[] = {
     {"Wireless Screen",     _enterWirelessScreen, MENU_NONE},       // 无线屏幕
     {"Clock",               _setClockInterface, MENU_NONE},         // 时钟
@@ -133,7 +223,11 @@ const MenuItem mainMenuItems[] = {
 const MenuItem settingsMenuItems[] = {
     {"Web setting",     _setupWebSetting, MENU_NONE},
     {"WiFi Config",     NULL, MENU_WIFI_CONFIG},
+    {"Auto Bright",     _toggleAutoBrightness, MENU_NONE},
     {"Brightness",      _enterBrightnessScreen, MENU_NONE},
+    {"Battery info",    _enterBatteryInfoScreen, MENU_NONE},
+    {"Reset fuel IC",   _resetFuelGauge, MENU_NONE},
+    {"Reboot",          _rebootSystem, MENU_NONE},
     {"Return",          NULL, MENU_MAIN}
 };
 
@@ -177,6 +271,232 @@ const Menu* currentMenu = &allMenus[MENU_MAIN]; // 初始为主菜单
 int menuCursor = 0;         // 当前菜单项光标位置
 int scrollOffset = -1;      // 当前显示窗口起始项，-1为状态栏
 
+// =====================
+// 内部辅助函数实现
+// =====================
+
+static inline bool _isMainMenu(const Menu* menu) {
+    return menu == &allMenus[MENU_MAIN];
+}
+
+// 读取一次“有效按键”（带去抖），未检测到返回 -1
+static int _readMenuButtonOnce() {
+    for (int i = 0; i < 5; i++) {
+        if (isButtonReadyToRespond(i, BUTTON_DEBOUNCE_DELAY)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// 生成状态栏时间字符串：固定6字符，右对齐（" HH:MM" / " --:--"）
+static void _formatStatusBarTime(char* outBuf, size_t outBufLen) {
+    if (!outBuf || outBufLen == 0) return;
+
+    // 需要容纳 6 字符 + '\0'
+    if (outBufLen < 7) {
+        outBuf[0] = '\0';
+        return;
+    }
+
+    char hmBuf[6] = {0}; // "HH:MM" + '\0'
+
+    // TIME_SYNC_SUCCESS：直接显示本地时间
+    if (timeSyncState == TIME_SYNC_SUCCESS) {
+        strftime(hmBuf, sizeof(hmBuf), "%H:%M", &localTimeInfo);
+        snprintf(outBuf, outBufLen, " %s", hmBuf);
+        return;
+    }
+
+    // 未同步成功：尝试使用 RTC
+    if (getRtcTime().tv_sec > 1765967312) { // 2025-12-17 18:40 GMT+8
+        time_t rtcTime = getRtcTime().tv_sec;
+
+        // 仅在 IDLE（尚未配置时区）时，手动补时区偏移
+        if (timeSyncState == TIME_SYNC_IDLE) {
+            rtcTime += GMT_OFFSET_HOUR * 3600;
+        }
+
+        localtime_r(&rtcTime, &currentTimeInfo);
+        strftime(hmBuf, sizeof(hmBuf), "%H:%M", &currentTimeInfo);
+        snprintf(outBuf, outBufLen, " %s", hmBuf);
+        return;
+    }
+
+    strncpy(outBuf, " --:--", outBufLen);
+    outBuf[outBufLen - 1] = '\0';
+}
+
+// 渲染主菜单状态栏（占用一行）
+static void _renderMainMenuStatusBar() {
+    lcdSetCursor(0);
+    lcdResetCharSlot();
+
+    // 电池状态 6字符 (2图标 + 4文本)
+    if(isfuelICConnected && cachedBatteryVoltage_mV < 4500){
+        lcdCreateCharAuto(SystemIcons::getBatteryLeftIcon(cachedBatterySOC));
+        lcdCreateCharAuto(SystemIcons::getBatteryRightIcon(cachedBatterySOC));
+
+        char tempBuf[5];
+        char batteryBuf[5] = {0};
+        snprintf(tempBuf, sizeof(tempBuf), "%d%%", cachedBatterySOC);  // 先格式化为 "9%" 或 "99%" 或 "100%"
+        
+        if (cachedCurrentBattery_mA > 0 && cachedBatterySOC != 100) {
+            lcdCreateCharAuto(SystemIcons::getIcon("battery_charging"));
+            snprintf(batteryBuf, sizeof(batteryBuf), "%-3s", tempBuf);  // 左对齐，右补空格到3字符
+        } else {
+            snprintf(batteryBuf, sizeof(batteryBuf), "%-4s", tempBuf);  // 左对齐，右补空格到4字符
+        }
+        lcdPrint(batteryBuf);
+    }
+    else{
+        lcdCreateCharAuto(SystemIcons::getIcon("dc_left"));
+        lcdCreateCharAuto(SystemIcons::getIcon("dc_right"));
+        lcdPrint("DC  ");
+    }
+
+    // 组件间空 1 格：电量(6) + 空格(1) + WiFi(2) + 空格(1) + 时间(6) = 16
+    lcdPrint(" ");
+
+    // WiFi 状态 2字符（中间区域）
+    switch (wifiConnectionState) {
+        case WIFI_CONNECTING:
+            lcdCreateCharAuto(spinneranim->frames[spinneranim->currentFrame]);
+            lcdCreateCharAuto(wifianim->frames[wifianim->currentFrame]);
+            break;
+        case WIFI_CONNECTED:
+            lcdPrint(" ");
+            lcdCreateCharAuto(SystemIcons::getIcon("wifi"));
+            break;
+        case WIFI_DISCONNECTED:
+            lcdCreateCharAuto(spinneranim->frames[spinneranim->currentFrame]);
+            lcdCreateCharAuto(SystemIcons::getIcon("wifi"));
+            break;
+        case WIFI_FAILED:
+            lcdCreateCharAuto(wronganim->frames[wronganim->currentFrame]);
+            lcdCreateCharAuto(SystemIcons::getIcon("wifi"));
+            break;
+        case WIFI_IDLE:
+            lcdPrint(" ");
+            lcdCreateCharAuto(spinneranim->frames[spinneranim->currentFrame]);
+            break;
+        default:
+            {
+                static int lastUnknownWiFiState = -1;
+                static unsigned long lastUnknownWiFiLogMs = 0;
+                int stateVal = (int)wifiConnectionState;
+                if (stateVal != lastUnknownWiFiState && millis() - lastUnknownWiFiLogMs > 1000) {
+                    LOG_MENU_WARN("Unknown wifiConnectionState=%d", stateVal);
+                    lastUnknownWiFiState = stateVal;
+                    lastUnknownWiFiLogMs = millis();
+                }
+                lcdCreateCharAuto(wronganim->frames[wronganim->currentFrame]);
+                lcdPrint(" ");
+            }
+            break;
+    }
+
+    // 组件间空 1 格
+    lcdPrint(" ");
+
+    // 时间 6字符（右对齐）
+    char timeBuf[8] = {0};
+    _formatStatusBarTime(timeBuf, sizeof(timeBuf));
+    lcdPrint(timeBuf);
+}
+
+// 渲染普通菜单项一行（带 > 光标）
+static void _renderMenuItemLine(const Menu* menu, int menuItemIndex, int visibleIndex, int lcdLine) {
+    if (!menu || menuItemIndex < 0 || menuItemIndex >= menu->itemCount) {
+        lcdText(" ", lcdLine);
+        return;
+    }
+
+    String itemName = menu->items[menuItemIndex].name;
+
+    // 主菜单第0项：根据 WiFi 状态动态显示名称
+    if (_isMainMenu(menu) && menuItemIndex == 0) {
+        itemName = (wifiConnectionState == WIFI_CONNECTED) ? "Wireless Screen" : "Config WiFi";
+    }
+
+    if (menuCursor == visibleIndex) {
+        lcdText(">" + itemName, lcdLine);
+    } else {
+        lcdText(" " + itemName, lcdLine);
+    }
+}
+
+static bool _shouldHideMenuItem(const Menu* menu, int menuItemIndex) {
+    if (!menu || menuItemIndex < 0 || menuItemIndex >= menu->itemCount) {
+        return false;
+    }
+
+    // 设置菜单中：启用自动亮度时隐藏手动亮度调节项
+    if (menu == &allMenus[MENU_SETTINGS]
+        && menuItemIndex == SETTINGS_ITEM_BRIGHTNESS
+        && isAutoBrightnessActive()) {
+        return true;
+    }
+
+    return false;
+}
+
+static int _getVisibleMenuItemCount(const Menu* menu) {
+    if (!menu) return 0;
+
+    int visibleCount = 0;
+    for (int i = 0; i < menu->itemCount; ++i) {
+        if (!_shouldHideMenuItem(menu, i)) {
+            visibleCount++;
+        }
+    }
+    return visibleCount;
+}
+
+static int _getActualMenuIndexFromVisible(const Menu* menu, int visibleIndex) {
+    if (!menu || visibleIndex < 0) return -1;
+
+    int currentVisibleIndex = 0;
+    for (int i = 0; i < menu->itemCount; ++i) {
+        if (_shouldHideMenuItem(menu, i)) {
+            continue;
+        }
+
+        if (currentVisibleIndex == visibleIndex) {
+            return i;
+        }
+        currentVisibleIndex++;
+    }
+
+    return -1;
+}
+
+// 根据光标位置，自动修正 scrollOffset（仅用于 scrollOffset>=0 的模式）
+static void _followCursorToKeepVisible(const Menu* menu) {
+    if (!menu) return;
+    if (scrollOffset < 0) return; // -1 表示主菜单显示状态栏，不在这里处理
+
+    int visibleCount = _getVisibleMenuItemCount(menu);
+    if (visibleCount <= 0) {
+        menuCursor = 0;
+        scrollOffset = 0;
+        return;
+    }
+
+    menuCursor = constrain(menuCursor, 0, visibleCount - 1);
+
+    if (menuCursor < scrollOffset) {
+        scrollOffset = menuCursor;
+    } else if (menuCursor >= scrollOffset + VISIBLE_LINES) {
+        scrollOffset = menuCursor - VISIBLE_LINES + 1;
+    }
+
+    // 防止越界
+    int maxScrollOffset = visibleCount - VISIBLE_LINES;
+    if (maxScrollOffset < 0) maxScrollOffset = 0;
+    scrollOffset = constrain(scrollOffset, 0, maxScrollOffset);
+}
+
 // 初始化
 void initMenu() {
     if(inConfigMode) return; // 配置模式不启动菜单任务
@@ -194,236 +514,185 @@ void initMenu() {
 }
 
 void _displayMenu(const Menu* menu, int menuIndex, int scrollOffset) {
-    // LOG_MENU_VERBOSE("menu cursor at index " + String(menuIndex) + " scroll offset " + String(scrollOffset));
+    // menuIndex / scrollOffset 由调用者传入（menuCursor/scrollOffset 是全局状态），这里保持参数以便调试
     lcdResetCursor();
-    char timeBuf[8];
     
     // 检查是否为主菜单，如果是则显示状态栏
     if (menu == &allMenus[MENU_MAIN]) {
-        // 主菜单：状态栏作为第-1项（虚拟项），可滚动但不可选中
+        // 主菜单：状态栏作为第 -1 项（虚拟项），可滚动但不可选中
         for (int i = 0; i < VISIBLE_LINES; i++) {
             int displayIndex = scrollOffset + i;
             
             if (displayIndex == -1) {
-                // 显示状态栏（虚拟项-1）
-                
-                // 根据WiFi连接状态显示不同内容
-                switch (wifiConnectionState) {
-                    case WIFI_CONNECTING:
-                        lcdCreateChar(0, wifianim->frames[wifianim->currentFrame]);
-                        lcdDisCustom(0);
-                        lcdCreateChar(1, spinneranim->frames[spinneranim->currentFrame]);
-                        lcdDisCustom(1);
-                        lcdPrint("              "); // 填充剩余空间
-                        break;
-                    case WIFI_CONNECTED:
-                        lcdCreateChar(0, SystemIcons::getIcon("wifi" ));
-                        lcdDisCustom(0);
-                        lcdPrint("         "); // 填充剩余空间
-                        if(timeSyncState == TIME_SYNC_IN_PROGRESS){
-                            lcdCreateChar(1, SystemIcons::getIcon("clock"));
-                            lcdDisCustom(1);
-                            lcdCreateChar(2, spinneranim->frames[spinneranim->currentFrame]);
-                            lcdDisCustom(2);
-                            lcdPrint("    "); // 填充剩余空间
-                        } else if (timeSyncState == TIME_SYNC_SUCCESS) {
-                            lcdCreateChar(1, SystemIcons::getIcon("clock"));
-                            lcdDisCustom(1);
-                            strftime(timeBuf, sizeof(timeBuf), "%H:%M", &localTimeInfo);
-                            lcdPrint(timeBuf);
-                        } else if(timeSyncState == TIME_SYNC_FAILED){
-                            lcdCreateChar(1, SystemIcons::getIcon("clock"));
-                            lcdDisCustom(1);
-                            lcdCreateChar(2, wronganim->frames[wronganim->currentFrame]);
-                            lcdDisCustom(2);
-                            lcdPrint("    "); // 填充剩余空间
-                        }
-                        break;
-                    case WIFI_FAILED:
-                        lcdCreateChar(0, SystemIcons::getIcon("wifi" ));
-                        lcdDisCustom(0);
-                        lcdCreateChar(1, wronganim->frames[wronganim->currentFrame]);
-                        lcdDisCustom(1);
-                        lcdPrint("             "); // 填充剩余空间
-                        break;
-                    case WIFI_IDLE:
-                        lcdPrint("W:idle          ");
-                        break;
-                    default:
-                        lcdPrint("offline mode    ");
-                        break;
-                }
-            } else if (displayIndex >= 0 && displayIndex < menu->itemCount) {
-                // 显示正常菜单项
-                String itemName = menu->items[displayIndex].name;
-                
-                // 如果是Wireless Screen，根据 WiFi 状态动态修改名称
-                if (displayIndex == 0) {
-                    if (wifiConnectionState == WIFI_CONNECTED) {
-                        itemName = "Wireless Screen";
-                    } else {
-                        itemName = "Config WiFi";
-                    }
-                }
-                
-                if (menuCursor == displayIndex)
-                    lcdText(">" + itemName, i + 1);
-                else
-                    lcdText(" " + itemName, i + 1);
+                // 状态栏固定渲染在第 1 行
+                _renderMainMenuStatusBar();
             } else {
-                lcdText(" ", i + 1);  // 清空无效行
+                // 普通菜单项
+                _renderMenuItemLine(menu, displayIndex, displayIndex, i + 1);
             }
         }
     } else {
-        // 其他菜单保持原有显示方式
+        // 其他菜单：纯列表显示，不包含状态栏
         for (int i = 0; i < VISIBLE_LINES; i++) {
-            int menuItemIndex = scrollOffset + i;
+            int visibleIndex = scrollOffset + i;
+            int menuItemIndex = _getActualMenuIndexFromVisible(menu, visibleIndex);
 
-            if (menuItemIndex >= menu->itemCount) {
-                lcdText(" ", i + 1);  // 清空无效行
+            if (menuItemIndex < 0) {
+                lcdText(" ", i + 1);
                 continue;
             }
 
-            if (menuCursor == menuItemIndex)
-                lcdText(">" + (String)menu->items[menuItemIndex].name, i + 1);
-            else
-                lcdText(" " + (String)menu->items[menuItemIndex].name, i + 1);
+            _renderMenuItemLine(menu, menuItemIndex, visibleIndex, i + 1);
         }
     }
 }
 
 // 根据菜单枚举获取对应菜单结构体指针
 const Menu* _getMenuByState(MenuState state) {
-    switch (state) {
-        case MENU_MAIN:
-            return &allMenus[MENU_MAIN];
-        case MENU_SETTINGS:
-            return &allMenus[MENU_SETTINGS];
-        case MENU_WIFI_CONFIG:
-            return &allMenus[MENU_WIFI_CONFIG];
-        case MENU_ABOUT:
-            return &allMenus[MENU_ABOUT];
-
-        default:
-            return NULL;
+    // MenuState 与 allMenus 的顺序一致，直接按索引取更简单
+    if (state >= MENU_MAIN && state <= MENU_ABOUT) {
+        return &allMenus[(int)state];
     }
+    return NULL;
+}
+
+static void _syncMenuNavigationState() {
+    if (!currentMenu) return;
+
+    const bool isMain = _isMainMenu(currentMenu);
+    const int visibleItemCount = _getVisibleMenuItemCount(currentMenu);
+
+    if (visibleItemCount <= 0) {
+        menuCursor = 0;
+        scrollOffset = isMain ? -1 : 0;
+        return;
+    }
+
+    menuCursor = constrain(menuCursor, 0, visibleItemCount - 1);
+
+    if (isMain) {
+        // 主菜单允许 -1（显示状态栏）
+        if (scrollOffset < -1) {
+            scrollOffset = -1;
+        }
+    } else if (scrollOffset < 0) {
+        scrollOffset = 0;
+    }
+
+    _followCursorToKeepVisible(currentMenu);
+}
+
+static void _switchToMenu(const Menu* menu) {
+    if (!menu) return;
+
+    currentMenu = menu;
+    menuCursor = 0;
+    scrollOffset = _isMainMenu(currentMenu) ? -1 : 0;
+    _syncMenuNavigationState();
+    isDisplayNeedsUpdate = true;
+}
+
+static void _moveMenuCursorUp() {
+    _syncMenuNavigationState();
+
+    const bool isMain = _isMainMenu(currentMenu);
+    if (isMain) {
+        if (menuCursor > 0) {
+            menuCursor--;
+        } else if (scrollOffset > -1) {
+            scrollOffset = -1;
+        }
+    } else if (menuCursor > 0) {
+        menuCursor--;
+    }
+
+    _syncMenuNavigationState();
+    isDisplayNeedsUpdate = true;
+}
+
+static void _moveMenuCursorDown() {
+    _syncMenuNavigationState();
+
+    const int visibleItemCount = _getVisibleMenuItemCount(currentMenu);
+    if (visibleItemCount <= 0) {
+        isDisplayNeedsUpdate = true;
+        return;
+    }
+
+    if (_isMainMenu(currentMenu) && scrollOffset == -1 && menuCursor == 0) {
+        // 主菜单状态栏可见时，先收起状态栏
+        scrollOffset = 0;
+    } else {
+        menuCursor = constrain(menuCursor + 1, 0, visibleItemCount - 1);
+    }
+
+    _syncMenuNavigationState();
+    isDisplayNeedsUpdate = true;
+}
+
+static void _activateCurrentMenuItem() {
+    _syncMenuNavigationState();
+
+    int actualMenuIndex = _getActualMenuIndexFromVisible(currentMenu, menuCursor);
+    if (actualMenuIndex < 0) {
+        isDisplayNeedsUpdate = true;
+        return;
+    }
+
+    const MenuItem& item = currentMenu->items[actualMenuIndex];
+
+    if (item.nextState != MENU_NONE) {
+        const Menu* nextMenu = _getMenuByState(item.nextState);
+        if (nextMenu) {
+            _switchToMenu(nextMenu);
+            globalButtonDelay(FIRST_TIME_DELAY);  // 切换菜单后防抖
+            return;
+        }
+    }
+
+    if (item.action) {
+        item.action();  // 触发动作
+        globalButtonDelay(FIRST_TIME_DELAY);  // 执行动作后防抖
+    }
+
+    _syncMenuNavigationState();
+    isDisplayNeedsUpdate = true;
 }
 
 void _handleMenuInterface() {
+    _syncMenuNavigationState();
+
     // 显示菜单项
     if (isDisplayNeedsUpdate || _checkStateChanges()) {
         _displayMenu(currentMenu, menuCursor, scrollOffset);
         isDisplayNeedsUpdate = false;
     }
 
-    int lastPressedButton = -1;
-    for (int i = 0; i < 5; i++) {
-        if (isButtonReadyToRespond(i, BUTTON_DEBOUNCE_DELAY)) { 
-            lastPressedButton = i;
-            break;  // 只处理一个键
-        }
-    }
+    // 只处理一个键：一次循环最多响应一次输入
+    int lastPressedButton = _readMenuButtonOnce();
 
     switch (lastPressedButton) {
-        //光标上移
+        // 光标上移（LEFT）
         case LEFT:
-            if (currentMenu == &allMenus[MENU_MAIN]) {
-                // 主菜单特殊处理：允许滚动到状态栏
-                if (menuCursor > 0) {
-                    // 光标最多滚动到0项
-                    menuCursor--;
-                    isDisplayNeedsUpdate = true;
-                } else if (scrollOffset > -1) {
-                    // 如果光标在第0项且还能向上滚动，则滚动显示状态栏
-                    scrollOffset--;
-                    isDisplayNeedsUpdate = true;
-                }
-            } else {
-                // 其他菜单
-                if (menuCursor > 0) {
-                    isDisplayNeedsUpdate = true;
-                    menuCursor = constrain(menuCursor - 1, 0, currentMenu->itemCount - 1);
-                }
-            }
+            _moveMenuCursorUp();
             break;
 
+        // 光标下移（RIGHT）
         case RIGHT:
-            if (currentMenu == &allMenus[MENU_MAIN]) {
-                // 主菜单特殊处理
-                if (scrollOffset == -1 && menuCursor == 0) {
-                    // 如果当前显示状态栏且光标在第0项，向下滚动隐藏状态栏
-                    isDisplayNeedsUpdate = true;
-                    scrollOffset = 0;
-                } else {
-                    isDisplayNeedsUpdate = true;
-                    menuCursor = constrain(menuCursor + 1, 0, currentMenu->itemCount - 1);
-                }
-            } else {
-                // 滚动光标同时防止越界
-                isDisplayNeedsUpdate = true;
-                menuCursor = constrain(menuCursor + 1, 0, currentMenu->itemCount - 1);
-            }
+            _moveMenuCursorDown();
             break;
 
         case CENTER:
-            isDisplayNeedsUpdate = true;
-
-            // 菜单选项
-            if (currentMenu->items[menuCursor].nextState != MENU_NONE) {
-                const Menu* nextMenu = _getMenuByState(currentMenu->items[menuCursor].nextState);
-                if (nextMenu) {
-                    currentMenu = nextMenu;
-                    menuCursor = 0; // 重置光标
-                    
-                    // 如果进入主菜单，初始化scrollOffset为-1以显示状态栏
-                    if (currentMenu == &allMenus[MENU_MAIN]) {
-                        scrollOffset = -1;
-                    } else {
-                        scrollOffset = 0;
-                    }
-                    
-                    globalButtonDelay(FIRST_TIME_DELAY);  // 切换菜单后防抖
-                }
-            }
-            // 动作选项
-            else if (currentMenu->items[menuCursor].action) {
-                currentMenu->items[menuCursor].action();  // 触发动作
-                globalButtonDelay(FIRST_TIME_DELAY);  // 执行动作后防抖
-            } 
+            _activateCurrentMenuItem();
             break;
-    }
 
-    // 更新 scrollOffset 以保持光标在可视区
-    if (scrollOffset >= 0) {
-        if (menuCursor < scrollOffset) {
-            // 可视范围跟随光标上移
-            scrollOffset = menuCursor;
-        } 
-        else if (menuCursor >= scrollOffset + VISIBLE_LINES) {
-            // 可视范围跟随光标下移
-            scrollOffset = menuCursor - VISIBLE_LINES + 1;
-        }
-    }
-    
-    // 确保scrollOffset在合理范围内
-    if (scrollOffset < -1) {
-        LOG_MENU_WARN("Adjusting scrollOffset from " + String(scrollOffset) + " to -1");
-        scrollOffset = -1;
-    }
-    
-    int maxScrollOffset = currentMenu->itemCount - VISIBLE_LINES;
-    if (maxScrollOffset < -1) {
-        LOG_MENU_WARN("Adjusting maxScrollOffset from " + String(maxScrollOffset) + " to -1");
-        maxScrollOffset = -1;
-    }
-    if (scrollOffset > maxScrollOffset) {
-        LOG_MENU_WARN("Adjusting scrollOffset from " + String(scrollOffset) + " to " + String(maxScrollOffset));
-        scrollOffset = maxScrollOffset;
+        default:
+            break;
     }
 }
 
 bool _ensureisTimeSynced() {
-    if (timeSyncState != TIME_SYNC_SUCCESS) {
+    if (!(timeSyncState == TIME_SYNC_SUCCESS) && !(getRtcTime().tv_sec > 1765967312)) { // 2025-12-17 18-40 GMT+8
         lcdText("Try time sync", 1);
         lcdText("Please wait", 2);
         updateTimeSync();
@@ -468,8 +737,26 @@ bool _checkStateChanges() {
 TaskHandle_t _menuTaskHandle = NULL;
 void _menuTask(void* parameter) {
     static unsigned long lastDisplayUpdate = 0;
+    
+    // 初始读取电量
+    cachedBatterySOC = readStateOfCharge();
+    cachedCurrentBattery_mA = readAverageCurrent();
+    cachedBatteryVoltage_mV = readVoltage();
+    LOG_SYSTEM_DEBUG("Initial battery: %d%%, %dmA, %dmV", cachedBatterySOC, cachedCurrentBattery_mA, cachedBatteryVoltage_mV);
 
-    while (true) {
+    while (!shouldExitTasks) {
+        // 定期更新电量缓存（避免频繁I2C读取）
+        if (millis() - lastBatteryRead > BATTERY_READ_INTERVAL) {
+            cachedBatterySOC = readStateOfCharge();
+            cachedCurrentBattery_mA = readAverageCurrent();
+            cachedBatteryVoltage_mV = readVoltage();
+            lastBatteryRead = millis();
+            // 如果状态栏可见，标记需要更新显示
+            if (currentState == STATE_MENU && scrollOffset == -1) {
+                isDisplayNeedsUpdate = true;
+            }
+        }
+        
         // 持续更新动画
         Animations::update();
         
@@ -481,22 +768,26 @@ void _menuTask(void* parameter) {
                     break;
 
                 case STATE_CLOCK:
-                    if(!_ensureisTimeSynced())
+                    // 先处理退出按键，避免在未同步时因前置校验导致无法返回
+                    if(isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)){
+                        LOG_MENU_INFO("exit to main menu");
+                        currentState = STATE_MENU;
+                        globalButtonDelay(FIRST_TIME_DELAY);  // 状态切换防抖
                         break;
+                    }
+
+                    // 时间不可用时，自动返回主菜单，避免卡在 CLOCK 状态反复告警
+                    if(!_ensureisTimeSynced()) {
+                        currentState = STATE_MENU;
+                        globalButtonDelay(FIRST_TIME_DELAY);
+                        break;
+                    }
 
                     // 每隔1秒刷新一次时间显示
                     if (millis() - lastDisplayUpdate > 1000 || isNewInterface) {
                         isNewInterface = false;
                         updateClockScreen();
                         lastDisplayUpdate = millis();
-                    }
-
-                    // 始终检查是否需要退出
-                    if(isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)){
-                        LOG_MENU_INFO("exit to main menu");
-                        currentState = STATE_MENU;
-                        globalButtonDelay(FIRST_TIME_DELAY);  // 状态切换防抖
-                        break;
                     }
 
                     break;
@@ -560,4 +851,9 @@ void _menuTask(void* parameter) {
         }
         vTaskDelay(5 / portTICK_PERIOD_MS);  // 快速刷新提升响应
     }
+    
+    // 任务退出清理
+    LOG_MENU_DEBUG("_menuTask exiting...");
+    _menuTaskHandle = NULL;
+    vTaskDelete(NULL);
 }

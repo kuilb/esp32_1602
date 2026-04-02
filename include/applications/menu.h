@@ -21,9 +21,12 @@
 #include "./hardware/lcd_driver.h"
 #include "./hardware/button.h"
 #include "./hardware/button.h"
+#include "./hardware/fuel_gauge.h"
 
 #include "./services/wifi_config_manager.h"
 #include "./services/web_setting.h"
+#include "./services/time_manager.h"
+#include "./services/sleep_manager.h"
 
 #include "./ui/icons.h"
 #include "./ui/animations.h"
@@ -31,15 +34,6 @@
 
 /** @brief 表示是否准备好显示 */
 extern volatile bool isReadyToDisplay;
-
-/** @brief 定义按钮的索引值 */
-enum ButtonIndex {
-    UP = 0,      /**< 上按钮 */
-    DOWN = 1,    /**< 下按钮 */
-    LEFT = 2,    /**< 左按钮 */
-    RIGHT = 3,   /**< 右按钮 */
-    CENTER = 4   /**< 中按钮 */
-};
 
 /** @brief 定义当前界面的状态 */
 enum InterfaceState {

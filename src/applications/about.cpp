@@ -13,15 +13,15 @@ struct AboutPage {
 
 const AboutPage aboutMePages[] = {
     {"Created: kulib", "kulib88.com"},
-    {"だいがくせいかつが", "まもなくおわるけど"},
-    {"これからも", "がんばります"},
+    {"これからも", "よろしくおねがいします!"},
     {"Thanks!", "Please report"},
-    {"Contact:    john", "kulib@icloud.com"},
-    {"License:", "GPL3.0"},
+    {"Contact:", "kulib@icloud.com"},
+    {"GitHub:", "github.com/kuilb"},
+    {"Enjoy!", ":-)"},
 };
 
 const AboutPage aboutProjectPages[] = {
-    {"ESP32 1602A", "Ver.2025/11/18"},
+    {"ESP32 1602A", "Ver.2025/12/18"},
     {"ESP32-S3-N8R8", "8MB FLASH+PSRAM"},
     {"Features:", "Wireless LCD"},
     {"WiFi Config", "AP + Web UI"},
@@ -30,8 +30,6 @@ const AboutPage aboutProjectPages[] = {
     {"Libraries:", "FastLED"},
     {"ArduinoJson", "libsodium"},
     {"zlib_turbo", "etc..."},
-    {"Usage Tips:", "Hold CENTER cfg"},
-    {"Changelog:", "updated About"},
 };
 
 void showAboutPage(const char* line1, const char* line2) {

@@ -28,7 +28,7 @@ void _rgbTask(void* pvParameters) {
   CRGB lastColor = currentColor;
   uint8_t lastBrightness = currentBrightness;
 
-  while (1) {
+  while(1) {
     if (currentColor != lastColor || currentBrightness != lastBrightness) {
       FastLED.setBrightness(currentBrightness);
       leds[0] = currentColor;

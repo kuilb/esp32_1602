@@ -64,12 +64,32 @@ void lcdText(String ltext,int line);
 void lcdResetCursor();
 
 /**
- * @brief 在 CGRAM 中创建自定义字符
+ * @brief 清除 LCD 屏幕内容
+ * @details 发送清屏命令清除所有显示内容，并将光标重置到左上角 (0,0)
+ */
+void lcdClear();
+
+/**
+ * @brief 在 CGRAM 中创建自定义字符（手动指定槽位）
  * @details 将 8 字节点阵数据写入指定的 CGRAM 位置，用于定义自定义 LCD 字符（最多支持 8 个槽位，编号 0~7），写入完成后，光标位置恢复到当前 DDRAM 的显示位置
  * @param[in] slot 自定义字符槽位编号, 范围 0~7
  * @param[in] data 包含 8 字节点阵数据的数组, 每字节对应字符的一行像素
  */
 void lcdCreateChar(int slot, const uint8_t data[8]);
+
+/**
+ * @brief 在 CGRAM 中创建自定义字符并立即显示（自动分配槽位）
+ * @details 将 8 字节点阵数据写入自动分配的 CGRAM 位置并在当前光标位置显示，槽位会在 0~7 之间自动循环，如果在重置后调用超过 8 次，会输出警告日志。显示后光标会自动移动到下一个位置
+ * @param[in] data 包含 8 字节点阵数据的数组, 每字节对应字符的一行像素
+ * @return 返回使用的槽位编号 (0~7)
+ */
+int lcdCreateCharAuto(const uint8_t data[8]);
+
+/**
+ * @brief 重置自动分配的槽位计数器
+ * @details 将自动槽位分配重置为 0，用于新一帧显示的开始，确保槽位使用不会超出范围
+ */
+void lcdResetCharSlot();
 
 /**
  * @brief 显示自定义字符
@@ -100,9 +120,16 @@ void lcdPrint(String s);
 void lcdSetCursor(int changecursor);
 
 /**
- * @brief 清除光标后面单行的字符
- * @details 清除当前行光标位置之后的所有字符
+ * @brief 差分刷新整屏（32字节），只更新变化的位置
+ * @details
+ * - ddram32: 屏幕 32 个字符位置的字符编码（0~255），其中 0~7 表示自定义字符槽位
+ * - cgram8x8: 8 个自定义字符槽的点阵定义（每槽 8 字节）
+ * - cgramUsed: 标记某槽本帧是否被使用；未使用槽不会被写入 CGRAM
+ *
+ * @note
+ * - 内部会缓存上一帧的 DDRAM(32) 和 CGRAM(8*8)，仅在变化时写入
+ * - 若某槽位点阵发生变化，会自动重写使用该槽位的屏幕位置，避免显示错误
  */
-void clearOtherChar();
+uint8_t lcdRenderDiff(const uint8_t ddram32[32], const uint8_t cgram8x8[8][8], const bool cgramUsed[8]);
 
 #endif

@@ -1,10 +1,44 @@
 #include "./hardware/lcd_driver.h"
 
+#include <cstring>
+#include <Arduino.h>
+
+// Forward declaration: used by helpers before the definition below
+inline void _gpioWrite(int data, int mode);
+
 int lcdCursor = 0;  // 当前光标位置，全局变量 0~31
 
-int brightness = 255;  // 默认亮度
+int brightness = 0;  // 默认亮度
+
+int contrast = 128;  // 默认对比度
 
 uint32_t mask, value;
+
+// 自定义字符槽位自动管理
+static int currentCharSlot = 0;     // 当前自动分配的槽位 (0~7)
+
+// ==============================
+// 差分刷新缓存
+// ==============================
+static bool lastFrameValid = false;
+static uint8_t lastDdram[32] = {
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20
+};
+static uint8_t lastCgram[8][8] = {{0}};
+static bool lastCgramUsed[8] = {false};
+
+static inline bool _isCustomCode(uint8_t code) {
+    return code <= 7;
+}
+
+static inline void _writeCharAt(uint8_t pos, uint8_t code) {
+    if (pos >= 32) return;
+    lcdSetCursor(pos);
+    _gpioWrite(static_cast<int>(code), CHR);
+}
 
 //触发E引脚
 inline void _triggerE(){
@@ -48,6 +82,29 @@ inline void _gpioWrite(int data,int mode){
     _triggerE();
 }
 
+
+inline void _initLcdContrastPwm(uint8_t initialDuty = 128) {
+    ledcSetup(LCD_CTL_PWM_CHANNEL, LCD_CTL_PWM_FREQ, LCD_CTL_PWM_RESOLUTION);
+    ledcAttachPin(LCD_CTL_PWM_PIN, LCD_CTL_PWM_CHANNEL);
+    ledcWrite(LCD_CTL_PWM_CHANNEL, initialDuty);        // 设置初始对比度
+    contrast = initialDuty;
+}
+
+void setLcdContrast(uint8_t duty) {
+    if (duty > LCD_CTL_PWM_MAX_DUTY) duty = LCD_CTL_PWM_MAX_DUTY;
+    ledcWrite(LCD_CTL_PWM_CHANNEL, duty);
+    if( contrast != duty ){
+        contrast = duty;
+    }
+}
+
+void changeContrast(int delta) {
+    contrast += delta;
+    if (contrast < 0) contrast = 0;
+    if (contrast > 255) contrast = 255;
+    setLcdContrast(contrast);
+}
+
 // 初始化 LCD 背光
 inline void _initLcdBacklightPwm(uint8_t initialDuty = 255) {
     ledcSetup(LCD_BLA_PWM_CHANNEL, LCD_BLA_PWM_FREQ, LCD_BLA_PWM_RESOLUTION);
@@ -64,9 +121,12 @@ void changeBrightness(int delta) {
 }
 
 // 设置 LCD 背光亮度（0-255）
-inline void setLcdBrightness(uint8_t duty) {
+void setLcdBrightness(uint8_t duty) {
     if (duty > LCD_BLA_PWM_MAX_DUTY) duty = LCD_BLA_PWM_MAX_DUTY;
     ledcWrite(LCD_BLA_PWM_CHANNEL, duty);
+    if( brightness != duty ){
+        brightness = duty;
+    }
 }
 
 // 初始化 LCD 显示模块
@@ -78,8 +138,7 @@ void lcdInit(){
     setOutput(LCD_D6);
     setOutput(LCD_D7);
     setOutput(LCD_BLA);
-    
-    _initLcdBacklightPwm(255);           // 默认亮度 255
+    setOutput(LCD_CTL);
 
     _gpioWrite(0x33,CMD);               // 设置LCD进入8位模式
     delay(5);
@@ -93,6 +152,14 @@ void lcdInit(){
     delay(5);
     _gpioWrite(0x01,CMD);               // 清屏并将地址指针归位
     delay(5);
+
+    _initLcdBacklightPwm(0);           // 默认亮度 0
+    _initLcdContrastPwm(96);         // 默认对比度 96
+
+    for(int i=0;i<=26;i++){
+        changeBrightness(10);           // 渐亮背光
+        delay(10);
+    }
 
     LOG_LCD_INFO("LCD initialized");
 }
@@ -200,6 +267,19 @@ void lcdResetCursor(){
     lcdSetCursor(0);    // 回到屏幕起点
 }
 
+// 清除LCD屏幕内容
+void lcdClear(){
+    _gpioWrite(0x01, CMD);  // 发送清屏命令
+    delay(2);               // 清屏需要较长时间
+    lcdResetCursor();       // 重置光标到左上角
+    
+    // 重置差分刷新缓存状态
+    lastFrameValid = false;
+    std::memset(lastDdram, 0x20, 32);  // 清屏后所有位置都是空格
+    std::memset(lastCgram, 0, sizeof(lastCgram));
+    std::memset(lastCgramUsed, 0, sizeof(lastCgramUsed));
+}
+
 // 光标向后移动一格
 void _nextCursor(){
     if (lcdCursor >= 32) {
@@ -209,7 +289,7 @@ void _nextCursor(){
     lcdSetCursor(lcdCursor+1);
 }
 
-// 写入一字节的自定义字符
+// 写入一字节的自定义字符（手动指定槽位）
 void lcdCreateChar(int slot, const uint8_t data[8]){
     if (slot < 0 || slot > 7) return;       // 限制 slot 范围
 
@@ -223,6 +303,27 @@ void lcdCreateChar(int slot, const uint8_t data[8]){
 
     // 设置回 DDRAM 当前光标对应位置
     lcdSetCursor(lcdCursor);                // 将光标设置回当前显示位置
+}
+
+// 写入一字节的自定义字符并立即显示(自动分配槽位)
+int lcdCreateCharAuto(const uint8_t data[8]){
+    int slotToUse = currentCharSlot;
+    
+    lcdCreateChar(slotToUse, data);
+    lcdDisCustom(slotToUse);
+    
+    currentCharSlot = (currentCharSlot + 1) % 8;  // 循环使用 0~7
+    
+    if (currentCharSlot == 0) {
+        LOG_LCD_WARN("Auto slot wrapped around, overwriting previous slots!");
+    }
+    
+    return slotToUse;
+}
+
+// 重置自动分配的槽位计数器
+void lcdResetCharSlot(){
+    currentCharSlot = 0;
 }
 
 // 显示自定义字符
@@ -246,16 +347,43 @@ void lcdPrint(String s) {
     }
 }
 
-// 清除光标后面单行的字符
-void clearOtherChar(){   
-    if(lcdCursor < 15){
-        for(int i = lcdCursor; i < 16; i++){
-            lcdDisChar(' ');
+uint8_t lcdRenderDiff(const uint8_t ddram32[32], const uint8_t cgram8x8[8][8], const bool cgramUsed[8]) {
+    uint8_t updatedCells = 0;
+    bool slotChanged[8] = {false};
+
+    // 先更新本帧用到的 CGRAM 槽位（仅当点阵变化时才写）
+    for (int slot = 0; slot < 8; slot++) {
+        if (!cgramUsed[slot]) continue;
+
+        const bool needWrite = (!lastFrameValid) || (!lastCgramUsed[slot]) || (std::memcmp(lastCgram[slot], cgram8x8[slot], 8) != 0);
+        if (needWrite) {
+            lcdCreateChar(slot, cgram8x8[slot]);
+            std::memcpy(lastCgram[slot], cgram8x8[slot], 8);
+            slotChanged[slot] = true;
+        }
+        lastCgramUsed[slot] = true;
+    }
+
+    // DDRAM 差分写入：字符码变化 or 该位置引用的自定义槽位刚被重写
+    for (uint8_t pos = 0; pos < 32; pos++) {
+        const uint8_t code = ddram32[pos];
+        const bool changed = (!lastFrameValid) || (lastDdram[pos] != code);
+        const bool affectedBySlot = _isCustomCode(code) && slotChanged[code];
+        if (changed || affectedBySlot) {
+            _writeCharAt(pos, code);
+            lastDdram[pos] = code;
+            if (updatedCells < 255) updatedCells++;
         }
     }
-    else if(lcdCursor < 31){
-        for(int i = lcdCursor; i < 32; i++){
-            lcdDisChar(' ');
+
+    // 更新 lastCgramUsed：未使用的槽位标记为 false（下帧若再次使用可正确触发写入）
+    for (int slot = 0; slot < 8; slot++) {
+        if (!cgramUsed[slot]) {
+            lastCgramUsed[slot] = false;
         }
     }
+
+    lastFrameValid = true;
+
+    return updatedCells;
 }

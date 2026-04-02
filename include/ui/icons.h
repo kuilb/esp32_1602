@@ -17,6 +17,8 @@ namespace SystemIcons {
     extern uint8_t celsius[];
 
     uint8_t* getIcon(const String& iconName);
+    uint8_t* getBatteryLeftIcon(const uint8_t& soc);
+    uint8_t* getBatteryRightIcon(const uint8_t& soc);
 }
 
 // 天气风向图标

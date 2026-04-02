@@ -15,6 +15,10 @@ bool inConfigMode = false;
 // WiFi连接状态
 WiFiConnectionState wifiConnectionState = WIFI_IDLE;
 
+// 防止重复创建连接任务 / 时间同步任务导致资源耗尽和状态抖动
+static TaskHandle_t wifiConnectTaskHandle = nullptr;
+static TaskHandle_t timeSyncTaskHandle = nullptr;
+
 // 扫描状态
 WifiScanState wifiScanState = WIFI_SCAN_IDLE;
 String scanResult = "";
@@ -57,7 +61,10 @@ void wifiScanhandler(){
             scanResult = "{\"status\":\"done\",\"networks\":[";
             
             for (int i = 0; i < n; ++i) {
-                scanResult += "{\"ssid\":\"" + WiFi.SSID(i) + "\",\"rssi\":" + String(WiFi.RSSI(i)) + ",\"secure\":" + ((WiFi.encryptionType(i) != WIFI_AUTH_OPEN) ? "true" : "false") + "}";
+                scanResult += "{\"ssid\":\"" + WiFi.SSID(i) + 
+							  "\",\"rssi\":" + String(WiFi.RSSI(i)) + 
+							  ",\"secure\":" + ((WiFi.encryptionType(i) != WIFI_AUTH_OPEN) ? "true" : "false") + 
+							  "}";
                 if (i != n - 1) {
                     scanResult += ",";
                 }
@@ -78,7 +85,7 @@ void wifiScanhandler(){
             apServer.send(200, "application/json", scanResult);
             scanResult = "";
         } else {
-			LOG_NETWORK_DEBUG("send HTTP 500 scanning (no results)");
+			LOG_NETWORK_DEBUG("send HTTP 500 (no results)");
             apServer.send(500, "application/json", "{\"error\":\"no result\"}");
 			wifiScanState = WIFI_SCAN_IDLE;
         }
@@ -158,72 +165,108 @@ void enterConfigMode() {
 
 // WiFi连接后台任务
 void wifiConnectTask(void* parameter) {
-		LOG_WIFI_INFO("WiFi connection task started");
-		
-		// 等待一小段时间，确保网络栈完全初始化
-		vTaskDelay(100 / portTICK_PERIOD_MS);
-		
-		updateColor(CRGB::Blue);  // 连接中蓝灯
-		
-		WiFi.begin(wifiConfigManager.getSSID().c_str(), wifiConfigManager.getPassword().c_str());
-		
-		unsigned long startTime = millis();
-		int fadeStep = 2;
-		uint8_t brightness = 64;
-		
-        // 连接中蓝灯闪烁
-		while (WiFi.status() != WL_CONNECTED && millis() - startTime < 15000) {
-            brightness += fadeStep;
+	LOG_WIFI_DEBUG("WiFi connection task started");
+	
+	// 等待一小段时间，确保网络栈完全初始化
+	vTaskDelay(100 / portTICK_PERIOD_MS);
+	
+	updateColor(CRGB::Blue);  // 连接中蓝灯
 
-            if (brightness == 0 || brightness == 192) {
-                    fadeStep = -fadeStep;
-            }
+	// 避免底层自动重连导致“超时失败后仍在后台不断重试”，这里交由上层逻辑控制重连
+	WiFi.persistent(false);
+	WiFi.setAutoReconnect(false);
 
-            if((millis() - startTime) % 500 == 0){
-                    LOG_WIFI_DEBUG(".");
-            }
-            updateBrightness(brightness);
-            vTaskDelay(5 / portTICK_PERIOD_MS);
+	// 连接期间关闭省电，避免连接抖动/状态不同步
+	WiFi.setSleep(false);
+	
+	WiFi.begin(wifiConfigManager.getSSID().c_str(), wifiConfigManager.getPassword().c_str());
+	
+	unsigned long startTime = millis();
+	int fadeStep = 2;
+	uint8_t brightness = 64;
+	
+	// 连接中蓝灯闪烁
+	uint32_t lastDotMs = 0;
+	while (millis() - startTime < 15000 && !shouldExitTasks) {
+		const IPAddress ipNow = WiFi.localIP();
+		if (WiFi.status() == WL_CONNECTED || ipNow != IPAddress(0, 0, 0, 0)) {
+			break;
 		}
-		updateBrightness(128);
-		
 
-		if (WiFi.status() == WL_CONNECTED) {
-				wifiConnectionState = WIFI_CONNECTED;
-				updateColor(CRGB::Green);  	// 连接成功绿灯
-				server.begin();				// 启动TCP服务器
+		brightness += fadeStep;
 
-				// 设置DNS服务器为Google Public DNS
-				IPAddress dns1(223, 5, 5, 5);
-				IPAddress dns2(1, 1, 1, 1);
-				WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), dns1, dns2);
-				LOG_WIFI_INFO("DNS set to 223.5.5.5 and 1.1.1.1");
-
-				LOG_WIFI_INFO("connected: %s", wifiConfigManager.getSSID().c_str());
-				LOG_WIFI_INFO("IP: %s", WiFi.localIP().toString().c_str());
-				LOG_WIFI_INFO("TCP server started on port %d", CONNECT_PORT);
-
-				// 联网成功后启动非阻塞时间同步
-				LOG_WIFI_INFO("starting background time sync...");
-				initTimeSync();
-				
-				// 启用WiFi Modem Sleep以降低功耗
-				WiFi.setSleep(true);
-				LOG_WIFI_INFO("WiFi Modem Sleep enabled for power saving");
-				
-				// 创建后台时间同步任务
-				xTaskCreate(timeSyncTask, "TimeSyncTask", 4096, NULL, 1, NULL);
-		} else {
-				wifiConnectionState = WIFI_FAILED;
-				WiFi.disconnect();
-				LOG_WIFI_ERROR("can't connect to WiFi");
-
-				updateColor(CRGB::Red);  // 失败变红
+		if (brightness == 0 || brightness == 192) {
+				fadeStep = -fadeStep;
 		}
-		
-		// 任务完成，删除任务自身
-		vTaskDelay(pdMS_TO_TICKS(5));	//延迟5MS确保RGB灯状态更新
+
+		const uint32_t nowMs = millis();
+		if ((uint32_t)(nowMs - lastDotMs) >= 500) {
+			lastDotMs = nowMs;
+			LOG_WIFI_DEBUG(".");
+		}
+		updateBrightness(brightness);
+		vTaskDelay(5 / portTICK_PERIOD_MS);
+	}
+	updateBrightness(128);
+	
+	// 检查是否因睡眠退出
+	if (shouldExitTasks) {
+		LOG_WIFI_INFO("WiFi connect task exiting due to sleep request");
+		vTaskDelay(pdMS_TO_TICKS(5));
 		vTaskDelete(NULL);
+		return;
+	}
+
+	const IPAddress ipAfter = WiFi.localIP();
+	if (WiFi.status() == WL_CONNECTED || ipAfter != IPAddress(0, 0, 0, 0)) {
+		wifiConnectionState = WIFI_CONNECTED;
+		LOG_WIFI_DEBUG("WiFi connected successfully");
+		
+		updateColor(CRGB::Green);  	// 连接成功绿灯
+		updateBrightness(10);
+		
+		// 等待 DHCP 分配到有效 IP
+		unsigned long ipWaitStart = millis();
+		IPAddress ip = WiFi.localIP();
+		while (ip == IPAddress(0, 0, 0, 0) && (millis() - ipWaitStart) < 5000 && !shouldExitTasks) {
+			vTaskDelay(pdMS_TO_TICKS(50));
+			ip = WiFi.localIP();
+		}
+		LOG_WIFI_DEBUG("STA IP after connect: %s", ip.toString().c_str());
+
+		// 启动TCP服务器（放在 IP/DNS 完成后）
+		LOG_WIFI_DEBUG("Starting TCP server...");
+		server.begin();
+		LOG_WIFI_INFO("TCP server started on port %d", CONNECT_PORT);
+
+		LOG_WIFI_INFO("connected: %s", wifiConfigManager.getSSID().c_str());
+		LOG_WIFI_INFO("IP: %s", WiFi.localIP().toString().c_str());
+		LOG_WIFI_DEBUG("starting background time sync...");
+
+		// 默认保持 WiFi 睡眠
+		WiFi.setSleep(true);
+
+		// 创建后台时间同步任务（initNtpTimeSync 移到后台任务中，避免阻塞）
+		if (timeSyncTaskHandle == nullptr) {
+			xTaskCreate(timeSyncTask, "TimeSyncTask", 4096, &timeSyncTaskHandle, 1, &timeSyncTaskHandle);
+		} else {
+			LOG_WIFI_DEBUG("TimeSyncTask already running, skip create.");
+		}
+	} else {
+			wifiConnectionState = WIFI_FAILED;
+			// 关闭射频，防止 WiFi 底层在后台继续自动尝试连接
+			WiFi.disconnect(true);
+			WiFi.mode(WIFI_OFF);
+			LOG_WIFI_ERROR("can't connect to WiFi");
+
+			updateColor(CRGB::Red);  // 失败变红
+	}
+	
+	// 任务完成，删除任务自身
+	setCpuFrequencyMhz(80);  // 降频至40MHz以节省功耗
+	vTaskDelay(pdMS_TO_TICKS(5));	//延迟5MS确保RGB灯状态更新
+	wifiConnectTaskHandle = nullptr;
+	vTaskDelete(NULL);
 }
 
 void connectToWiFi() {
@@ -234,7 +277,20 @@ void connectToWiFi() {
 			return;
 		}
 
+		// 避免重复创建连接任务
+		if (wifiConnectionState == WIFI_CONNECTING || wifiConnectTaskHandle != nullptr) {
+			LOG_WIFI_DEBUG("WiFi connect already in progress, skip.");
+			return;
+		}
+
 		LOG_WIFI_INFO("will connect to: %s", wifiConfigManager.getSSID());
+
+		// 连接前做一次硬断开，清理底层状态/停止可能存在的后台重连
+		WiFi.persistent(false);
+		WiFi.setAutoReconnect(false);
+		WiFi.disconnect(true);
+		WiFi.mode(WIFI_OFF);
+		vTaskDelay(pdMS_TO_TICKS(50));
 
 		// 设置连接中状态
 		wifiConnectionState = WIFI_CONNECTING;
@@ -244,12 +300,12 @@ void connectToWiFi() {
 		vTaskDelay(50 / portTICK_PERIOD_MS);  // 给WiFi栈一点时间初始化
 		
 		// 创建后台任务进行WiFi连接，不阻塞主线程
-		xTaskCreate(wifiConnectTask, "WiFiConnectTask", 4096, NULL, 1, NULL);
+		xTaskCreate(wifiConnectTask, "WiFiConnectTask", 4096, NULL, 1, &wifiConnectTaskHandle);
 }
 
 // 初始化wifi
 void wifiinit(){
-	if (digitalRead(BUTTEN_CENTER_PIN)) {
+	if (digitalRead(BUTTON_CENTER_PIN)) {
 			LOG_WIFI_INFO("Entering config mode by button");
 			enterConfigMode();
 	} else {

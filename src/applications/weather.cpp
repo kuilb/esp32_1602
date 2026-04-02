@@ -29,71 +29,43 @@ void updateWeatherScreen() {
 
         lcdSetCursor(16); 
         
-        // 获取天气图标
-        uint8_t* leftIcon = WeatherIcons::getLeftIcon(currentWeather);
-        uint8_t* rightIcon = WeatherIcons::getRightIcon(currentWeather);
-        
-        if (leftIcon && rightIcon) {
-            lcdCreateChar(0, leftIcon);
-            lcdCreateChar(1, rightIcon);
-            lcdCreateChar(2, SystemIcons::tempIcon);
-            lcdCreateChar(3, SystemIcons::celsius);
+        lcdCreateCharAuto(WeatherIcons::getLeftIcon(currentWeather));
+        lcdCreateCharAuto(WeatherIcons::getRightIcon(currentWeather));
+        lcdCreateCharAuto(SystemIcons::tempIcon);
 
-            lcdDisCustom(0);
-            lcdDisCustom(1);
-            lcdDisCustom(2);
-            lcdPrint(currentTemp);
-            lcdDisCustom(3);
-            lcdPrint(" Fel " + feelsLike);
-            lcdDisCustom(3);
-        } else {
-            // 如果天气图标获取失败，显示空白
-            lcdPrint("  ");
-        }
+        lcdPrint(currentTemp);
+        lcdCreateCharAuto(SystemIcons::celsius);
+        lcdPrint(" Fel " + feelsLike);
+        lcdCreateCharAuto(SystemIcons::celsius);
+
 
         for(int i=lcdCursor;i<32;i++) lcdDisChar(' '); // 清除剩余部分
         
     } else if(interface_num == 1){
-        lcdResetCursor();
+        lcdClear();
         
-        // 安全地获取风向图标
-        uint8_t* windIcon = WindIcons::getIcon(windDir);
-        
-        if (windIcon) {
-            lcdCreateChar(4, windIcon);
-            lcdPrint("Wind ");
-            lcdDisCustom(4);
-            lcdPrint(windScale);
-        } else {
-            lcdPrint("Wind:");
-            lcdPrint("  ");
-            lcdPrint(windScale);
-        }
-        
-        clearOtherChar();
+        lcdPrint("Wind ");
+        lcdCreateCharAuto(WindIcons::getIcon(windDir));
+        lcdPrint(windScale);
 
         lcdSetCursor(16); 
         lcdPrint("Humi:"); // 第二行显示湿度
         lcdPrint(humidity);
-        clearOtherChar();
 
     } else if(interface_num == 2){
-        lcdResetCursor();
+        lcdClear();
         lcdPrint("Pres:");
         lcdPrint(pressure);
-        clearOtherChar();
         lcdText(" ",2);
         
     } else if(interface_num == 3){
-        lcdResetCursor();
+        lcdClear();
         lcdPrint("Obs:");
         lcdPrint(obsTime);
-        clearOtherChar();
 
         lcdSetCursor(16); 
         lcdPrint("Upd:"); // 第二行显示观测时间
         lcdPrint(weatherUpdateTime);
-        clearOtherChar();
     }
 }
 

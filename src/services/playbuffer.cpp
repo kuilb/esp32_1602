@@ -1,5 +1,7 @@
 #include "./services/playbuffer.h"
 
+#include "./services/frame_stats.h"
+
 unsigned long lastDisplayTime = 0;   // 上一帧显示时间戳
 bool isDisplayingCache = false;      // 当前是否正在播放缓存
 
@@ -11,6 +13,16 @@ void tryDisplayCachedFrames() {
     }
 
     unsigned long now = millis();
+
+    // 如果队头帧已经过期（滞后过大），直接丢弃，追上最新画面
+    while (!frameCache.empty() && (uint32_t)(now - frameCache.front().enqueueMs) > (uint32_t)MAX_LATENCY_MS) {
+        frameCache.pop_front();
+        gFramesDropped++;
+    }
+    if (frameCache.empty()) {
+        isDisplayingCache = false;
+        return;
+    }
 
     // 立即显示第一帧（首次触发播放）
     if (!isDisplayingCache) {

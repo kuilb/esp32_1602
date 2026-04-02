@@ -29,7 +29,7 @@ void loadJwtConfig() {
     strncpy(cityName, qweatherAuthConfigManager.getCityName().c_str(), sizeof(cityName) - 1);
     cityName[sizeof(cityName) - 1] = '\0';
 
-    LOG_JWT_INFO("JWT 配置已加载");
+    LOG_JWT_INFO("JWT config loaded");
     LOG_JWT_DEBUG("apiHost: %s", apiHost);
     LOG_JWT_DEBUG("kid: %s", kid);
     LOG_JWT_DEBUG("projectID: %s", projectID);

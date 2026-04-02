@@ -20,7 +20,10 @@ const char* Logger::modulePrefixes[LOG_MODULE_MAX] = {
     "MEMORY",
     "RGB",
     "DISPLAY",
-    "CONFIG"
+    "CONFIG",
+    "BATTERY",
+    "SLEEP",
+    "ALS"
 };
 
 // 日志级别前缀定义

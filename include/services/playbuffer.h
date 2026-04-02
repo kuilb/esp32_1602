@@ -5,14 +5,6 @@
 #include "./connectivity/network.h"
 
 /**
- * @brief 帧数据结构体，包含帧内容和帧间隔时间（毫秒）
- */
-struct FrameData {
-    std::vector<uint8_t> data;       /**< 帧的原始数据 */
-    uint16_t frameIntervalMs;        /**< 两帧之间的间隔时间，单位：毫秒 */
-};
-
-/**
  * @brief 上一帧显示时间戳，单位为毫秒
  */
 extern unsigned long lastDisplayTime;
@@ -23,10 +15,7 @@ extern unsigned long lastDisplayTime;
  */
 extern bool isDisplayingCache;
 
-/**
- * @brief 声明帧缓存队列，用于存储待播放的帧数据
- */
-extern std::deque<FrameData> frameCache;
+// frameCache / FramePacket 在 network.h 中声明
 
 
 /**

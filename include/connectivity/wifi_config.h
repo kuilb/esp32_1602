@@ -19,6 +19,7 @@
 #include "./connectivity/network.h"
 #include "./services/web_pages.h"
 #include "./services/wifi_config_manager.h"
+#include "./services/time_manager.h"
 
 extern WebServer apServer;                      /**< 配网模式使用的 Web 服务器 */
 extern DNSServer dnsServer;                     /**< DNS 服务器用于强制门户 */

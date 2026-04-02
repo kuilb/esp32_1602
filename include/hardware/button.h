@@ -13,8 +13,26 @@
 #include "mydefine.h"
 #include "./connectivity/network.h"
 #include "./hardware/button.h"
+#include "./hardware/lcd_driver.h"
+#include "./hardware/rgb_led.h"
 #include "./applications/menu.h"
 #include "./utils/logger.h"
+#include "./services/time_manager.h"
+
+// 外部变量声明，用于深度睡眠时间追踪
+extern RTC_DATA_ATTR uint64_t sleep_enter_rtc_time;  /**< 睡眠时的RTC计数器值 */
+
+/**
+ * @brief 按钮索引枚举
+ * 
+ * 定义按钮在数组中的索引位置，避免使用魔法数字
+ */
+enum ButtonIndex {
+    SIDE = 0,    ///< 侧面按钮
+    LEFT,        ///< 左按钮
+    RIGHT,       ///< 右按钮
+    CENTER       ///< 中心按钮
+};
 
 /**
  * @brief 按钮状态结构体
@@ -73,5 +91,15 @@ extern WiFiClient client;
  *
  */
 void startButtonTask();
+
+/**
+ * @brief 按键扫描任务句柄
+ */
+extern TaskHandle_t scanTaskHandle;
+
+/**
+ * @brief 按键处理任务句柄
+ */
+extern TaskHandle_t handleTaskHandle;
 
 #endif
