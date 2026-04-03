@@ -1,5 +1,6 @@
 #include "./hardware/button.h"
 #include "./services/sleep_manager.h"
+#include "./hardware/buzzer.h"
 
 ButtonState buttons[] = {
     {BUTTON_SIDE_PIN ,  "SIDE",   false, 0},
@@ -150,6 +151,8 @@ void scanButtonsTask(void *pvParameters) {
                     powerKeySleepTriggered = true;
                     powerKeyOverlayActive = false;
                     LOG_BUTTON_INFO("Power key hold complete, entering deep sleep");
+                    buzzerPlaySleepSound();
+                    vTaskDelay(pdMS_TO_TICKS(120));
                     enterDeepSleep();
                 }
             }

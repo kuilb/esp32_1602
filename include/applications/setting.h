@@ -7,6 +7,9 @@ void _enterBrightnessScreen();
 /** @brief 切换自动亮度状态 */
 void _toggleAutoBrightness();
 
+/** @brief 切换按键音效状态 */
+void _toggleSoundEffects();
+
 /** @brief 清除 WiFi 配置并重启 */
 void _resetWifi();
 

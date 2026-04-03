@@ -14,6 +14,7 @@
 #include "./applications/badappleplayer.h"
 #include "./applications/weather.h"
 #include "./applications/about.h"
+#include "./applications/pomodoro.h"
 
 #include "./connectivity/network.h"
 #include "./connectivity/wifi_config.h"

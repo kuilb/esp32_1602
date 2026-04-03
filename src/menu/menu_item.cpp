@@ -6,12 +6,14 @@ void _enterWirelessScreen();
 void _setClockInterface();
 void _setWeatherInterface();
 void _playBadAppleWrapper();
+void _startPomodoroWrapper();
 
 // 主菜单
 const MenuItem mainMenuItems[] = {
     {"Wireless Screen",     _enterWirelessScreen, MENU_NONE},
     {"Clock",               _setClockInterface, MENU_NONE},
     {"Weather",             _setWeatherInterface, MENU_NONE},
+    {"Pomodoro",            _startPomodoroWrapper, MENU_NONE},
     {"Settings",            NULL, MENU_SETTINGS},
     {"About",               NULL, MENU_ABOUT},
     {"Bad Apple",           _playBadAppleWrapper, MENU_NONE}
@@ -22,6 +24,7 @@ const MenuItem settingsMenuItems[] = {
     {"Web setting",     _setupWebSetting, MENU_NONE},
     {"WiFi Config",     NULL, MENU_WIFI_CONFIG},
     {"Auto Bright",     _toggleAutoBrightness, MENU_NONE},
+    {"Sound FX",        _toggleSoundEffects, MENU_NONE},
     {"Brightness",      _enterBrightnessScreen, MENU_NONE},
     {"Battery info",    _enterBatteryInfoScreen, MENU_NONE},
     {"Reset fuel IC",   _resetFuelGauge, MENU_NONE},

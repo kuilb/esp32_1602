@@ -21,8 +21,8 @@ const AboutPage aboutMePages[] = {
 };
 
 const AboutPage aboutProjectPages[] = {
-    {"ESP32 1602A", "Ver.2025/12/18"},
-    {"ESP32-S3-N8R8", "8MB FLASH+PSRAM"},
+    {"ESP32 1602A", "Ver.2026/04/03"},
+    {"ESP32-S3-N8", "128MB FLASH"},
     {"Features:", "Wireless LCD"},
     {"WiFi Config", "AP + Web UI"},
     {"JWT Auth", "Ed25519 Crypto"},

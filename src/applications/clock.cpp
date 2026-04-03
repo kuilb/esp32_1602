@@ -1,7 +1,18 @@
 #include "./applications/clock.h"
+#include "./hardware/buzzer.h"
 
 static bool s_clockIsNewInterface = false;
 static unsigned long s_lastClockDisplayUpdate = 0;
+static unsigned long s_lastClockFailSoundMs = 0;
+
+static void _playClockFailSoundThrottled(unsigned long intervalMs = 2000) {
+    const unsigned long now = millis();
+    if (now - s_lastClockFailSoundMs < intervalMs) {
+        return;
+    }
+    s_lastClockFailSoundMs = now;
+    buzzerPlayError();
+}
 
 static bool _ensureClockTimeSynced() {
     if (!(timeSyncState == TIME_SYNC_SUCCESS) && !(getRtcTime().tv_sec > 1765967312)) { // 2025-12-17 18:40 GMT+8
@@ -12,6 +23,7 @@ static bool _ensureClockTimeSynced() {
             LOG_TIME_WARN("Time not synced yet, cannot display");
             lcdText("Time not synced", 1);
             lcdText("", 2);
+            _playClockFailSoundThrottled();
             delay(500);
             return false;
         }
@@ -67,11 +79,13 @@ void updateClockScreen() {
             lcdText("Time Error", 1);
             lcdText(" ", 2);
             LOG_TIME_ERROR("Failed to get local time for clock display");
+            _playClockFailSoundThrottled();
         }
     } else {
         lcdText("Can't get Time", 1);
         lcdText("Check network", 2);
         LOG_TIME_WARN("Time not synced yet, cannot display clock");
+        _playClockFailSoundThrottled();
         currentState = STATE_MENU;
         delay(800);
     }

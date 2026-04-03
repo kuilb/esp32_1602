@@ -226,7 +226,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     <div class='container'>
         <h1>ESP32 设置</h1>
         <div class='main-buttons'>
-            <button type='button' class='btn-blue' onclick='openCitySearch()'>
+            <button type='button' id='city-search-btn' class='btn-blue' onclick='openCitySearch()'>
                 <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" x="0" y="0" viewBox="0 0 18 18">
                     <style>
                         .st0 {
@@ -292,6 +292,21 @@ const char index_html[] PROGMEM = R"rawliteral(
                 </svg>
                 <span>和风天气密钥</span>
             </button>
+            <button type='button' id='toggle-device-info-btn' class='btn-gray' onclick='toggleDeviceInfo()'>
+                <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                    <circle cx='12' cy='12' r='10'></circle>
+                    <line x1='12' y1='16' x2='12' y2='12'></line>
+                    <line x1='12' y1='8' x2='12.01' y2='8'></line>
+                </svg>
+                <span>设备信息</span>
+            </button>
+            <button type='button' id='toggle-device-settings-btn' class='btn-gray' onclick='toggleDeviceSettings()'>
+                <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                    <circle cx='12' cy='12' r='3'></circle>
+                    <path d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8.92 4.6H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c0 .65.39 1.24 1 1.51H21a2 2 0 1 1 0 4h-.09c-.61.27-1 .86-1 1.49z'></path>
+                </svg>
+                <span>设备设置</span>
+            </button>
             <button type='button' class='btn-red' onclick='exitSettings()'>
                 <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none'
                     stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
@@ -319,8 +334,223 @@ const char index_html[] PROGMEM = R"rawliteral(
                 <button type='button' class='btn-blue' style='width:100px;' onclick='submitKeySettings()'>提交</button>
             </div>
         </form>
+
+        <div id='device-info-panel' style='display:none; width:80%; text-align:left; margin-top:10px;'>
+            <div class='main-buttons' style='margin-bottom:10px;'>
+                <button type='button' class='btn-gray' onclick='showBasicInfo()'><span>基本信息</span></button>
+                <button type='button' class='btn-gray' onclick='showAlsInfo()'><span>环境光传感器</span></button>
+                <button type='button' class='btn-gray' onclick='showFuelInfo()'><span>燃料计IC</span></button>
+                <button type='button' class='btn-gray' onclick='showWifiInfo()'><span>WiFi信息</span></button>
+            </div>
+            <div id='device-info-box' style='white-space:pre-wrap; border:1px solid var(--border); border-radius:6px; padding:10px; min-height:90px; background: rgba(255,255,255,0.6);'></div>
+        </div>
+
+        <div id='device-settings-panel' style='display:none; width:80%; text-align:left; margin-top:10px;'>
+            <div class='main-buttons' style='margin-bottom:10px;'>
+                <button type='button' id='auto-brightness-toggle-btn' class='btn-gray' onclick='toggleAutoBrightnessFromWeb()'><span>自动亮度: --</span></button>
+                <button type='button' id='sound-effects-toggle-btn' class='btn-gray' onclick='toggleSoundEffectsFromWeb()'><span>按键音效: --</span></button>
+            </div>
+            <label for='brightness-range'>亮度调节 (0-255)</label>
+            <input id='brightness-range' type='range' min='0' max='255' value='128' oninput='onBrightnessSliderInput()'>
+            <div id='device-settings-box' style='white-space:pre-wrap; border:1px solid var(--border); border-radius:6px; padding:10px; min-height:60px; background: rgba(255,255,255,0.6);'></div>
+        </div>
     </div>
     <script>
+        var settingsRealtimeTimer = null;
+        var brightnessSetTimer = null;
+
+        function stopSettingsRealtime() {
+            if (settingsRealtimeTimer) {
+                clearInterval(settingsRealtimeTimer);
+                settingsRealtimeTimer = null;
+            }
+        }
+
+        function startSettingsRealtime(fetchFn) {
+            stopSettingsRealtime();
+            fetchFn();
+            settingsRealtimeTimer = setInterval(fetchFn, 1000);
+        }
+
+        function setDeviceInfoText(text) {
+            document.getElementById('device-info-box').textContent = text;
+        }
+
+        function setDeviceSettingsText(text) {
+            document.getElementById('device-settings-box').textContent = text;
+        }
+
+        function updateAutoBrightnessToggleLabel(enabled) {
+            var btn = document.getElementById('auto-brightness-toggle-btn').querySelector('span');
+            btn.textContent = '自动亮度: ' + (enabled ? '开' : '关');
+        }
+
+        function updateSoundEffectsToggleLabel(enabled) {
+            var btn = document.getElementById('sound-effects-toggle-btn').querySelector('span');
+            btn.textContent = '按键音效: ' + (enabled ? '开' : '关');
+        }
+
+        function refreshCitySearchAvailability() {
+            fetch('/settings/city_search_ready')
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    var btn = document.getElementById('city-search-btn');
+                    if (!btn) return;
+                    var ready = !!(d && d.ready);
+                    btn.disabled = !ready;
+                    btn.title = ready ? '' : (d.message || '和风天气密钥未完整配置，无法搜索');
+                })
+                .catch(function () { });
+        }
+
+        function loadSettingsStatus() {
+            fetch('/settings/status')
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    var slider = document.getElementById('brightness-range');
+                    slider.value = (data && typeof data.brightness === 'number') ? data.brightness : 128;
+                    updateAutoBrightnessToggleLabel(!!(data && data.autoBrightness));
+                    updateSoundEffectsToggleLabel(!!(data && data.soundEffects));
+                    setDeviceSettingsText('当前亮度: ' + slider.value + '\n自动亮度: ' + ((data && data.autoBrightness) ? '开' : '关') + '\n按键音效: ' + ((data && data.soundEffects) ? '开' : '关'));
+                })
+                .catch(function () { });
+        }
+
+        function showBasicInfo() {
+            stopSettingsRealtime();
+            fetch('/settings/basic_info')
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    setDeviceInfoText(
+                        '固件版本: ' + d.projectVersion + '\n' +
+                        '构建版本: ' + d.buildVersion + '\n' +
+                        '构建时间: ' + d.buildTimestamp + '\n' +
+                        '运行时长(ms): ' + d.uptimeMs + '\n' +
+                        'CPU频率(MHz): ' + d.cpuFreqMHz + '\n' +
+                        '堆内存: ' + d.freeHeap + ' / ' + d.totalHeap + '\n' +
+                        'PSRAM: ' + d.freePsram + ' / ' + d.totalPsram + '\n' +
+                        '复位原因: ' + d.resetReason
+                    );
+                })
+                .catch(function () { setDeviceInfoText('获取基本信息失败'); });
+        }
+
+        function showAlsInfo() {
+            startSettingsRealtime(function () {
+                fetch('/settings/als')
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        setDeviceInfoText(
+                            '连接状态: ' + (d.connected ? '已连接' : '未连接') + '\n' +
+                            '实时光照(lux): ' + d.lux + '\n' +
+                            '平滑光照(lux): ' + d.smoothedLux
+                        );
+                    })
+                    .catch(function () { setDeviceInfoText('获取环境光信息失败'); });
+            });
+        }
+
+        function showFuelInfo() {
+            startSettingsRealtime(function () {
+                fetch('/settings/fuel')
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        setDeviceInfoText(
+                            '连接状态: ' + (d.connected ? '已连接' : '未连接') + '\n' +
+                            '电压(mV): ' + d.voltageMv + '\n' +
+                            '电流(mA): ' + d.currentMa + '\n' +
+                            '电量(%): ' + d.soc
+                        );
+                    })
+                    .catch(function () { setDeviceInfoText('获取燃料计信息失败'); });
+            });
+        }
+
+        function showWifiInfo() {
+            startSettingsRealtime(function () {
+                fetch('/settings/wifi')
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        setDeviceInfoText(
+                            '连接状态: ' + d.state + '\n' +
+                            'WiFi状态码: ' + d.wlStatus + '\n' +
+                            'SSID: ' + d.ssid + '\n' +
+                            'IP: ' + d.ip + '\n' +
+                            'RSSI: ' + d.rssi + '\n' +
+                            'MAC: ' + d.mac
+                        );
+                    })
+                    .catch(function () { setDeviceInfoText('获取WiFi信息失败'); });
+            });
+        }
+
+        function applyBrightnessFromWeb() {
+            var value = document.getElementById('brightness-range').value;
+            fetch('/settings/brightness', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'value=' + encodeURIComponent(value)
+            }).then(function (r) { return r.json(); })
+              .then(function (d) {
+                  loadSettingsStatus();
+                  setDeviceSettingsText('当前亮度: ' + d.brightness + '\n自动亮度: 关');
+              })
+              .catch(function () { setDeviceSettingsText('设置亮度失败'); });
+        }
+
+        function onBrightnessSliderInput() {
+            if (brightnessSetTimer) {
+                clearTimeout(brightnessSetTimer);
+            }
+            brightnessSetTimer = setTimeout(function () {
+                applyBrightnessFromWeb();
+            }, 120);
+        }
+
+        function toggleAutoBrightnessFromWeb() {
+            fetch('/settings/auto_brightness/toggle', { method: 'POST' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    updateAutoBrightnessToggleLabel(!!d.autoBrightness);
+                    setDeviceSettingsText('自动亮度已' + (d.autoBrightness ? '开启' : '关闭'));
+                    loadSettingsStatus();
+                })
+                .catch(function () { setDeviceSettingsText('切换自动亮度失败'); });
+        }
+
+        function toggleSoundEffectsFromWeb() {
+            fetch('/settings/sound_effects/toggle', { method: 'POST' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    updateSoundEffectsToggleLabel(!!d.soundEffects);
+                    setDeviceSettingsText('按键音效已' + (d.soundEffects ? '开启' : '关闭'));
+                    loadSettingsStatus();
+                })
+                .catch(function () { setDeviceSettingsText('切换按键音效失败'); });
+        }
+
+        function closeAllExpandablePanels(exceptPanelId) {
+            var keyForm = document.getElementById('key-settings-form');
+            var infoPanel = document.getElementById('device-info-panel');
+            var settingsPanel = document.getElementById('device-settings-panel');
+
+            if (exceptPanelId !== 'key-settings-form') {
+                keyForm.style.display = 'none';
+                document.getElementById('toggle-key-btn').querySelector('span').textContent = '和风天气密钥';
+            }
+            if (exceptPanelId !== 'device-info-panel') {
+                infoPanel.style.display = 'none';
+                document.getElementById('toggle-device-info-btn').querySelector('span').textContent = '设备信息';
+            }
+            if (exceptPanelId !== 'device-settings-panel') {
+                settingsPanel.style.display = 'none';
+                document.getElementById('toggle-device-settings-btn').querySelector('span').textContent = '设备设置';
+            }
+            if (exceptPanelId !== 'device-info-panel') {
+                stopSettingsRealtime();
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
             console.log('正在获取预填写数据...');
             fetch('/get_api_info')
@@ -335,6 +565,9 @@ const char index_html[] PROGMEM = R"rawliteral(
                 .catch(function (error) {
                     console.error('获取预填写数据时出错:', error);
                 });
+
+            loadSettingsStatus();
+            refreshCitySearchAvailability();
         });
 
         function submitKeySettings() {
@@ -380,6 +613,11 @@ const char index_html[] PROGMEM = R"rawliteral(
         }
 
         function openCitySearch() {
+            var btn = document.getElementById('city-search-btn');
+            if (btn && btn.disabled) {
+                alert(btn.title || '和风天气密钥未完整配置，无法搜索');
+                return;
+            }
             window.location.href = '/citysearch';
         }
 
@@ -421,8 +659,38 @@ const char index_html[] PROGMEM = R"rawliteral(
                 btn.textContent = '和风天气密钥';
             }
             else {
+                closeAllExpandablePanels('key-settings-form');
                 form.style.display = 'block';
                 btn.textContent = '收起密钥设置';
+            }
+        }
+
+        function toggleDeviceInfo() {
+            var panel = document.getElementById('device-info-panel');
+            var btn = document.getElementById('toggle-device-info-btn').querySelector('span');
+            if (panel.style.display === 'block') {
+                panel.style.display = 'none';
+                btn.textContent = '设备信息';
+                stopSettingsRealtime();
+            } else {
+                closeAllExpandablePanels('device-info-panel');
+                panel.style.display = 'block';
+                btn.textContent = '收起设备信息';
+                showBasicInfo();
+            }
+        }
+
+        function toggleDeviceSettings() {
+            var panel = document.getElementById('device-settings-panel');
+            var btn = document.getElementById('toggle-device-settings-btn').querySelector('span');
+            if (panel.style.display === 'block') {
+                panel.style.display = 'none';
+                btn.textContent = '设备设置';
+            } else {
+                closeAllExpandablePanels('device-settings-panel');
+                panel.style.display = 'block';
+                btn.textContent = '收起设备设置';
+                loadSettingsStatus();
             }
         }
 
@@ -673,7 +941,7 @@ const char city_search_html[] PROGMEM = R"rawliteral(
         </div>
         <input type="text" name="location" id="locationInput" placeholder="请输入英语城市名或拼音" required style="width: 60%;" oninput="this.value=this.value.replace(/[^a-zA-Z\s]/g,'')">
         <div style='display: flex;flex-direction: column; gap: 16px; width: 35%;'>
-            <input type="submit" value="搜索" class='btn-blue' onclick="getCitySerachResult();" />
+            <input type="submit" id="citySearchSubmitBtn" value="搜索" class='btn-blue' onclick="getCitySerachResult();" />
         </div>
         <div class="loading hidden" id="loadingBox" style="margin-top: 65px;">
             <div class="spinner"></div>
@@ -683,7 +951,31 @@ const char city_search_html[] PROGMEM = R"rawliteral(
     </div>
 </body>
 <script>
+    let citySearchReady = true;
+
+    function syncCitySearchAvailability() {
+        fetch('/settings/city_search_ready')
+            .then(response => response.json())
+            .then(data => {
+                citySearchReady = !!(data && data.ready);
+                const searchBtn = document.getElementById('citySearchSubmitBtn');
+                const resultBox = document.getElementById('resultBox');
+                if (searchBtn) {
+                    searchBtn.disabled = !citySearchReady;
+                    searchBtn.title = citySearchReady ? '' : (data.message || '和风天气密钥未完整配置，无法搜索');
+                }
+                if (!citySearchReady && resultBox) {
+                    resultBox.innerHTML = `<div style='color:var(--red);'>${(data && data.message) ? data.message : '和风天气密钥未完整配置，无法搜索'}</div>`;
+                }
+            })
+            .catch(() => {});
+    }
+
     function getCitySerachResult() {
+        if (!citySearchReady) {
+            alert('和风天气密钥未完整配置，无法搜索');
+            return;
+        }
         const location = document.getElementById('locationInput').value.trim();
         const loadingBox = document.getElementById('loadingBox');
         const resultBox = document.getElementById('resultBox');
@@ -824,6 +1116,10 @@ const char city_search_html[] PROGMEM = R"rawliteral(
     function goBack() {
         window.location.href = '../';
     }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        syncCitySearchAvailability();
+    });
 </script>
 </html>
 

@@ -182,6 +182,18 @@ uint8_t buzzerGetVolume();
  */
 bool buzzerIsBusy();
 
+/**
+ * @brief 设置UI按键音效总开关
+ * @param[in] enabled true启用，false禁用
+ */
+void buzzerSetUiSoundEnabled(bool enabled);
+
+/**
+ * @brief 获取UI按键音效开关状态
+ * @return true 已启用，false 已禁用
+ */
+bool buzzerIsUiSoundEnabled();
+
 // ===== 快捷音效函数 =====
 
 /**
@@ -223,6 +235,34 @@ void buzzerPlayClick();
  * @brief 播放忙提示音（非阻塞）
  */
 void buzzerPlayBusy();
+
+/**
+ * @brief 播放一次指定频率与时长的单音（非阻塞）
+ * @param[in] frequency 频率（Hz）
+ * @param[in] duration 持续时间（ms）
+ * @param[in] volume 音量 (0-100)，默认当前音量
+ */
+void buzzerPlayTone(uint16_t frequency, uint16_t duration, uint8_t volume = 50);
+
+/**
+ * @brief 播放导航移动音效（旋钮移动）
+ */
+void buzzerPlayNavigateSound();
+
+/**
+ * @brief 播放确认音效（点击/确认）
+ */
+void buzzerPlaySelectSound();
+
+/**
+ * @brief 播放返回音效
+ */
+void buzzerPlayBackSound();
+
+/**
+ * @brief 播放休眠确认音效（长按触发休眠）
+ */
+void buzzerPlaySleepSound();
 
 /**
  * @brief 播放自定义旋律（非阻塞）

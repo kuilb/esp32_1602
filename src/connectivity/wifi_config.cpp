@@ -24,13 +24,14 @@ void ensureTimeSyncTaskRunning() {
 		return;
 	}
 
-	BaseType_t rc = xTaskCreate(
+	BaseType_t rc = xTaskCreatePinnedToCore(
 		timeSyncTask,
 		"TimeSyncTask",
-		4096,
+		6144,
 		&timeSyncTaskHandle,
 		1,
-		&timeSyncTaskHandle
+		&timeSyncTaskHandle,
+		0
 	);
 
 	if (rc != pdPASS) {
@@ -265,8 +266,8 @@ void wifiConnectTask(void* parameter) {
 		LOG_WIFI_INFO("IP: %s", WiFi.localIP().toString().c_str());
 		LOG_WIFI_DEBUG("starting background time sync...");
 
-		// 默认保持 WiFi 睡眠
-		WiFi.setSleep(true);
+		// 稳定性优先：保持关闭 WiFi 睡眠，避免在当前固件中再次触发 pm/idle 相关异常。
+		WiFi.setSleep(false);
 
 		// 创建后台时间同步任务（initNtpTimeSync 移到后台任务中，避免阻塞）
 		ensureTimeSyncTaskRunning();
@@ -317,7 +318,7 @@ void connectToWiFi() {
 		vTaskDelay(50 / portTICK_PERIOD_MS);  // 给WiFi栈一点时间初始化
 		
 		// 创建后台任务进行WiFi连接，不阻塞主线程
-		xTaskCreate(wifiConnectTask, "WiFiConnectTask", 4096, NULL, 1, &wifiConnectTaskHandle);
+		xTaskCreatePinnedToCore(wifiConnectTask, "WiFiConnectTask", 6144, NULL, 1, &wifiConnectTaskHandle, 0);
 }
 
 // 初始化wifi

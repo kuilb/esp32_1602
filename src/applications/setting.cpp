@@ -2,8 +2,122 @@
 #include "./menu/menu.h"
 #include "./services/auto_brightness.h"
 #include "./services/config_manager.h"
+#include "./hardware/buzzer.h"
 
 extern WifiConfigManager wifiConfigManager;
+
+namespace {
+static const unsigned long TOGGLE_PROGRESS_START_MS = 300;
+static const unsigned long TOGGLE_TRIGGER_MS = 1800;
+
+static const uint8_t kToggleBarGlyphs[6][8] = {
+	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10},
+	{0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18},
+	{0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C},
+	{0x1E, 0x1E, 0x1E, 0x1E, 0x1E, 0x1E, 0x1E, 0x1E},
+	{0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F}
+};
+
+static void _prepareToggleBarGlyphs() {
+	for (int slot = 0; slot <= 5; ++slot) {
+		lcdCreateChar(slot, kToggleBarGlyphs[slot]);
+	}
+}
+
+static void _renderToggleProgress(uint8_t percent) {
+	if (percent > 100) percent = 100;
+
+	lcdText("Hold to toggle  ", 1);
+	_prepareToggleBarGlyphs();
+
+	const int barSlots = 16;
+	const int cellCols = 5;
+	const int gapCols = 1;
+	const int totalVirtualCols = barSlots * cellCols + (barSlots - 1) * gapCols;
+	const int filledVirtualCols = (percent * totalVirtualCols) / 100;
+
+	lcdSetCursor(16);
+	for (int slot = 0; slot < barSlots; ++slot) {
+		const int cellStart = slot * (cellCols + gapCols);
+		int fillInCell = filledVirtualCols - cellStart;
+		if (fillInCell < 0) fillInCell = 0;
+		if (fillInCell > cellCols) fillInCell = cellCols;
+
+		if (fillInCell == 0) {
+			lcdDisChar(' ');
+		} else {
+			lcdDisCustom(fillInCell);
+		}
+	}
+}
+
+static void _showTogglePrompt(const char* itemName, bool enabled) {
+	char line1[17];
+	snprintf(line1, sizeof(line1), "%s:%s", itemName, enabled ? "ON" : "OFF");
+	lcdText(line1, 1);
+	lcdText("Long Press C", 2);
+}
+
+static bool _waitToggleConfirm(const char* itemName, bool currentEnabled) {
+	while (digitalRead(BUTTON_CENTER_PIN) == HIGH) {
+		vTaskDelay(pdMS_TO_TICKS(10));
+	}
+
+	_showTogglePrompt(itemName, currentEnabled);
+
+	bool centerLastState = false;
+	bool overlayStarted = false;
+	unsigned long pressStartMs = 0;
+
+	for (;;) {
+		const unsigned long now = millis();
+		const bool centerPressed = (digitalRead(BUTTON_CENTER_PIN) == HIGH);
+
+		if (centerPressed && !centerLastState) {
+			pressStartMs = now;
+			overlayStarted = false;
+		}
+
+		if (centerPressed) {
+			const unsigned long pressDurationMs = now - pressStartMs;
+
+			if (!overlayStarted && pressDurationMs >= TOGGLE_PROGRESS_START_MS) {
+				overlayStarted = true;
+				lcdPushOverlayFrame();
+				lcdClear();
+				_renderToggleProgress(0);
+			}
+
+			if (overlayStarted) {
+				const unsigned long progressElapsed = pressDurationMs - TOGGLE_PROGRESS_START_MS;
+				const unsigned long progressWindow = TOGGLE_TRIGGER_MS - TOGGLE_PROGRESS_START_MS;
+				const uint8_t percent = (progressWindow == 0)
+					? 100
+					: static_cast<uint8_t>(min(100UL, (progressElapsed * 100UL) / progressWindow));
+
+				_renderToggleProgress(percent);
+
+				if (pressDurationMs >= TOGGLE_TRIGGER_MS) {
+					lcdPopOverlayFrame();
+					return true;
+				}
+			}
+		}
+
+		if (!centerPressed && centerLastState) {
+			if (overlayStarted) {
+				lcdPopOverlayFrame();
+			}
+			buzzerPlayBackSound();
+			return false;
+		}
+
+		centerLastState = centerPressed;
+		vTaskDelay(pdMS_TO_TICKS(20));
+	}
+}
+}
 
 void _enterBrightnessScreen() {
 	// 手动亮度调节界面：左右键改亮度，中键保存返回。
@@ -16,9 +130,11 @@ void _enterBrightnessScreen() {
 
 	while (!isButtonReadyToRespond(CENTER)) {
 		if (isButtonReadyToRespond(LEFT, 10)) {
+			buzzerPlayNavigateSound();
 			changeBrightness(-1);
 		}
 		if (isButtonReadyToRespond(RIGHT, 10)) {
+			buzzerPlayNavigateSound();
 			changeBrightness(1);
 		}
 
@@ -32,6 +148,7 @@ void _enterBrightnessScreen() {
 
 		vTaskDelay(10 / portTICK_PERIOD_MS);  // 节流
 	}
+	buzzerPlaySelectSound();
 
 	lcdText("Brightness saved", 1);
 	lcdText("Back to Menu", 2);
@@ -40,14 +157,37 @@ void _enterBrightnessScreen() {
 }
 
 void _toggleAutoBrightness() {
-	// 切换自动亮度开关，并即时反馈当前状态。
-	bool isEnabled = toggleAutoBrightness();
+	const bool currentEnabled = isAutoBrightnessActive();
+	if (!_waitToggleConfirm("AutoBright", currentEnabled)) {
+		return;
+	}
+
+	const bool isEnabled = toggleAutoBrightness();
 	if (!ConfigManager::saveAutoBrightnessEnabled(isEnabled)) {
 		LOG_CONFIG_WARN("Failed to persist auto brightness state");
 	}
-	lcdText("Auto Brightness", 1);
-	lcdText(isEnabled ? "ON" : "OFF", 2);
+	buzzerPlaySelectSound();
+	_showTogglePrompt("AutoBright", isEnabled);
 	LOG_SYSTEM_INFO("Auto brightness %s", isEnabled ? "enabled" : "disabled");
+	delay(500);
+}
+
+void _toggleSoundEffects() {
+	const bool currentEnabled = buzzerIsUiSoundEnabled();
+	if (!_waitToggleConfirm("SoundFX", currentEnabled)) {
+		return;
+	}
+
+	const bool enabled = !currentEnabled;
+	buzzerSetUiSoundEnabled(enabled);
+	if (!ConfigManager::saveSoundEffectsEnabled(enabled)) {
+		LOG_CONFIG_WARN("Failed to persist sound effects state");
+	}
+	if (enabled) {
+		buzzerPlaySelectSound();
+	}
+	_showTogglePrompt("SoundFX", enabled);
+	LOG_SYSTEM_INFO("Sound effects %s", enabled ? "enabled" : "disabled");
 	delay(500);
 }
 

@@ -7,16 +7,27 @@ uint8_t currentBrightness = 128;    // 默认亮度一半
 
 // 设置颜色
 void updateColor(CRGB newColor) {
+  if (newColor == currentColor) {
+    return;
+  }
+
   currentColor = newColor;
   // 立即更新LED，避免任务调度延迟
   FastLED.setBrightness(currentBrightness);
   leds[0] = currentColor;
   FastLED.show();
-  LOG_RGB_DEBUG("Updated color to R:" + String(newColor.r) + " G:" + String(newColor.g) + " B:" + String(newColor.b));
+  LOG_RGB_DEBUG("Updated color to R:%u G:%u B:%u",
+      static_cast<unsigned int>(newColor.r),
+      static_cast<unsigned int>(newColor.g),
+      static_cast<unsigned int>(newColor.b));
 }
 
 // 设置亮度
 void updateBrightness(uint8_t newBrightness) {
+  if (newBrightness == currentBrightness) {
+    return;
+  }
+
   currentBrightness = newBrightness;
   FastLED.setBrightness(currentBrightness);
   leds[0] = currentColor;

@@ -1,6 +1,7 @@
 #include "./connectivity/network.h"
 
 #include "./services/frame_stats.h"
+#include "./hardware/buzzer.h"
 
 volatile uint32_t gFramesEnqueued = 0;
 volatile uint32_t gFramesDropped = 0;
@@ -17,6 +18,19 @@ bool clientConnected = false;
 std::vector<uint8_t> recvBuffer;
 unsigned long lastClientActivity = 0;
 static size_t recvHead = 0; // recvBuffer 中未消费数据的起始偏移，避免频繁 erase() 造成 O(n) 搬移
+static std::vector<uint8_t> s_lastDisplayPacket;
+static uint32_t s_duplicateDisplayPackets = 0;
+static uint32_t s_lastDuplicateLogMs = 0;
+static bool s_clientHasReceivedPayload = false;
+static const uint32_t kInitialClientSilentTimeoutMs = 20000;
+
+static void _cleanupClientStreamState() {
+    recvBuffer.clear();
+    recvHead = 0;
+    frameCache.clear();
+    s_lastDisplayPacket.clear();
+    s_clientHasReceivedPayload = false;
+}
 
 static size_t trimFrameCacheLockedByPolicy(uint32_t nowMs) {
     // 以“真实时间延迟”为主：
@@ -73,6 +87,48 @@ bool _isHeartbeatPacket(const std::vector<uint8_t>& packet) {
            packet[3] == 0x02;
 }
 
+// V2 TONE命令包：
+// [AA][55][LEN][0x20][0x02][seq][freqH][freqL][durH][durL][optional volume]
+static bool _isToneCommandPacket(const std::vector<uint8_t>& packet) {
+    if (packet.size() < 10) return false;
+    if (packet[0] != 0xAA || packet[1] != 0x55) return false;
+    if (packet[3] != 0x20 || packet[4] != 0x02) return false;
+    return true;
+}
+
+static bool _handleToneCommandPacket(const std::vector<uint8_t>& packet) {
+    if (!_isToneCommandPacket(packet)) {
+        return false;
+    }
+
+    // 兼容 10字节(无音量) 和 11字节(带音量)
+    if (packet.size() != 10 && packet.size() != 11) {
+        LOG_NETWORK_WARN("Invalid TONE packet length: %u", static_cast<unsigned int>(packet.size()));
+        return true;
+    }
+
+    const uint16_t frequency = (uint16_t(packet[6]) << 8) | uint16_t(packet[7]);
+    const uint16_t duration = (uint16_t(packet[8]) << 8) | uint16_t(packet[9]);
+    uint8_t volume = buzzerGetVolume();
+    if (packet.size() == 11) {
+        volume = static_cast<uint8_t>(constrain(packet[10], 0, 100));
+    }
+
+    if (frequency == 0 || duration == 0) {
+        LOG_NETWORK_WARN("Ignore TONE packet with invalid params: f=%u, d=%u",
+            static_cast<unsigned int>(frequency),
+            static_cast<unsigned int>(duration));
+        return true;
+    }
+
+    buzzerPlayTone(frequency, duration, volume);
+    LOG_NETWORK_DEBUG("TONE cmd: f=%uHz d=%ums v=%u",
+        static_cast<unsigned int>(frequency),
+        static_cast<unsigned int>(duration),
+        static_cast<unsigned int>(volume));
+    return true;
+}
+
 // 连接客户端
 void acceptClientIfNew() {
     initNetwork();
@@ -86,8 +142,8 @@ void acceptClientIfNew() {
                 client.setNoDelay(true);
                 updateColor(CRGB::Orange);      // RGB灯=黄色
                 lastClientActivity = millis();
-                recvBuffer.clear();
-                recvHead = 0;
+                _cleanupClientStreamState();
+                lastClientActivity = millis();
 
                 LOG_NETWORK_INFO("Socket Client connected from %s:%d",
                     client.remoteIP().toString().c_str(),
@@ -102,7 +158,10 @@ void acceptClientIfNew() {
 void receiveClientData() {
     initNetwork();
 
-    if (!clientConnected) return;
+    if (!clientConnected) {
+        _cleanupClientStreamState();
+        return;
+    }
 
     bool connectedNow = false;
     int availableNow = 0;
@@ -135,6 +194,7 @@ void receiveClientData() {
             }
 
             if (len > 0) {
+                s_clientHasReceivedPayload = true;
                 // 以“未消费数据量”为准判断是否溢出；必要时先进行一次紧凑化，降低误判断连概率
                 const size_t used = (recvBuffer.size() >= recvHead) ? (recvBuffer.size() - recvHead) : recvBuffer.size();
                 if (used + static_cast<size_t>(len) > MAX_RECV_BUFFER_SIZE) {
@@ -149,8 +209,7 @@ void receiveClientData() {
                         len,
                         static_cast<unsigned int>(recvBuffer.size()),
                         static_cast<unsigned int>(MAX_RECV_BUFFER_SIZE));
-                    recvBuffer.clear();
-                    recvHead = 0;
+                    _cleanupClientStreamState();
                     updateColor(CRGB::Green);
                     if (clientMutex != nullptr && xSemaphoreTake(clientMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
                         client.stop();
@@ -165,8 +224,7 @@ void receiveClientData() {
             } else if (len < 0) {
                 // read() 失败时 len 可能为 -1；若不处理会导致 buf + len 指针越界，进而破坏堆/网络栈
                 LOG_NETWORK_ERROR("Socket read failed (len=%d). Disconnecting client.", len);
-                recvBuffer.clear();
-                recvHead = 0;
+                _cleanupClientStreamState();
                 updateColor(CRGB::Green);
                 if (clientMutex != nullptr && xSemaphoreTake(clientMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
                     client.stop();
@@ -180,8 +238,7 @@ void receiveClientData() {
         // 检查接收缓冲区大小，防止内存耗尽
         if (recvBuffer.size() > MAX_RECV_BUFFER_SIZE) {
             LOG_NETWORK_ERROR("Receive buffer overflow, disconnecting client. Size: %u", static_cast<unsigned int>(recvBuffer.size()));
-            recvBuffer.clear();
-            recvHead = 0;
+            _cleanupClientStreamState();
             return;
         }
 
@@ -206,8 +263,29 @@ void receiveClientData() {
                         LOG_NETWORK_DEBUG("Heartbeat packet received.");
                     } 
                     else {
+                        // 蜂鸣器命令独立于显示链路：收到后立即播放，不入显示缓存。
+                        if (_handleToneCommandPacket(fullPacket)) {
+                            continue;
+                        }
+
                         if (fullPacket.size() < 5) {
                             LOG_NETWORK_WARN("Non-heartbeat packet too short (len=%u), dropped.", static_cast<unsigned int>(fullPacket.size()));
+                            continue;
+                        }
+
+                        // 连续重复帧直接丢弃：对所有显示帧生效，降低无效入队/解析/差分比较带来的CPU与发热。
+                        if (!s_lastDisplayPacket.empty()
+                            && s_lastDisplayPacket.size() == fullPacket.size()
+                            && memcmp(s_lastDisplayPacket.data(), fullPacket.data(), fullPacket.size()) == 0) {
+                            s_duplicateDisplayPackets++;
+                            gFramesDropped++;
+
+                            const uint32_t nowMs = millis();
+                            if ((uint32_t)(nowMs - s_lastDuplicateLogMs) >= 2000) {
+                                LOG_NETWORK_INFO("Dropping duplicate display frames: %u", static_cast<unsigned int>(s_duplicateDisplayPackets));
+                                s_duplicateDisplayPackets = 0;
+                                s_lastDuplicateLogMs = nowMs;
+                            }
                             continue;
                         }
 
@@ -243,6 +321,7 @@ void receiveClientData() {
                         }
 
                         frameCache.push_back({std::move(fullPacket), frameInterval, nowMs});
+                        s_lastDisplayPacket = frameCache.back().data;
 
                         // 按真实最大允许延迟继续修剪（可能一次丢多帧）
                         dropped += trimFrameCacheLockedByPolicy(nowMs);
@@ -283,14 +362,22 @@ void receiveClientData() {
         }
 
         // 超时断开连接
-        if (millis() - lastClientActivity > CONNECT_TIMEOUT_MS) {
+        const uint32_t timeoutLimitMs = s_clientHasReceivedPayload ? CONNECT_TIMEOUT_MS : kInitialClientSilentTimeoutMs;
+        if (millis() - lastClientActivity > timeoutLimitMs) {
+            const bool hadPayload = s_clientHasReceivedPayload;
             updateColor(CRGB::Green);
             if (clientMutex != nullptr && xSemaphoreTake(clientMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
                 client.stop();
                 clientConnected = false;
                 xSemaphoreGive(clientMutex);
             }
-            LOG_NETWORK_INFO("Client connection timed out.");
+            _cleanupClientStreamState();
+            if (hadPayload) {
+                LOG_NETWORK_INFO("Client connection timed out.");
+            } else {
+                LOG_NETWORK_INFO("Client silent after connect, closed by timeout (%u ms).",
+                    static_cast<unsigned int>(timeoutLimitMs));
+            }
         }
 
     } 
@@ -302,6 +389,7 @@ void receiveClientData() {
             clientConnected = false;
             xSemaphoreGive(clientMutex);
         }
+        _cleanupClientStreamState();
         LOG_NETWORK_INFO("Client disconnected.");
     }
 }

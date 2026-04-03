@@ -10,6 +10,7 @@ static const uint32_t buzzerPwmResolution = 8; ///< PWM分辨率
 static TaskHandle_t buzzerTaskHandle = nullptr; ///< 任务句柄
 static QueueHandle_t buzzerQueue = nullptr;    ///< 音频队列句柄
 static volatile bool buzzerBusy = false;       ///< 忙标志
+static volatile bool uiSoundEnabled = true;    ///< UI音效总开关
 
 // ==============================
 // 内部辅助函数声明
@@ -283,6 +284,15 @@ bool buzzerIsBusy() {
     return buzzerBusy;
 }
 
+void buzzerSetUiSoundEnabled(bool enabled) {
+    uiSoundEnabled = enabled;
+    LOG_SYSTEM_INFO("UI sound effects %s", enabled ? "enabled" : "disabled");
+}
+
+bool buzzerIsUiSoundEnabled() {
+    return uiSoundEnabled;
+}
+
 // ==============================
 // 快捷音效函数实现
 // ==============================
@@ -399,6 +409,21 @@ void buzzerPlayBusy() {
     enqueueSound(item);
 }
 
+void buzzerPlayTone(uint16_t frequency, uint16_t duration, uint8_t volume) {
+    const uint8_t vol = static_cast<uint8_t>(constrain(volume, 0, 100));
+    BuzzerQueueItem item = {
+        .type = BuzzerSoundType::TONE,
+        .frequency = frequency,
+        .duration = duration,
+        .volume = vol,
+        .timestamp = millis(),
+        .melody = nullptr,
+        .durations = nullptr,
+        .melodyLength = 0
+    };
+    enqueueSound(item);
+}
+
 void buzzerPlayMelody(const uint16_t* melody, const uint16_t* durations, uint16_t length, uint8_t volume) {
     BuzzerQueueItem item = {
         .type = BuzzerSoundType::MELODY,
@@ -411,4 +436,26 @@ void buzzerPlayMelody(const uint16_t* melody, const uint16_t* durations, uint16_
         .melodyLength = length
     };
     enqueueSound(item);
+}
+
+void buzzerPlayNavigateSound() {
+    if (!uiSoundEnabled) return;
+    buzzerPlayClick();
+}
+
+void buzzerPlaySelectSound() {
+    if (!uiSoundEnabled) return;
+    buzzerBeep();
+}
+
+void buzzerPlayBackSound() {
+    if (!uiSoundEnabled) return;
+    buzzerTone(NOTE_A4, 28);
+    vTaskDelay(pdMS_TO_TICKS(30));
+    buzzerNoTone();
+}
+
+void buzzerPlaySleepSound() {
+    if (!uiSoundEnabled) return;
+    buzzerPlayWarning();
 }

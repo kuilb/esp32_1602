@@ -1,5 +1,12 @@
 #include "./services/web_setting.h"
 
+#include "./hardware/opt3001.h"
+#include "./hardware/fuel_gauge.h"
+#include "./services/auto_brightness.h"
+#include "./services/config_manager.h"
+#include "./hardware/buzzer.h"
+#include "esp32-hal-cpu.h"
+
 extern QWeatherAuthConfigManager qweatherAuthConfigManager;
 
 WebServer settingServer(80);
@@ -7,6 +14,163 @@ volatile bool isConfigDone = false;
 volatile bool isKeyDone = false;
 volatile bool otaUploadSuccess = false;
 static size_t otaExpectedSize = 0;      // 预期的OTA文件大小
+
+static const char* _wifiStateToStr(WiFiConnectionState state) {
+    switch (state) {
+        case WIFI_IDLE: return "idle";
+        case WIFI_CONNECTING: return "connecting";
+        case WIFI_CONNECTED: return "connected";
+        case WIFI_DISCONNECTED: return "disconnected";
+        case WIFI_FAILED: return "failed";
+        default: return "unknown";
+    }
+}
+
+void webSettingHandleDeviceStatus() {
+    String json = "{";
+    json += "\"brightness\":" + String(brightness) + ",";
+    json += "\"autoBrightness\":" + String(isAutoBrightnessActive() ? "true" : "false") + ",";
+    json += "\"soundEffects\":" + String(buzzerIsUiSoundEnabled() ? "true" : "false");
+    json += "}";
+    settingServer.send(200, "application/json; charset=utf-8", json);
+}
+
+void webSettingHandleCitySearchReady() {
+    const bool ready = qweatherAuthConfigManager.checkApiConfigValid();
+    String json = "{";
+    json += "\"ready\":" + String(ready ? "true" : "false") + ",";
+    json += "\"message\":\"" + String(ready ? "配置完整，可进行城市搜索" : "和风天气密钥未完整配置，无法搜索") + "\"";
+    json += "}";
+    settingServer.send(200, "application/json; charset=utf-8", json);
+}
+
+void webSettingHandleDeviceBasicInfo() {
+    const unsigned long uptimeMs = millis();
+    const size_t freeHeap = ESP.getFreeHeap();
+    const size_t totalHeap = ESP.getHeapSize();
+    const size_t freePsram = ESP.getFreePsram();
+    const size_t totalPsram = ESP.getPsramSize();
+
+    String json = "{";
+    json += "\"projectVersion\":\"" + String(PROJECT_VERSION) + "\",";
+    json += "\"buildVersion\":\"" + String(BUILD_VERSION) + "\",";
+    json += "\"buildTimestamp\":\"" + String(BUILD_TIMESTAMP) + "\",";
+    json += "\"uptimeMs\":" + String(uptimeMs) + ",";
+    json += "\"cpuFreqMHz\":" + String(getCpuFrequencyMhz()) + ",";
+    json += "\"freeHeap\":" + String(freeHeap) + ",";
+    json += "\"totalHeap\":" + String(totalHeap) + ",";
+    json += "\"freePsram\":" + String(freePsram) + ",";
+    json += "\"totalPsram\":" + String(totalPsram) + ",";
+    json += "\"resetReason\":" + String((int)esp_reset_reason());
+    json += "}";
+
+    settingServer.send(200, "application/json; charset=utf-8", json);
+}
+
+void webSettingHandleAlsRealtimeInfo() {
+    const float lux = isOPT3001Connected ? readLux() : -1.0f;
+    const float smoothedLux = getCurrentLux(true);
+
+    String json = "{";
+    json += "\"connected\":" + String(isOPT3001Connected ? "true" : "false") + ",";
+    json += "\"lux\":" + String(lux, 2) + ",";
+    json += "\"smoothedLux\":" + String(smoothedLux, 2);
+    json += "}";
+
+    settingServer.send(200, "application/json; charset=utf-8", json);
+}
+
+void webSettingHandleFuelGaugeRealtimeInfo() {
+    const uint16_t voltage = readVoltage();
+    const int16_t current = readAverageCurrent();
+    const uint8_t soc = readStateOfCharge();
+
+    String json = "{";
+    json += "\"connected\":" + String(isfuelICConnected ? "true" : "false") + ",";
+    json += "\"voltageMv\":" + String(voltage) + ",";
+    json += "\"currentMa\":" + String(current) + ",";
+    json += "\"soc\":" + String(soc);
+    json += "}";
+
+    settingServer.send(200, "application/json; charset=utf-8", json);
+}
+
+void webSettingHandleWifiInfo() {
+    String json = "{";
+    json += "\"state\":\"" + String(_wifiStateToStr(wifiConnectionState)) + "\",";
+    json += "\"wlStatus\":" + String((int)WiFi.status()) + ",";
+    json += "\"ssid\":\"" + WiFi.SSID() + "\",";
+    json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
+    json += "\"rssi\":" + String(WiFi.RSSI()) + ",";
+    json += "\"mac\":\"" + WiFi.macAddress() + "\"";
+    json += "}";
+
+    settingServer.send(200, "application/json; charset=utf-8", json);
+}
+
+void webSettingHandleSetBrightness() {
+    if (settingServer.method() != HTTP_POST) {
+        settingServer.send(405, "application/json; charset=utf-8", "{\"error\":\"请使用 POST 方法\"}");
+        return;
+    }
+
+    if (!settingServer.hasArg("value")) {
+        settingServer.send(400, "application/json; charset=utf-8", "{\"error\":\"缺少 value 参数\"}");
+        return;
+    }
+
+    int value = settingServer.arg("value").toInt();
+    if (value < 0) value = 0;
+    if (value > 255) value = 255;
+
+    disableAutoBrightness();
+    setLcdBrightness((uint8_t)value);
+    ConfigManager::saveAutoBrightnessEnabled(false);
+
+    String json = "{";
+    json += "\"ok\":true,";
+    json += "\"brightness\":" + String(brightness) + ",";
+    json += "\"autoBrightness\":false";
+    json += "}";
+    settingServer.send(200, "application/json; charset=utf-8", json);
+}
+
+void webSettingHandleToggleAutoBrightness() {
+    if (settingServer.method() != HTTP_POST) {
+        settingServer.send(405, "application/json; charset=utf-8", "{\"error\":\"请使用 POST 方法\"}");
+        return;
+    }
+
+    const bool enabled = toggleAutoBrightness();
+    ConfigManager::saveAutoBrightnessEnabled(enabled);
+
+    String json = "{";
+    json += "\"ok\":true,";
+    json += "\"autoBrightness\":" + String(enabled ? "true" : "false") + ",";
+    json += "\"brightness\":" + String(brightness);
+    json += "}";
+    settingServer.send(200, "application/json; charset=utf-8", json);
+}
+
+void webSettingHandleToggleSoundEffects() {
+    if (settingServer.method() != HTTP_POST) {
+        settingServer.send(405, "application/json; charset=utf-8", "{\"error\":\"请使用 POST 方法\"}");
+        return;
+    }
+
+    const bool enabled = !buzzerIsUiSoundEnabled();
+    buzzerSetUiSoundEnabled(enabled);
+    ConfigManager::saveSoundEffectsEnabled(enabled);
+    if (enabled) {
+        buzzerPlaySelectSound();
+    }
+
+    String json = "{";
+    json += "\"ok\":true,";
+    json += "\"soundEffects\":" + String(enabled ? "true" : "false");
+    json += "}";
+    settingServer.send(200, "application/json; charset=utf-8", json);
+}
 
 // OTA页面处理
 void webSettingHandleOTA() {
@@ -606,6 +770,17 @@ void webSettingSetupWebServer() {
     settingServer.on("/citysearch", webSettingHandleCitySearch);    // 城市搜索界面
     settingServer.on("/citysearch_result", webSettingHandleCitySearchResult);
     settingServer.on("/set_location", webSettingHandleSetLocation);
+    settingServer.on("/settings/city_search_ready", webSettingHandleCitySearchReady);
+
+    // 设置菜单相关路由
+    settingServer.on("/settings/status", webSettingHandleDeviceStatus);
+    settingServer.on("/settings/basic_info", webSettingHandleDeviceBasicInfo);
+    settingServer.on("/settings/als", webSettingHandleAlsRealtimeInfo);
+    settingServer.on("/settings/fuel", webSettingHandleFuelGaugeRealtimeInfo);
+    settingServer.on("/settings/wifi", webSettingHandleWifiInfo);
+    settingServer.on("/settings/brightness", HTTP_POST, webSettingHandleSetBrightness);
+    settingServer.on("/settings/auto_brightness/toggle", HTTP_POST, webSettingHandleToggleAutoBrightness);
+    settingServer.on("/settings/sound_effects/toggle", HTTP_POST, webSettingHandleToggleSoundEffects);
     
     settingServer.begin();
     LOG_WEATHER_INFO("Web configuration server started, access via IP address");

@@ -2,6 +2,7 @@
 #include "./menu/menu_navigator.h"
 #include "./menu/status_bar_renderer.h"
 #include "./services/auto_brightness.h"
+#include "./hardware/buzzer.h"
 
 // 前置声明
 void _displayMenu(const Menu* menu, int menuIndex, int scrollOffset);
@@ -42,6 +43,7 @@ enum SettingsMenuIndex {
     SETTINGS_ITEM_WEB = 0,
     SETTINGS_ITEM_WIFI_CONFIG,
     SETTINGS_ITEM_AUTO_BRIGHTNESS,
+    SETTINGS_ITEM_SOUND_EFFECTS,
     SETTINGS_ITEM_BRIGHTNESS,
     SETTINGS_ITEM_BATTERY_INFO,
     SETTINGS_ITEM_RESET_FUEL_IC,
@@ -76,6 +78,8 @@ void _enterWirelessScreen(){
     }
     // WiFi 已连接时，显示连接信息
     else{
+        server.begin();
+        LOG_MENU_INFO("Wireless screen ensured TCP server on port %d", CONNECT_PORT);
         lcdText("SSID:" + wifiConfigManager.getSSID(),1);
         lcdText("IP:" + WiFi.localIP().toString(),2);
     }
@@ -94,6 +98,11 @@ void _setWeatherInterface(){
 void _playBadAppleWrapper() {
     // 播放 Bad Apple 动画文件。
     playBadAppleFromFileRaw("/badapple.bin");
+}
+
+void _startPomodoroWrapper() {
+    // 启动番茄钟应用（25分钟工作 + 5分钟休息循环）。
+    runPomodoroApp();
 }
 
 static const MenuNavigationCallbacks kMenuNavigationCallbacks = {
@@ -267,6 +276,7 @@ static MenuState _getParentMenuState(MenuState childState) {
 void menuHandleBackAction() {
     // 非菜单页面（含无线显示/应用页面）统一回主菜单。
     if (!inMenuMode) {
+        buzzerPlayBackSound();
         inMenuMode = true;
         currentState = STATE_MENU;
         s_menuContext.currentMenu = &allMenus[MENU_MAIN];
@@ -279,6 +289,7 @@ void menuHandleBackAction() {
     }
 
     // 菜单内返回上一级。
+    buzzerPlayBackSound();
     const MenuState currentMenuState = _getMenuStateFromPtr(s_menuContext.currentMenu);
     const MenuState targetMenuState = _getParentMenuState(currentMenuState);
 
@@ -397,15 +408,18 @@ void _handleMenuInterface() {
     switch (lastPressedButton) {
         // 光标上移（LEFT）
         case LEFT:
+            buzzerPlayNavigateSound();
             _moveMenuCursorUp();
             break;
 
         // 光标下移（RIGHT）
         case RIGHT:
+            buzzerPlayNavigateSound();
             _moveMenuCursorDown();
             break;
 
         case CENTER:
+            buzzerPlaySelectSound();
             _activateCurrentMenuItem();
             break;
 
@@ -435,7 +449,11 @@ void _menuTask(void* parameter) {
         if (inMenuMode) {
             _dispatchCurrentInterfaceState();
         }
-        vTaskDelay(pdMS_TO_TICKS(50));  // 50ms 轮询，进一步降低主菜单空闲功耗与发热
+        const bool menuIdleNoSync = inMenuMode
+            && !inConfigMode
+            && !clientConnected
+            && (timeSyncState != TIME_SYNC_IN_PROGRESS);
+        vTaskDelay(pdMS_TO_TICKS(menuIdleNoSync ? 120 : 50));
     }
     
     // 任务退出清理

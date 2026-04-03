@@ -1,6 +1,7 @@
 #include "./services/config_manager.h"
 
 static const char* kAutoBrightnessConfigPath = "/auto_brightness_config.txt";
+static const char* kSoundEffectsConfigPath = "/sound_effects_config.txt";
 
 bool ConfigManager::isSPIFFSInitialized = false;
 
@@ -308,5 +309,84 @@ bool ConfigManager::loadAutoBrightnessEnabled(bool& enabled) {
 
     enabled = doc["enabled"].as<bool>();
     LOG_CONFIG_INFO("Auto brightness config loaded: enabled=%s", enabled ? "true" : "false");
+    return true;
+}
+
+bool ConfigManager::saveSoundEffectsEnabled(bool enabled) {
+    if (!isSPIFFSInitialized && !initSPIFFS()) {
+        LOG_CONFIG_ERROR("Failed to init SPIFFS before saving sound effects config");
+        return false;
+    }
+
+    JsonDocument doc;
+    doc["enabled"] = enabled;
+
+    String jsonString;
+    serializeJson(doc, jsonString);
+
+    if (SPIFFS.exists(kSoundEffectsConfigPath)) {
+        SPIFFS.remove(kSoundEffectsConfigPath);
+    }
+
+    File file = SPIFFS.open(kSoundEffectsConfigPath, "w", true);
+    if (!file) {
+        LOG_CONFIG_ERROR("Failed to open sound effects config for write: %s", kSoundEffectsConfigPath);
+        return false;
+    }
+
+    size_t written = file.print(jsonString);
+    file.flush();
+    file.close();
+
+    if (written != jsonString.length()) {
+        LOG_CONFIG_ERROR("Failed to write full sound effects config (%u/%u)",
+            static_cast<unsigned int>(written),
+            static_cast<unsigned int>(jsonString.length()));
+        return false;
+    }
+
+    LOG_CONFIG_INFO("Sound effects config saved: enabled=%s", enabled ? "true" : "false");
+    return true;
+}
+
+bool ConfigManager::loadSoundEffectsEnabled(bool& enabled) {
+    if (!isSPIFFSInitialized && !initSPIFFS()) {
+        LOG_CONFIG_ERROR("Failed to init SPIFFS before loading sound effects config");
+        return false;
+    }
+
+    if (!SPIFFS.exists(kSoundEffectsConfigPath)) {
+        LOG_CONFIG_INFO("Sound effects config not found, keep current default");
+        return false;
+    }
+
+    File file = SPIFFS.open(kSoundEffectsConfigPath, "r");
+    if (!file) {
+        LOG_CONFIG_ERROR("Failed to open sound effects config for read: %s", kSoundEffectsConfigPath);
+        return false;
+    }
+
+    String content = file.readString();
+    file.close();
+
+    if (content.length() == 0) {
+        LOG_CONFIG_WARN("Sound effects config is empty");
+        return false;
+    }
+
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, content);
+    if (error) {
+        LOG_CONFIG_ERROR("Failed to parse sound effects config: %s", error.c_str());
+        return false;
+    }
+
+    if (!doc["enabled"].is<bool>()) {
+        LOG_CONFIG_WARN("Sound effects config missing boolean field: enabled");
+        return false;
+    }
+
+    enabled = doc["enabled"].as<bool>();
+    LOG_CONFIG_INFO("Sound effects config loaded: enabled=%s", enabled ? "true" : "false");
     return true;
 }

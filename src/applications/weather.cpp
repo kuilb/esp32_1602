@@ -1,4 +1,5 @@
 #include "./applications/weather.h"
+#include "./hardware/buzzer.h"
 
 // 天气服务，API接口通过ESP32向云端获取JSON数据
 extern QWeatherAuthConfigManager qweatherAuthConfigManager;
@@ -19,6 +20,16 @@ unsigned int interface_num = 0; // 当前显示的界面编号
 static bool s_weatherIsNewInterface = false;
 static bool s_weatherReadyToDisplay = false;
 static unsigned long s_lastWeatherFail = 0;
+static unsigned long s_lastWeatherFailSoundMs = 0;
+
+static void _playWeatherFailSoundThrottled(unsigned long intervalMs = 2500) {
+    const unsigned long now = millis();
+    if (now - s_lastWeatherFailSoundMs < intervalMs) {
+        return;
+    }
+    s_lastWeatherFailSoundMs = now;
+    buzzerPlayError();
+}
 
 static bool _ensureWeatherTimeSynced() {
     if (!(timeSyncState == TIME_SYNC_SUCCESS) && !(getRtcTime().tv_sec > 1765967312)) { // 2025-12-17 18:40 GMT+8
@@ -29,6 +40,7 @@ static bool _ensureWeatherTimeSynced() {
             LOG_WEATHER_WARN("Time not synced yet, cannot display weather");
             lcdText("Time not synced", 1);
             lcdText("", 2);
+            _playWeatherFailSoundThrottled();
             delay(500);
             return false;
         }
@@ -48,6 +60,34 @@ void handleWeatherInterface() {
         return;
     }
 
+    // 进入天气界面时先做本地前置校验，避免被失败重试冷却窗口“卡住”。
+    if (WiFi.status() != WL_CONNECTED) {
+        lcdText("No WiFi", 1);
+        lcdText(" ", 2);
+        _playWeatherFailSoundThrottled();
+        currentState = STATE_MENU;
+        globalButtonDelay(FIRST_TIME_DELAY);
+        return;
+    }
+    if (!qweatherAuthConfigManager.checkApiConfigValid()) {
+        lcdText("No API config", 1);
+        lcdText("Use web config", 2);
+        _playWeatherFailSoundThrottled();
+        currentState = STATE_MENU;
+        globalButtonDelay(FIRST_TIME_DELAY);
+        delay(600);
+        return;
+    }
+    if (!qweatherAuthConfigManager.checkLocationConfigValid()) {
+        lcdText("No City Set", 1);
+        lcdText("Use Web Config", 2);
+        _playWeatherFailSoundThrottled();
+        currentState = STATE_MENU;
+        globalButtonDelay(FIRST_TIME_DELAY);
+        delay(600);
+        return;
+    }
+
     // 每隔10分钟更新一次天气数据
     if (!s_weatherReadyToDisplay || millis() - lastWeatherUpdate > 10 * 60 * 1000) {
         if (millis() - s_lastWeatherFail > 15 * 1000) { // 失败后15秒再试
@@ -58,8 +98,12 @@ void handleWeatherInterface() {
                 lastWeatherUpdate = millis();
             } else {
                 LOG_WEATHER_WARN("Failed to fetch weather data");
+                _playWeatherFailSoundThrottled(4000);
                 s_weatherReadyToDisplay = false;
                 s_lastWeatherFail = millis();
+                currentState = STATE_MENU;
+                globalButtonDelay(FIRST_TIME_DELAY);
+                return;
             }
         }
     }
@@ -79,8 +123,7 @@ void handleWeatherInterface() {
     }
 
     if (!s_weatherReadyToDisplay) {
-        lcdText("No Data", 1);
-        lcdText(" ", 2);
+        // 失败时已显示具体错误信息，并在上方直接返回菜单，这里不再二次覆盖为 No Data。
         return;
     }
 
@@ -155,6 +198,7 @@ bool fetchWeatherData() {
         LOG_WEATHER_ERROR("WiFi not connected");
         lcdText("No WiFi", 1);
         lcdText(" ", 2);
+        _playWeatherFailSoundThrottled();
         return false;
     }
 
@@ -163,6 +207,7 @@ bool fetchWeatherData() {
         LOG_WEATHER_ERROR("Missing API configuration");
         lcdText("No API config", 1);
         lcdText("Use web config", 2);
+        _playWeatherFailSoundThrottled();
         delay(1000);
         return false;
     }
@@ -172,6 +217,7 @@ bool fetchWeatherData() {
         LOG_WEATHER_ERROR("Missing city/location configuration");
         lcdText("No City Set", 1);
         lcdText("Use Web Config", 2);
+        _playWeatherFailSoundThrottled();
         delay(1000);
         return false;
     }
@@ -204,6 +250,7 @@ bool fetchWeatherData() {
         LOG_WEATHER_ERROR("HTTP error: %d", httpCode);
         lcdText("HTTP error", 1);
         lcdText(String(httpCode), 2);
+        _playWeatherFailSoundThrottled();
         http.end();
         return false; // 直接返回，避免解析空数据
     } 
@@ -214,6 +261,7 @@ bool fetchWeatherData() {
         LOG_WEATHER_ERROR("Empty response");
         lcdText("Empty response", 1);
         lcdText("", 2);
+        _playWeatherFailSoundThrottled();
         http.end();
         return false;
     }
@@ -224,6 +272,7 @@ bool fetchWeatherData() {
         LOG_WEATHER_ERROR("malloc failed for compressed buffer");
         lcdText("Mem fail", 1);
         lcdText("", 2);
+        _playWeatherFailSoundThrottled();
         http.end();
         return false;
     }
@@ -244,6 +293,7 @@ bool fetchWeatherData() {
         LOG_WEATHER_ERROR("Read timeout");
         lcdText("Read timeout", 1);
         lcdText("", 2);
+        _playWeatherFailSoundThrottled();
         http.end();
         return false;
     }
@@ -253,6 +303,7 @@ bool fetchWeatherData() {
         LOG_WEATHER_ERROR("No data received");
         lcdText("No data received", 1);
         lcdText("", 2);
+        _playWeatherFailSoundThrottled();
         return false;
     }
 
@@ -266,6 +317,7 @@ bool fetchWeatherData() {
             LOG_WEATHER_ERROR("get gzip_info failed");
             lcdText("Gzip info fail", 1);
             lcdText("", 2);
+            _playWeatherFailSoundThrottled();
             return false;
         }
 
@@ -275,6 +327,7 @@ bool fetchWeatherData() {
             LOG_WEATHER_ERROR("malloc failed for uncompressed buffer");
             lcdText("Mem fail", 1);
             lcdText("", 2);
+            _playWeatherFailSoundThrottled();
             return false;
         }
 
@@ -284,6 +337,7 @@ bool fetchWeatherData() {
             LOG_WEATHER_ERROR("Gzip decompress failed");
             lcdText("Gzip failed", 1);
             lcdText("", 2);
+            _playWeatherFailSoundThrottled();
             return false;
         }
         jsonData = String((char *)uncompressedBuffer.get(), uncompSize);
@@ -297,6 +351,7 @@ bool fetchWeatherData() {
         LOG_WEATHER_ERROR("Empty response");
         lcdText("Empty response", 1);
         lcdText("", 2);
+        _playWeatherFailSoundThrottled();
         return false;
     }
 
@@ -307,6 +362,7 @@ bool fetchWeatherData() {
         LOG_WEATHER_ERROR("JSON parse failed: %s", error.c_str());
         lcdText("JSON failed", 1);
         lcdText("", 2);
+        _playWeatherFailSoundThrottled();
         return false;
     }
 

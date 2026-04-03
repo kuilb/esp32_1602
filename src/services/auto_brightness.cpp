@@ -106,11 +106,15 @@ void enableAutoBrightness() {
     }
     
     isAutoBrightnessEnabled = true;
+    if (autoBrightnessTaskHandle == nullptr) {
+        startAutoBrightnessTask();
+    }
     LOG_DISPLAY_INFO("Auto brightness enabled");
 }
 
 void disableAutoBrightness() {
     isAutoBrightnessEnabled = false;
+    stopAutoBrightnessTask();
     LOG_DISPLAY_INFO("Auto brightness disabled");
 }
 
@@ -261,8 +265,7 @@ static void _autoBrightnessTask(void* parameter) {
     while (true) {
         // 如果任务被禁用，等待后继续检查
         if (!isAutoBrightnessActive()) {
-            vTaskDelay(pdMS_TO_TICKS(1000));  // 禁用时1秒检查一次
-            continue;
+            break;
         }
 
         const bool menuIdle = inMenuMode && !clientConnected;
@@ -274,13 +277,14 @@ static void _autoBrightnessTask(void* parameter) {
         // 等待下一次更新
         vTaskDelay(updateInterval);
     }
+
+    autoBrightnessTaskHandle = nullptr;
+    vTaskDelete(NULL);
 }
 
 void startAutoBrightnessTask() {
-    // 如果任务已经在运行，先停止
     if (autoBrightnessTaskHandle != nullptr) {
-        LOG_DISPLAY_WARN("Auto brightness task already running, stopping old task");
-        stopAutoBrightnessTask();
+        return;
     }
     
     // 创建任务
