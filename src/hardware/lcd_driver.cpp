@@ -4,16 +4,12 @@
 #include <Arduino.h>
 #include "esp_rom_sys.h"
 
-// Forward declaration: used by helpers before the definition below
-inline void _gpioWrite(int data, int mode);
-
+inline void _gpioWrite(int data, int mode); // 前置声明
 int lcdCursor = 0;  // 当前光标位置，全局变量 0~31
 
 int brightness = 0;  // 默认亮度
 
 int contrast = 128;  // 默认对比度
-
-uint32_t mask, value;
 
 // 自定义字符槽位自动管理
 static int currentCharSlot = 0;     // 当前自动分配的槽位 (0~7)
@@ -32,6 +28,7 @@ typedef struct LcdFrameState {
     bool cgramUsed[LCD_CGRAM_SLOTS];
 } LcdFrameState;
 
+// 当前硬件状态（上次成功渲染的状态）
 static LcdFrameState s_hwFrame = {
     false,
     {
@@ -44,6 +41,7 @@ static LcdFrameState s_hwFrame = {
     {false}
 };
 
+// 待渲染的目标状态（由上层调用 lcdRenderDiff 更新）
 static LcdFrameState s_pendingFrame = {
     false,
     {
@@ -56,6 +54,7 @@ static LcdFrameState s_pendingFrame = {
     {false}
 };
 
+// 叠加显示时的备份状态（用于保存被叠加覆盖的内容，以便恢复）
 static LcdFrameState s_overlayBackupFrame = {
     false,
     {
@@ -120,7 +119,7 @@ static inline uint8_t _flushPendingFrame() {
 
 //触发E引脚
 inline void _triggerE(){
-    // 使用 ROM 级微秒延时，避免高频轮询 systimer 造成中断压力。
+    // 使用 ROM 微秒延时
     esp_rom_delay_us(3);
     GPIO.out |= (1 << LCD_E);
     esp_rom_delay_us(3);
@@ -167,21 +166,6 @@ inline void _initLcdContrastPwm(uint8_t initialDuty = 128) {
     ledcAttachPin(LCD_CTL_PWM_PIN, LCD_CTL_PWM_CHANNEL);
     ledcWrite(LCD_CTL_PWM_CHANNEL, initialDuty);        // 设置初始对比度
     contrast = initialDuty;
-}
-
-void setLcdContrast(uint8_t duty) {
-    if (duty > LCD_CTL_PWM_MAX_DUTY) duty = LCD_CTL_PWM_MAX_DUTY;
-    ledcWrite(LCD_CTL_PWM_CHANNEL, duty);
-    if( contrast != duty ){
-        contrast = duty;
-    }
-}
-
-void changeContrast(int delta) {
-    contrast += delta;
-    if (contrast < 0) contrast = 0;
-    if (contrast > 255) contrast = 255;
-    setLcdContrast(contrast);
 }
 
 // 初始化 LCD 背光
@@ -341,27 +325,10 @@ void lcdText(const String& ltext,int line){
     _flushPendingFrame();
 }
 
-// 设置光标位置
+// 设置光标位置（逻辑位置，差分渲染器负责硬件光标定位）
 void lcdSetCursor(int changecursor){
     // LOG_LCD_VERBOSE("set cursor in " + String(changecursor));
-    lcdCursor=changecursor;
-    int row = (lcdCursor < 16) ? 0 : 1;
-    int col = lcdCursor % 16;
-
-    int addr = 0;
-    if (row == 0) {
-        addr = 0x00 + col;
-    } 
-    else if (row == 1) {
-        addr = 0x40 + col;
-    } 
-    else {
-        LOG_LCD_WARN("Invalid LCD row: " + String(row));
-        return; // 无效行
-    }
-
-    int command = 0x80 | addr;  // 设置 DDRAM 地址命令
-    _gpioWrite(command, CMD);
+    lcdCursor = changecursor;
 }
 
 void lcdResetCursor(){
@@ -377,6 +344,7 @@ void lcdClear(){
 
     _flushPendingFrame();
     lcdResetCursor();
+    lcdResetCharSlot();
 }
 
 // 光标向后移动一格
@@ -436,8 +404,9 @@ void lcdDisChar(char text){             //显示函数
 
 // 连续显示整段的普通字符，不清除其他的内容，注意越界
 void lcdPrint(const String& s) {
-    for (unsigned int i = 0; i < s.length(); i++) {
-        _queueCharAt(static_cast<uint8_t>(lcdCursor), static_cast<uint8_t>(s[i]));
+    String converted = convertUTF8ToKana(s);
+    for (unsigned int i = 0; i < converted.length(); i++) {
+        _queueCharAt(static_cast<uint8_t>(lcdCursor), static_cast<uint8_t>(converted[i]));
         _nextCursor();
     }
     _flushPendingFrame();
@@ -447,19 +416,13 @@ void lcdPrint(const char* s) {
     if (s == nullptr) {
         return;
     }
-    while (*s != '\0') {
-        _queueCharAt(static_cast<uint8_t>(lcdCursor), static_cast<uint8_t>(*s));
-        _nextCursor();
-        ++s;
-    }
-    _flushPendingFrame();
+    lcdPrint(String(s));
 }
 
 uint8_t lcdRenderDiff(const uint8_t ddram32[32], const uint8_t cgram8x8[8][8], const bool cgramUsed[8]) {
     uint8_t updatedCells = 0;
     bool slotChanged[8] = {false};
     bool effectiveUsed[8] = {false};
-    const int logicalCursor = lcdCursor;
 
     // 统一“槽位是否被使用”的判断：外部传入标记 + DDRAM 中实际引用。
     for (uint8_t pos = 0; pos < LCD_DDRAM_SIZE; ++pos) {
@@ -510,11 +473,6 @@ uint8_t lcdRenderDiff(const uint8_t ddram32[32], const uint8_t cgram8x8[8][8], c
 
     s_hwFrame.valid = true;
 
-    // 提交结束后将光标恢复到逻辑光标位置（若仍在显示区）。
-    if (logicalCursor >= 0 && logicalCursor < LCD_DDRAM_SIZE) {
-        lcdSetCursor(logicalCursor);
-    }
-
     // 同步待渲染缓冲，保证统一差分路径与直接差分路径一致。
     std::memcpy(s_pendingFrame.ddram, ddram32, LCD_DDRAM_SIZE);
     std::memcpy(s_pendingFrame.cgram, cgram8x8, sizeof(s_pendingFrame.cgram));
@@ -537,9 +495,6 @@ void lcdPopOverlayFrame() {
 
     lcdRenderDiff(s_overlayBackupFrame.ddram, s_overlayBackupFrame.cgram, s_overlayBackupFrame.cgramUsed);
     lcdCursor = s_overlayBackupCursor;
-    if (lcdCursor >= 0 && lcdCursor < LCD_DDRAM_SIZE) {
-        lcdSetCursor(lcdCursor);
-    }
 
     std::memcpy(&s_pendingFrame, &s_overlayBackupFrame, sizeof(LcdFrameState));
     s_overlayBackupValid = false;

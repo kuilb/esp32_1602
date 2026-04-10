@@ -23,9 +23,6 @@
 #define CMD                 0   ///< 表示发送的是 LCD 命令
 #define CHR                 1   ///< 表示发送的是 LCD 字符数据
 
-#define LCD_line1           0x80 ///< LCD 第一行 DDRAM 起始地址
-#define LCD_line2           0xc0 ///< LCD 第二行 DDRAM 起始地址
-
 extern int lcdCursor;                   /**< 当前 LCD 光标位置 */
 extern int brightness;                  /**< 当前背光亮度（0~255），初始为最大亮度 */
 

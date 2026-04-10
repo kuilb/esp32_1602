@@ -1,5 +1,6 @@
 #include "./menu/menu.h"
 #include "./applications/setting.h"
+#include "./applications/about.h"
 
 // 菜单动作函数由 menu.cpp 提供实现，这里只做声明用于菜单表绑定。
 void _enterWirelessScreen();
@@ -41,8 +42,9 @@ const MenuItem wifiConfigMenuItems[] = {
 
 // 关于菜单
 const MenuItem aboutMenuItems[] = {
-    {"About me",        aboutMe, MENU_NONE},
-    {"About Project",   aboutProject, MENU_NONE},
+    {"Build info",      enterBuildInfoInterface, MENU_NONE},
+    {"About me",        enterAboutMeInterface, MENU_NONE},
+    {"About Project",   enterAboutProjectInterface, MENU_NONE},
     {"Return",          NULL, MENU_MAIN}
 };
 

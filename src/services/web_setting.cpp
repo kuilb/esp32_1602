@@ -14,6 +14,7 @@ volatile bool isConfigDone = false;
 volatile bool isKeyDone = false;
 volatile bool otaUploadSuccess = false;
 static size_t otaExpectedSize = 0;      // 预期的OTA文件大小
+static bool s_otaModuleInitialized = false;
 
 static const char* _wifiStateToStr(WiFiConnectionState state) {
     switch (state) {
@@ -204,7 +205,7 @@ void webSettingHandleOTAURL() {
     }
     
     // 如果已有 OTA 在进行那么 HTTP409 Conflict
-    if (OTAManager::isInProgress()) {
+    if (otaIsInProgress()) {
         settingServer.send(409, "application/json", 
             "{\"success\":false,\"error\":\"当前正在进行 OTA\"}");
         return;
@@ -226,9 +227,9 @@ void webSettingHandleOTAURL() {
         } else {
             useHTTPS = false;
         }
-        OTAResult result = OTAManager::updateFromURL(*urlPtr, useHTTPS);
+        OTAResult result = otaUpdateFromURL(*urlPtr, useHTTPS);
         if (result != OTA_SUCCESS) {
-            LOG_SYSTEM_ERROR("OTA failed: %s", OTAManager::getErrorString().c_str());
+            LOG_SYSTEM_ERROR("OTA failed: %s", otaGetErrorString().c_str());
         }
         delete urlPtr;
         vTaskDelete(NULL);
@@ -237,8 +238,8 @@ void webSettingHandleOTAURL() {
 
 // OTA进度查询
 void webSettingHandleOTAProgress() {
-    int progress = OTAManager::getProgress();
-    OTAStatus status = OTAManager::getStatus();
+    int progress = otaGetProgress();
+    OTAStatus status = otaGetStatus();
     String statusStr;
     
     switch(status) {
@@ -263,8 +264,8 @@ void webSettingHandleOTAProgress() {
     String errorJson = ",\"error\":\"";
 
     // 有错误信息时提示客户端
-    if(OTAManager::getErrorString() != ""){
-        json = "{\"progress\":\"0\",\"status\":\"failed\",\"error\":\"" + OTAManager::getErrorString() + "\"}";
+    if(otaGetErrorString() != ""){
+        json = "{\"progress\":\"0\",\"status\":\"failed\",\"error\":\"" + otaGetErrorString() + "\"}";
         LOG_SYSTEM_DEBUG("OTA Progress queried with error: " + json);
     }
     
@@ -731,6 +732,11 @@ void webSettingSetupWebServer() {
         lcdText(" ", 2);
         delay(1000);
         return;
+    }
+
+    if (!s_otaModuleInitialized) {
+        otaInit();
+        s_otaModuleInitialized = true;
     }
 
     isConfigDone=false;

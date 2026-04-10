@@ -1,11 +1,5 @@
 #include "./applications/about.h"
 
-enum NavigationResult {
-    NAV_NONE,      // 无按键
-    NAV_PAGE_CHANGE, // 页面改变
-    NAV_EXIT       // 退出
-};
-
 struct AboutPage {
     const char* line1;
     const char* line2;
@@ -32,71 +26,67 @@ const AboutPage aboutProjectPages[] = {
     {"zlib_turbo", "etc..."},
 };
 
-void showAboutPage(const char* line1, const char* line2) {
-    lcdText(line1, 1);
-    lcdText(line2, 2);
-}
+static int s_aboutCurrentPage = 0;
+static bool s_aboutIsNewPage = true;
 
-NavigationResult _handleAboutNavigation(int& currentPage, int totalPages) {
-    if (isButtonReadyToRespond(LEFT, BUTTON_DEBOUNCE_DELAY) && currentPage > 0) {
-        currentPage--;
-        return NAV_PAGE_CHANGE;
+static void _aboutHandleNavigation(int totalPages) {
+    if (isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)) {
+        menuReturnToCurrentSubMenu();
+        return;
     }
-    else if (isButtonReadyToRespond(RIGHT, BUTTON_DEBOUNCE_DELAY) && currentPage < totalPages - 1) {
-        currentPage++;
-        return NAV_PAGE_CHANGE;
-    }
-    else if (isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)) {
-        currentState = STATE_MENU;
-        inMenuMode = true;
-        return NAV_EXIT;
-    }
-    return NAV_NONE; // 没有按键按下
-}
-
-void aboutMe(){
-    inMenuMode = false;
-    int currentPage = 0;
-    const int totalPages = 6; // 页面数量
-    
-    while(true) {
-        showAboutPage(aboutMePages[currentPage].line1, aboutMePages[currentPage].line2);
-        
-        // 等待按键输入
-        while(true) {
-            NavigationResult result = _handleAboutNavigation(currentPage, totalPages);
-            if (result == NAV_PAGE_CHANGE) {
-                break; // 页面改变，跳出内层循环，重新显示
-            } else if (result == NAV_EXIT) {
-                return; // 退出关于界面
-            }
-            // NAV_NONE: 继续等待
-            delay(50);
-        }
+    if (isButtonReadyToRespond(LEFT, BUTTON_DEBOUNCE_DELAY) && s_aboutCurrentPage > 0) {
+        s_aboutCurrentPage--;
+        s_aboutIsNewPage = true;
+    } else if (isButtonReadyToRespond(RIGHT, BUTTON_DEBOUNCE_DELAY) && s_aboutCurrentPage < totalPages - 1) {
+        s_aboutCurrentPage++;
+        s_aboutIsNewPage = true;
     }
 }
 
-void aboutProject(){
-    inMenuMode = false;
-    int currentPage = 0;
-    const int totalPages = 11; // 页面数量
-    
-    // 初始延迟，防止一进入就退出
+void enterBuildInfoInterface() {
+    setCurrentInterface(handleBuildInfoInterface);
     globalButtonDelay(FIRST_TIME_DELAY);
-    
-    while(true) {
-        showAboutPage(aboutProjectPages[currentPage].line1, aboutProjectPages[currentPage].line2);
-        
-        // 等待按键输入
-        while(true) {
-            NavigationResult result = _handleAboutNavigation(currentPage, totalPages);
-            if (result == NAV_PAGE_CHANGE) {
-                break; // 页面改变，跳出内层循环，重新显示
-            } else if (result == NAV_EXIT) {
-                return; // 退出关于界面
-            }
-            // NAV_NONE: 继续等待
-            delay(50);
-        }
+    String ver = String(PROJECT_VERSION) + "  " + String(BUILD_VERSION);
+    lcdText(ver, 1);
+    lcdText(BUILD_TIMESTAMP, 2);
+}
+
+void handleBuildInfoInterface() {
+    if (isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)) {
+        menuReturnToCurrentSubMenu();
     }
+}
+
+void enterAboutMeInterface() {
+    s_aboutCurrentPage = 0;
+    s_aboutIsNewPage = true;
+    setCurrentInterface(handleAboutMeInterface);
+    globalButtonDelay(FIRST_TIME_DELAY);
+}
+
+void enterAboutProjectInterface() {
+    s_aboutCurrentPage = 0;
+    s_aboutIsNewPage = true;
+    setCurrentInterface(handleAboutProjectInterface);
+    globalButtonDelay(FIRST_TIME_DELAY);
+}
+
+void handleAboutMeInterface() {
+    const int totalPages = sizeof(aboutMePages) / sizeof(aboutMePages[0]);
+    if (s_aboutIsNewPage) {
+        lcdText(aboutMePages[s_aboutCurrentPage].line1, 1);
+        lcdText(aboutMePages[s_aboutCurrentPage].line2, 2);
+        s_aboutIsNewPage = false;
+    }
+    _aboutHandleNavigation(totalPages);
+}
+
+void handleAboutProjectInterface() {
+    const int totalPages = sizeof(aboutProjectPages) / sizeof(aboutProjectPages[0]);
+    if (s_aboutIsNewPage) {
+        lcdText(aboutProjectPages[s_aboutCurrentPage].line1, 1);
+        lcdText(aboutProjectPages[s_aboutCurrentPage].line2, 2);
+        s_aboutIsNewPage = false;
+    }
+    _aboutHandleNavigation(totalPages);
 }

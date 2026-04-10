@@ -27,17 +27,9 @@ static void _markDisplayNeedsUpdate();
 static void _onMenuPostActivate();
 static void _handleMenuInterface();
 static void _handleMenuState();
-static void _handleUnknownInterfaceState();
 static void _dispatchCurrentInterfaceState();
 static MenuState _getMenuStateFromPtr(const Menu* menu);
 static MenuState _getParentMenuState(MenuState childState);
-
-typedef void (*InterfaceHandler)();
-
-typedef struct InterfaceHandlerEntry {
-    InterfaceState state;
-    InterfaceHandler handler;
-} InterfaceHandlerEntry;
 
 enum SettingsMenuIndex {
     SETTINGS_ITEM_WEB = 0,
@@ -62,7 +54,42 @@ static MenuContext s_menuContext = {
     true
 };
 
-InterfaceState currentState = STATE_MENU;
+// 当前子界面处理函数：Null 表示处于菜单模式
+static InterfaceHandler s_currentHandler = nullptr;
+
+// 菜单历史栈：进入子菜单时压栈，返回时弹栈恢复光标位置
+struct MenuHistoryEntry {
+    const Menu* menu;
+    int menuCursor;
+    int scrollOffset;
+};
+
+static const int kMenuHistoryMaxDepth = 4;
+static MenuHistoryEntry s_menuHistory[kMenuHistoryMaxDepth];
+static int s_menuHistoryDepth = 0;
+
+// 子界面 API 实现
+void setCurrentInterface(InterfaceHandler handler) {
+    // 进入子界面时将当前菜单上下文压栈，使返回时能回到正确菜单（而非跳过当前层）
+    if (handler != nullptr && s_menuHistoryDepth < kMenuHistoryMaxDepth) {
+        s_menuHistory[s_menuHistoryDepth++] = {
+            s_menuContext.currentMenu,
+            s_menuContext.menuCursor,
+            s_menuContext.scrollOffset
+        };
+    }
+    s_currentHandler = handler;
+    s_menuContext.isDisplayNeedsUpdate = true;
+}
+
+void clearCurrentInterface() {
+    s_currentHandler = nullptr;
+    s_menuContext.isDisplayNeedsUpdate = true;
+}
+
+bool isInSubInterface() {
+    return s_currentHandler != nullptr;
+}
 
 extern WifiConfigManager wifiConfigManager;
 
@@ -278,28 +305,50 @@ void menuHandleBackAction() {
     if (!inMenuMode) {
         buzzerPlayBackSound();
         inMenuMode = true;
-        currentState = STATE_MENU;
+        clearCurrentInterface();
         s_menuContext.currentMenu = &allMenus[MENU_MAIN];
         s_menuContext.menuCursor = 0;
         s_menuContext.scrollOffset = -1;
         s_menuContext.isDisplayNeedsUpdate = true;
+        s_menuHistoryDepth = 0;  // 清空历史栈
         globalButtonDelay(FIRST_TIME_DELAY);
         LOG_MENU_INFO("Power short press: return to main menu");
         return;
     }
 
-    // 菜单内返回上一级。
+    // 菜单内返回上一级：优先从历史栈恢复光标位置。
     buzzerPlayBackSound();
-    const MenuState currentMenuState = _getMenuStateFromPtr(s_menuContext.currentMenu);
-    const MenuState targetMenuState = _getParentMenuState(currentMenuState);
-
-    s_menuContext.currentMenu = &allMenus[targetMenuState];
-    s_menuContext.menuCursor = 0;
-    s_menuContext.scrollOffset = (targetMenuState == MENU_MAIN) ? -1 : 0;
+    if (s_menuHistoryDepth > 0) {
+        const MenuHistoryEntry& e = s_menuHistory[--s_menuHistoryDepth];
+        s_menuContext.currentMenu = e.menu;
+        s_menuContext.menuCursor = e.menuCursor;
+        s_menuContext.scrollOffset = e.scrollOffset;
+    } else {
+        // 历史栈为空（已在主菜单），保持不动
+        const MenuState currentMenuState = _getMenuStateFromPtr(s_menuContext.currentMenu);
+        const MenuState targetMenuState = _getParentMenuState(currentMenuState);
+        s_menuContext.currentMenu = &allMenus[targetMenuState];
+        s_menuContext.menuCursor = 0;
+        s_menuContext.scrollOffset = (targetMenuState == MENU_MAIN) ? -1 : 0;
+    }
     s_menuContext.isDisplayNeedsUpdate = true;
-    currentState = STATE_MENU;
+    clearCurrentInterface();
     globalButtonDelay(FIRST_TIME_DELAY);
-    LOG_MENU_INFO("Power short press: back to menu state=%d", static_cast<int>(targetMenuState));
+    LOG_MENU_INFO("Power short press: back to menu, history depth=%d", s_menuHistoryDepth);
+}
+
+void menuReturnToCurrentSubMenu() {
+    // 弹栈恢复进入子界面前的菜单上下文（与 menuHandleBackAction 同路径）
+    buzzerPlayBackSound();
+    if (s_menuHistoryDepth > 0) {
+        const MenuHistoryEntry& e = s_menuHistory[--s_menuHistoryDepth];
+        s_menuContext.currentMenu = e.menu;
+        s_menuContext.menuCursor = e.menuCursor;
+        s_menuContext.scrollOffset = e.scrollOffset;
+        s_menuContext.isDisplayNeedsUpdate = true;
+    }
+    clearCurrentInterface();
+    globalButtonDelay(FIRST_TIME_DELAY);
 }
 
 static void _syncMenuNavigationState() {
@@ -339,6 +388,10 @@ static void _moveMenuCursorDown() {
 }
 
 static void _activateCurrentMenuItem() {
+    const Menu* menuBeforeActivate = s_menuContext.currentMenu;
+    const int cursorBeforeActivate = s_menuContext.menuCursor;
+    const int scrollBeforeActivate = s_menuContext.scrollOffset;
+
     MenuNavigationContext context = {
         s_menuContext.currentMenu,
         s_menuContext.menuCursor,
@@ -348,6 +401,27 @@ static void _activateCurrentMenuItem() {
     s_menuContext.currentMenu = context.currentMenu;
     s_menuContext.menuCursor = context.menuCursor;
     s_menuContext.scrollOffset = context.scrollOffset;
+
+    // 菜单发生了切换
+    if (s_menuContext.currentMenu != menuBeforeActivate) {
+        // 检查目标菜单是否在历史栈中（Return 项跳回父菜单的情况）
+        bool restoredFromHistory = false;
+        for (int i = s_menuHistoryDepth - 1; i >= 0; i--) {
+            if (s_menuHistory[i].menu == s_menuContext.currentMenu) {
+                // 恢复光标并裁剪历史栈
+                s_menuContext.menuCursor = s_menuHistory[i].menuCursor;
+                s_menuContext.scrollOffset = s_menuHistory[i].scrollOffset;
+                s_menuContext.isDisplayNeedsUpdate = true;
+                s_menuHistoryDepth = i;
+                restoredFromHistory = true;
+                break;
+            }
+        }
+        // 目标菜单不在栈中：正向进入子菜单，压栈
+        if (!restoredFromHistory && s_menuHistoryDepth < kMenuHistoryMaxDepth) {
+            s_menuHistory[s_menuHistoryDepth++] = {menuBeforeActivate, cursorBeforeActivate, scrollBeforeActivate};
+        }
+    }
 }
 
 static void _handleMenuState() {
@@ -358,38 +432,13 @@ static void _handleMenuState() {
     }
 }
 
-static void _handleUnknownInterfaceState() {
-    // 未知状态兜底：记录告警并回退到主菜单。
-    static int lastUnknownState = -1;
-    static unsigned long lastUnknownStateLogMs = 0;
-    int stateVal = (int)currentState;
-
-    if (stateVal != lastUnknownState || millis() - lastUnknownStateLogMs > 1000) {
-        LOG_MENU_WARN("Unknown interface state=%d, fallback to menu", stateVal);
-        lastUnknownState = stateVal;
-        lastUnknownStateLogMs = millis();
-    }
-
-    currentState = STATE_MENU;
-    s_menuContext.isDisplayNeedsUpdate = true;
-}
-
 static void _dispatchCurrentInterfaceState() {
-    // 通过注册表分发当前界面状态到对应处理函数。
-    static const InterfaceHandlerEntry kInterfaceHandlerRegistry[] = {
-        {STATE_MENU, _handleMenuState},
-        {STATE_CLOCK, handleClockInterface},
-        {STATE_WEATHER, handleWeatherInterface}
-    };
-
-    for (size_t i = 0; i < sizeof(kInterfaceHandlerRegistry) / sizeof(kInterfaceHandlerRegistry[0]); ++i) {
-        if (kInterfaceHandlerRegistry[i].state == currentState) {
-            kInterfaceHandlerRegistry[i].handler();
-            return;
-        }
+    // 直接调用已注册的处理函数；为 null 则进入菜单状态。
+    if (s_currentHandler != nullptr) {
+        s_currentHandler();
+    } else {
+        _handleMenuState();
     }
-
-    _handleUnknownInterfaceState();
 }
 
 void _handleMenuInterface() {

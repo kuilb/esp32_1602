@@ -230,7 +230,7 @@ void _connectInfo(){
 
 	for(;;){
 		if(isButtonReadyToRespond(CENTER)){
-			currentState = STATE_MENU;
+			clearCurrentInterface();
 			return;
 		}
 		vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -254,7 +254,7 @@ void _enterBatteryInfoScreen() {
 			lastBatteryUpdate = millis();
 		}
 		if(isButtonReadyToRespond(CENTER)){
-			currentState = STATE_MENU;
+			clearCurrentInterface();
 			return;
 		}
 		vTaskDelay(10 / portTICK_PERIOD_MS);

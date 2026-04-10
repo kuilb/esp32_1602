@@ -36,17 +36,27 @@
 /** @brief 表示是否准备好显示 */
 extern volatile bool isReadyToDisplay;
 
-/** @brief 定义当前界面的状态 */
-enum InterfaceState {
-    STATE_MENU,         /**< 菜单状态 */
-    STATE_BRIGHTNESS,   /**< 亮度设置状态 */
-    STATE_CLOCK,        /**< 时钟状态 */
-    STATE_WEATHER,      /**< 天气状态 */
-    STATE_OTHER         /**< 其他状态 */
-};
+/**
+ * @brief 界面处理函数指针类型
+ * 每帧由 _menuTask 调用一次
+ */
+typedef void (*InterfaceHandler)();
 
-/** @brief 当前界面状态 */
-extern InterfaceState currentState;
+/**
+ * @brief 切换到指定子界面（注册当前帧处理函数）
+ * @param handler 界面处理函数，NULL 等同于 clearCurrentInterface()
+ */
+void setCurrentInterface(InterfaceHandler handler);
+
+/**
+ * @brief 返回菜单（清除当前子界面）
+ */
+void clearCurrentInterface();
+
+/**
+ * @brief 是否处于子界面（非菜单）中
+ */
+bool isInSubInterface();
 
 /** @brief 定义菜单的类型 */
 typedef enum MenuState {
@@ -97,6 +107,11 @@ void handleMenuInterface();
  * - 非菜单界面（如无线显示/应用界面）：回到主菜单
  */
 void menuHandleBackAction();
+
+/**
+ * @brief 不弹历史栈，直接回到当前子菜单（用于应用内返回）
+ */
+void menuReturnToCurrentSubMenu();
 
 extern volatile bool inMenuMode;        /**< 菜单模式标志 */
 extern TaskHandle_t _menuTaskHandle;    /**< 菜单任务句柄 */

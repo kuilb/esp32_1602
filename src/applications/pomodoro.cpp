@@ -103,7 +103,6 @@ void alertPhaseSwitch(bool nextIsWorkPhase) {
 
 void runPomodoroApp() {
     inMenuMode = false;
-    currentState = STATE_OTHER;
     globalButtonDelay(FIRST_TIME_DELAY);
 
     bool isWorkPhase = true;
@@ -121,7 +120,7 @@ void runPomodoroApp() {
 
     while (true) {
         // 电源键短按会由全局按键逻辑切回菜单，这里检测状态变化后退出应用循环。
-        if (currentState != STATE_OTHER || inMenuMode) {
+        if (inMenuMode) {
             LOG_SYSTEM_INFO("Pomodoro app exit by power/back action");
             return;
         }

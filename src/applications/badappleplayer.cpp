@@ -234,7 +234,7 @@ void playBadAppleFromFileRaw(const char* path) {
 
         // 退出条件
         if(buttonJustPressed[CENTER] && currentFrame >= 15){
-            currentState = STATE_MENU;
+            clearCurrentInterface();
             buzzerNoTone();
             break;
         }

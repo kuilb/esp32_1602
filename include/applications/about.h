@@ -16,19 +16,33 @@
 #include "./menu/menu.h"
 
 /**
- * @brief 显示创建者信息
- * 
- * 此函数显示多页个人创建者信息,
- * 允许使用左右按键导航页面, 并使用中心按键退出
+ * @brief 进入"关于我"界面（非阻塞，注册到状态机）
  */
-void aboutMe();
+void enterAboutMeInterface();
 
 /**
- * @brief 显示项目信息
- * 
- * 此函数显示多页项目相关信息,
- * 允许使用左右按键导航页面, 并使用中心按键退出
+ * @brief 进入"关于项目"界面（非阻塞，注册到状态机）
  */
-void aboutProject();
+void enterAboutProjectInterface();
+
+/**
+ * @brief 进入"构建信息"界面（非阻塞，注册到状态机）
+ */
+void enterBuildInfoInterface();
+
+/**
+ * @brief 处理"构建信息"界面逻辑，每帧调用一次
+ */
+void handleBuildInfoInterface();
+
+/**
+ * @brief 处理"关于项目"界面逻辑，每帧调用一次
+ */
+void handleAboutProjectInterface();
+
+/**
+ * @brief 处理"关于我"界面逻辑，每帧调用一次
+ */
+void handleAboutMeInterface();
 
 #endif

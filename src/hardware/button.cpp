@@ -196,17 +196,6 @@ void handleButtonsTask(void *pvParameters) {
             continue;
         }
 
-        bool center = buttonJustPressed[CENTER];
-        bool up     = buttonJustPressed[SIDE];
-        bool down   = buttonJustPressed[LEFT];
-
-        // 按键按下
-        if (center && down) {
-            inMenuMode = true;
-            currentState = STATE_MENU;
-            LOG_MENU_INFO("Combo triggered: Center + Down");
-        } 
-
         // 若已连接则发送按键消息（加锁，避免与 loopTask 的 read()/stop() 并发）
         if (clientMutex != nullptr && xSemaphoreTake(clientMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             if (clientConnected && client.connected()) {

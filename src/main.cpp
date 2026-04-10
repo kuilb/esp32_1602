@@ -1,7 +1,5 @@
 #include "mydefine.h"
 
-#include <esp32-hal-cpu.h>
-
 #include "./menu/menu.h"
 #include "./applications/clock.h"
 
@@ -30,12 +28,7 @@
 #include <cstdlib>
 #include <esp_system.h>
 #include <esp_pm.h>
-#include "esp_freertos_hooks.h"
-
-#ifndef ENABLE_CPU_USAGE_MONITOR
-#define ENABLE_CPU_USAGE_MONITOR 0
-#endif
-
+#include <esp32-hal-cpu.h>
 #ifndef ENABLE_DYNAMIC_CPU_FREQ
 #define ENABLE_DYNAMIC_CPU_FREQ 0
 #endif
@@ -44,7 +37,6 @@ WifiConfigManager wifiConfigManager("/wifi_config.txt");
 QWeatherAuthConfigManager qweatherAuthConfigManager("/qweather_auth_config.txt");
 
 static TaskHandle_t s_taskHealthMonitorHandle = nullptr;
-static TaskHandle_t s_cpuUsageMonitorTaskHandle = nullptr;
 static esp_pm_lock_handle_t s_noLightSleepLock = nullptr;
 static esp_pm_lock_handle_t s_cpuFreqMaxLock = nullptr;
 static bool s_cpuFreqMaxLockHeld = false;
@@ -103,59 +95,6 @@ static void _setCpuMaxPerfMode(bool enabled) {
     }
 }
 
-#if ENABLE_CPU_USAGE_MONITOR
-static volatile uint32_t s_idleCounterCore0 = 0;
-static volatile uint32_t s_idleCounterCore1 = 0;
-
-static bool IRAM_ATTR _idleHookCore0(void) {
-    s_idleCounterCore0++;
-    return false;
-}
-
-static bool IRAM_ATTR _idleHookCore1(void) {
-    s_idleCounterCore1++;
-    return false;
-}
-
-static void _cpuUsageMonitorTask(void* parameter) {
-    (void)parameter;
-
-    uint32_t lastIdle0 = s_idleCounterCore0;
-    uint32_t lastIdle1 = s_idleCounterCore1;
-    uint32_t maxIdleDelta0 = 1;
-    uint32_t maxIdleDelta1 = 1;
-
-    while (!shouldExitTasks) {
-        vTaskDelay(pdMS_TO_TICKS(2000));
-
-        const uint32_t nowIdle0 = s_idleCounterCore0;
-        const uint32_t nowIdle1 = s_idleCounterCore1;
-
-        const uint32_t delta0 = nowIdle0 - lastIdle0;
-        const uint32_t delta1 = nowIdle1 - lastIdle1;
-
-        lastIdle0 = nowIdle0;
-        lastIdle1 = nowIdle1;
-
-        if (delta0 > maxIdleDelta0) maxIdleDelta0 = delta0;
-        if (delta1 > maxIdleDelta1) maxIdleDelta1 = delta1;
-
-        float usage0 = 100.0f * (1.0f - (float)delta0 / (float)maxIdleDelta0);
-        float usage1 = 100.0f * (1.0f - (float)delta1 / (float)maxIdleDelta1);
-
-        if (usage0 < 0.0f) usage0 = 0.0f;
-        if (usage0 > 100.0f) usage0 = 100.0f;
-        if (usage1 < 0.0f) usage1 = 0.0f;
-        if (usage1 > 100.0f) usage1 = 100.0f;
-
-        LOG_SYSTEM_INFO("CPU usage: Core0=%.1f%% Core1=%.1f%%", usage0, usage1);
-    }
-
-    s_cpuUsageMonitorTaskHandle = nullptr;
-    vTaskDelete(NULL);
-}
-#endif
-
 static void _logTaskStackIfLow(const char* taskName, TaskHandle_t handle, UBaseType_t thresholdWords) {
     if (!taskName || handle == nullptr) {
         return;
@@ -202,15 +141,6 @@ void setup() {
     #endif
     Logger::init(DEFAULT_LOG_LEVEL);  // 使用 platformio.ini 中定义的日志级别
 
-    // 在调试构建下限制高频模块日志，避免串口输出风暴触发中断看门狗。
-    if (DEFAULT_LOG_LEVEL >= LOG_LEVEL_DEBUG) {
-        Logger::setModuleLevel(LOG_MODULE_NETWORK, LOG_LEVEL_INFO);
-        Logger::setModuleLevel(LOG_MODULE_WIFI, LOG_LEVEL_INFO);
-        Logger::setModuleLevel(LOG_MODULE_DISPLAY, LOG_LEVEL_INFO);
-        Logger::setModuleLevel(LOG_MODULE_BATTERY, LOG_LEVEL_WARN);
-        Logger::setModuleLevel(LOG_MODULE_ALS, LOG_LEVEL_WARN);
-    }
-
     LOG_SYSTEM_INFO("Wireless 1602A by Kulib");
     LOG_SYSTEM_INFO("Build Information:");
     LOG_SYSTEM_INFO("  Firmware Version: %s", PROJECT_VERSION);
@@ -218,6 +148,7 @@ void setup() {
     LOG_SYSTEM_INFO("  Build Timestamp: %s \n", BUILD_TIMESTAMP);
     LOG_SYSTEM_INFO("Starting initialization...");
 
+    // 检查唤醒原因
     esp_reset_reason_t resetReason = esp_reset_reason();
     LOG_SYSTEM_DEBUG("Reset reason: %d", (int)resetReason);
     if (resetReason == ESP_RST_TASK_WDT) {
@@ -241,15 +172,14 @@ void setup() {
         LOG_SYSTEM_INFO("Normal boot");
     }
 
-    // 尽早初始化 LCD，启动阶段立即关闭光标/闪烁，避免上电后长时间可见闪烁光标。
+    // 初始化 LCD
     lcdInit();
     
     buzzerInit();
     initBQ27421(BATTERY_DESIGN_CAPACITY_MAH);  // 初始化燃料计芯片
-    // 初始化光传感器 OPT3001
-    initOPT3001();
+    initOPT3001();  // 初始化光传感器 OPT3001
     
-    // 初始化自动背光调节（会自动启用），但不立即启动任务
+    // 初始化自动背光调节，但不立即启动任务
     initAutoBrightness();
     
     initButtonsPin();
@@ -264,18 +194,7 @@ void setup() {
 
     startButtonTask();
 
-    #if ENABLE_CPU_USAGE_MONITOR
-    // 注册空闲钩子，用于统计双核空闲占比并换算 CPU 占用。
-    esp_register_freertos_idle_hook_for_cpu(_idleHookCore0, 0);
-    esp_register_freertos_idle_hook_for_cpu(_idleHookCore1, 1);
-
-    // CPU 占用监控：每 2 秒输出一次到串口日志。
-    xTaskCreatePinnedToCore(_cpuUsageMonitorTask, "CpuUsage", 3072, NULL, 1, &s_cpuUsageMonitorTaskHandle, 0);
-    #else
-    LOG_SYSTEM_INFO("CPU usage monitor disabled (ENABLE_CPU_USAGE_MONITOR=0)");
-    #endif
-
-    // 低频任务健康监测：提前发现栈水位过低，便于排查WDT/栈破坏。
+    // 低频任务健康监测
     xTaskCreatePinnedToCore(_taskHealthMonitorTask, "TaskHealth", 3072, NULL, 1, &s_taskHealthMonitorHandle, 0);
 
     // 欢迎消息
@@ -289,19 +208,21 @@ void setup() {
         fatalError("SPIFFS init failed"); 
     }
     
+    // 初始化配置管理器
     if(!wifiConfigManager.init()){ 
         LOG_SYSTEM_ERROR("WiFi config manager initialization failed!");
         LOG_SYSTEM_ERROR("Last error: %s", wifiConfigManager.getLastErrorString(wifiConfigManager.getLastError()).c_str());
         fatalError("WiFi config init failed"); 
     }
     
+    // 初始化和风天气配置管理器
     if(!qweatherAuthConfigManager.init()){ 
         LOG_SYSTEM_ERROR("QWeather config manager initialization failed!");
         LOG_SYSTEM_ERROR("Last error: %s", qweatherAuthConfigManager.getLastErrorString(qweatherAuthConfigManager.getLastError()).c_str());
         fatalError("QWeather auth config init failed"); 
     }
 
-    // 加载并应用自动亮度开关持久化状态（若配置不存在则保留默认行为）。
+    // 加载并应用自动亮度开关持久化状态
     bool autoBrightnessEnabledPersisted = false;
     if (ConfigManager::loadAutoBrightnessEnabled(autoBrightnessEnabledPersisted)) {
         if (autoBrightnessEnabledPersisted) {
@@ -311,22 +232,20 @@ void setup() {
         }
     }
 
-    // 加载并应用按键音效开关持久化状态（若配置不存在则保留默认开启）。
+    // 加载并应用按键音效开关持久化状态
     bool soundEffectsEnabledPersisted = true;
     if (ConfigManager::loadSoundEffectsEnabled(soundEffectsEnabledPersisted)) {
         buzzerSetUiSoundEnabled(soundEffectsEnabledPersisted);
     }
 
     // buzzerPlayStartup();
-    delay(300);
-    lcdClear();
     loadJwtConfig();  // 初始化JWT
     wifiinit();  // 初始化WiFi配置（非阻塞，后台连接）
     ensureTimeSyncTaskRunning(); // 启动期兜底：确保自动校时任务被拉起
     initMenu();  // 初始化菜单系统（立即进入主界面）
     
     // 所有初始化完成后，按配置决定是否启动自动背光调节后台任务
-    delay(500);  // 等待WiFi初始化稳定
+    //lcdClear();
     if (isAutoBrightnessActive()) {
         startAutoBrightnessTask();
     }
@@ -341,8 +260,9 @@ void loop(){
         }
     }
 
+    // 配网模式处理劫持DNS请求
     if (inConfigMode) {
-        dnsServer.processNextRequest();  // 处理劫持DNS请求
+        dnsServer.processNextRequest();
         apServer.handleClient();
     }
 
@@ -402,7 +322,7 @@ void loop(){
     }
     const bool hasStreamWork = clientConnected || !frameCache.empty();
     const bool wirelessScreenDisconnectedIdle = (!inMenuMode
-        && currentState == STATE_MENU
+        && !isInSubInterface()
         && !inConfigMode
         && !hasStreamWork);
 

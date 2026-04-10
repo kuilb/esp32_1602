@@ -33,20 +33,20 @@ static bool _ensureClockTimeSynced() {
 
 void enterClockInterface() {
     s_clockIsNewInterface = true;
-    currentState = STATE_CLOCK;
+    setCurrentInterface(handleClockInterface);
 }
 
 void handleClockInterface() {
     // 先处理退出，避免在未同步时被前置校验“卡住”
     if (isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)) {
         LOG_TIME_INFO("Exit clock interface to menu");
-        currentState = STATE_MENU;
+        clearCurrentInterface();
         globalButtonDelay(FIRST_TIME_DELAY);
         return;
     }
 
     if (!_ensureClockTimeSynced()) {
-        currentState = STATE_MENU;
+        clearCurrentInterface();
         globalButtonDelay(FIRST_TIME_DELAY);
         return;
     }
@@ -86,7 +86,7 @@ void updateClockScreen() {
         lcdText("Check network", 2);
         LOG_TIME_WARN("Time not synced yet, cannot display clock");
         _playClockFailSoundThrottled();
-        currentState = STATE_MENU;
+        clearCurrentInterface();
         delay(800);
     }
 }

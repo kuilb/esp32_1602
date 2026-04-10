@@ -50,12 +50,12 @@ static bool _ensureWeatherTimeSynced() {
 
 void enterWeatherInterface() {
     s_weatherIsNewInterface = true;
-    currentState = STATE_WEATHER;
+    setCurrentInterface(handleWeatherInterface);
 }
 
 void handleWeatherInterface() {
     if (!_ensureWeatherTimeSynced()) {
-        currentState = STATE_MENU;
+        clearCurrentInterface();
         globalButtonDelay(FIRST_TIME_DELAY);
         return;
     }
@@ -65,7 +65,7 @@ void handleWeatherInterface() {
         lcdText("No WiFi", 1);
         lcdText(" ", 2);
         _playWeatherFailSoundThrottled();
-        currentState = STATE_MENU;
+        clearCurrentInterface();
         globalButtonDelay(FIRST_TIME_DELAY);
         return;
     }
@@ -73,7 +73,7 @@ void handleWeatherInterface() {
         lcdText("No API config", 1);
         lcdText("Use web config", 2);
         _playWeatherFailSoundThrottled();
-        currentState = STATE_MENU;
+        clearCurrentInterface();
         globalButtonDelay(FIRST_TIME_DELAY);
         delay(600);
         return;
@@ -82,7 +82,7 @@ void handleWeatherInterface() {
         lcdText("No City Set", 1);
         lcdText("Use Web Config", 2);
         _playWeatherFailSoundThrottled();
-        currentState = STATE_MENU;
+        clearCurrentInterface();
         globalButtonDelay(FIRST_TIME_DELAY);
         delay(600);
         return;
@@ -101,7 +101,7 @@ void handleWeatherInterface() {
                 _playWeatherFailSoundThrottled(4000);
                 s_weatherReadyToDisplay = false;
                 s_lastWeatherFail = millis();
-                currentState = STATE_MENU;
+                clearCurrentInterface();
                 globalButtonDelay(FIRST_TIME_DELAY);
                 return;
             }
@@ -117,7 +117,7 @@ void handleWeatherInterface() {
 
     if (isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)) {
         LOG_WEATHER_INFO("Exit weather interface to menu");
-        currentState = STATE_MENU;
+        clearCurrentInterface();
         globalButtonDelay(FIRST_TIME_DELAY);
         return;
     }

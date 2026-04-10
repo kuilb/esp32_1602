@@ -101,7 +101,7 @@ void initOPT3001() {
     isOPT3001Connected = false;  // 初始化为未连接状态
     
     // I2C已经由BQ27421初始化，不需要再次初始化
-    LOG_ALS_DEBUG("Using shared I2C bus (already initialized)");
+    LOG_ALS_DEBUG("Using shared I2C bus");
 
     // 检查设备是否存在
     if (!_isOPT3001Present()) {
