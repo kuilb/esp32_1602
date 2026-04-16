@@ -114,11 +114,30 @@ inline void setInputPullUp(int pin) {
 #define VISIBLE_LINES       2           ///< LCD 行数
 
 #define BaudRate            115200      ///< 串口通信波特率
-#define MAX_CACHE_SIZE      200         ///< 最大缓存帧数量
+#define MAX_CACHE_SIZE      16          ///< 最大缓存帧数量
 #define MAX_RECV_BUFFER_SIZE 1024       ///< 最大接收缓冲区大小（字节）
-#define MAX_LATENCY_MS      300         ///< 最大缓存延迟（单位：毫秒）
+#define MAX_LATENCY_MS      1000        ///< 最大缓存延迟（单位：毫秒）
+#define IMMEDIATE_FRAME_CACHE_KEEP 3    ///< frameInterval=0 时保留最近帧数量
 #define CONNECT_PORT        13000       ///< TCP/UDP 通信端口号
-#define CONNECT_TIMEOUT_MS  5000        ///< 连接超时时间（单位：毫秒）
+#define CONNECT_TIMEOUT_MS  15000       ///< 连接超时时间（单位：毫秒）
+
+// 推流功耗策略（全局）
+#define STREAM_GLOBAL_LOW_POWER 1       ///< 1=有连接时优先低功耗；0=保持性能优先
+#define STREAM_CONNECTED_CPU_MHZ 80    ///< 有连接时目标CPU频率（建议 120/160）
+#define STREAM_CONNECTED_LOW_TX_POWER 1 ///< 有连接时使用低发射功率
+#define STREAM_CONNECTED_ULTRA_LOW_TX_POWER 1 ///< 连接态优先使用超低发射功率（若芯片支持）
+#define STREAM_CONNECTED_ALWAYS_POWER_SAVE 1 ///< 连接态全程保持省电（1=开启）
+#define STREAM_CONNECTED_WIFI_PS_LEVEL 1    ///< 连接态省电级别：1=MIN_MODEM, 2=MAX_MODEM
+
+// 待机监听占空比（降低待机功耗）
+#define STANDBY_LISTEN_WINDOW_ENABLE 0      ///< 1=启用待机监听窗口；0=待机时常驻监听
+#define STANDBY_LISTEN_CYCLE_MS 5000       ///< 待机监听周期（毫秒）
+#define STANDBY_LISTEN_WINDOW_MS 1000        ///< 待机监听窗口（毫秒）
+#define STANDBY_ACCEPT_POLL_INTERVAL_MS 700 ///< 待机/断联空闲时 accept 轮询间隔（毫秒）
+
+// 应用界面射频门控（非无线应用）
+#define APP_INTERFACE_RF_GATE_ENABLE 1      ///< 1=进入非无线应用界面后默认关闭监听并进入省电
+#define APP_INTERFACE_DEFAULT_NETWORK_REQUIRED 0 ///< 应用界面默认是否需要联网（可运行时覆盖）
 
 #define DEBOUNCE_TIME       20          ///< 按钮扫描消抖时间（单位：毫秒）
 #define BUTTON_DEBOUNCE_DELAY 150       ///< 按钮软件消抖延迟（单位：毫秒）

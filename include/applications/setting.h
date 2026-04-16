@@ -2,7 +2,7 @@
 #define SETTING_H
 
 /** @brief 进入手动亮度调节界面 */
-void _enterBrightnessScreen();
+void enterBrightnessInterface();
 
 /** @brief 切换自动亮度状态 */
 void _toggleAutoBrightness();
@@ -20,10 +20,10 @@ void _resetFuelGauge();
 void _setupWebSetting();
 
 /** @brief 显示连接信息界面 */
-void _connectInfo();
+void enterConnectInfoInterface();
 
 /** @brief 进入电池信息界面 */
-void _enterBatteryInfoScreen();
+void enterBatteryInfoInterface();
 
 /** @brief 重启系统 */
 void _rebootSystem();

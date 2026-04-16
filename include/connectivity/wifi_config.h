@@ -43,6 +43,7 @@ enum WiFiConnectionState {
 
 extern WiFiConnectionState wifiConnectionState;     /**< 当前 WiFi 连接状态 */
 extern bool inConfigMode;                           /**< 配网模式状态标志 */
+extern volatile bool pendingRestart;                /**< 待执行重启标志（回调外延迟执行） */
 
 /**
  * @brief 进入配网模式

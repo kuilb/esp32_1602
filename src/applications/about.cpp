@@ -30,21 +30,21 @@ static int s_aboutCurrentPage = 0;
 static bool s_aboutIsNewPage = true;
 
 static void _aboutHandleNavigation(int totalPages) {
-    if (isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)) {
-        menuReturnToCurrentSubMenu();
+    if (appHandleCenterExit()) {
         return;
     }
-    if (isButtonReadyToRespond(LEFT, BUTTON_DEBOUNCE_DELAY) && s_aboutCurrentPage > 0) {
-        s_aboutCurrentPage--;
-        s_aboutIsNewPage = true;
-    } else if (isButtonReadyToRespond(RIGHT, BUTTON_DEBOUNCE_DELAY) && s_aboutCurrentPage < totalPages - 1) {
-        s_aboutCurrentPage++;
+
+    if (totalPages <= 0) {
+        return;
+    }
+
+    if (appHandleLeftRightStep(s_aboutCurrentPage, 0, totalPages - 1)) {
         s_aboutIsNewPage = true;
     }
 }
 
 void enterBuildInfoInterface() {
-    setCurrentInterface(handleBuildInfoInterface);
+    enterAppInterface(handleBuildInfoInterface, false);
     globalButtonDelay(FIRST_TIME_DELAY);
     String ver = String(PROJECT_VERSION) + "  " + String(BUILD_VERSION);
     lcdText(ver, 1);
@@ -52,22 +52,20 @@ void enterBuildInfoInterface() {
 }
 
 void handleBuildInfoInterface() {
-    if (isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)) {
-        menuReturnToCurrentSubMenu();
-    }
+    appHandleCenterExit();
 }
 
 void enterAboutMeInterface() {
     s_aboutCurrentPage = 0;
     s_aboutIsNewPage = true;
-    setCurrentInterface(handleAboutMeInterface);
+    enterAppInterface(handleAboutMeInterface, false);
     globalButtonDelay(FIRST_TIME_DELAY);
 }
 
 void enterAboutProjectInterface() {
     s_aboutCurrentPage = 0;
     s_aboutIsNewPage = true;
-    setCurrentInterface(handleAboutProjectInterface);
+    enterAppInterface(handleAboutProjectInterface, false);
     globalButtonDelay(FIRST_TIME_DELAY);
 }
 

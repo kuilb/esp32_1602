@@ -69,4 +69,25 @@ void acceptClientIfNew();
  */
 void receiveClientData();
 
+/**
+ * @brief 应用界面声明是否需要联网
+ * @details 仅在 APP_INTERFACE_RF_GATE_ENABLE 开启时生效。
+ */
+void setAppInterfaceNetworkRequired(bool required);
+
+/**
+ * @brief 重置应用界面联网声明到默认值，并清空“显式声明”标记
+ */
+void resetAppInterfaceNetworkRequiredToDefault();
+
+/**
+ * @brief 查询应用界面当前是否声明需要联网
+ */
+bool isAppInterfaceNetworkRequired();
+
+/**
+ * @brief 查询应用界面是否已显式声明联网需求
+ */
+bool hasAppInterfaceNetworkRequirementOverride();
+
 #endif

@@ -2,11 +2,15 @@
 
 bool isfuelICConnected = false;  /**< 燃料计芯片连接状态 */
 
-// 检测I2C设备是否存在
+// 检测I2C设备是否存在（带重试，防止上电/唤醒时I2C总线未稳定导致伪ACK）
 bool _isBQ27421Present() {
-    Wire.beginTransmission(BQ27421_I2C_ADDR);
-    uint8_t error = Wire.endTransmission();
-    return (error == 0);  // 0 = 成功
+    for (int attempt = 0; attempt < 3; attempt++) {
+        Wire.beginTransmission(BQ27421_I2C_ADDR);
+        uint8_t error = Wire.endTransmission();
+        if (error == 0) return true;  // 0 = 成功
+        delay(5);
+    }
+    return false;
 }
 
 // 读取16位寄存器 (小端序)
@@ -114,7 +118,17 @@ void initBQ27421(uint16_t designCapacity_mAh) {
         return;
     }
     LOG_BATTERY_DEBUG("BQ27421 device detected");
-    
+
+    // 额外验证 DEVICE_TYPE，防止伪ACK误判（BQ27421应返回 0x0421）
+    _writeBQ27421Register(REG_CONTROL, CMD_DEVICE_TYPE);
+    delay(5);
+    uint16_t deviceType = _readBQ27421Register(REG_CONTROL);
+    if (deviceType != 0x0421) {
+        LOG_BATTERY_ERROR("BQ27421 DEVICE_TYPE mismatch: 0x%04X (expected 0x0421), skip init", deviceType);
+        return;
+    }
+    LOG_BATTERY_DEBUG("BQ27421 DEVICE_TYPE verified: 0x%04X", deviceType);
+
     // 检查 ITPOR 标志位
     uint16_t flags = _readBQ27421Register(REG_FLAGS);
     if (flags & FLAG_ITPOR) {

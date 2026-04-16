@@ -3,54 +3,38 @@
 #include "./services/auto_brightness.h"
 #include "./services/config_manager.h"
 #include "./hardware/buzzer.h"
+#include "./ui/hold_progress.h"
 
 extern WifiConfigManager wifiConfigManager;
+
+static void handleBrightnessInterface();
+static void handleBatteryInfoInterface();
+static void handleConnectInfoInterface();
 
 namespace {
 static const unsigned long TOGGLE_PROGRESS_START_MS = 300;
 static const unsigned long TOGGLE_TRIGGER_MS = 1800;
 
-static const uint8_t kToggleBarGlyphs[6][8] = {
-	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-	{0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10},
-	{0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18},
-	{0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C},
-	{0x1E, 0x1E, 0x1E, 0x1E, 0x1E, 0x1E, 0x1E, 0x1E},
-	{0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F}
+struct BrightnessScreenState {
+	bool active = false;
+	int lastBrightness = -1;
+	bool exitPending = false;
+	unsigned long exitAtMs = 0;
 };
 
-static void _prepareToggleBarGlyphs() {
-	for (int slot = 0; slot <= 5; ++slot) {
-		lcdCreateChar(slot, kToggleBarGlyphs[slot]);
-	}
-}
+struct BatteryInfoScreenState {
+	bool active = false;
+	unsigned long lastBatteryUpdate = 0;
+};
 
-static void _renderToggleProgress(uint8_t percent) {
-	if (percent > 100) percent = 100;
+struct ConnectInfoScreenState {
+	bool active = false;
+	unsigned long lastRefreshMs = 0;
+};
 
-	lcdText("Hold to toggle  ", 1);
-	_prepareToggleBarGlyphs();
-
-	const int barSlots = 16;
-	const int cellCols = 5;
-	const int gapCols = 1;
-	const int totalVirtualCols = barSlots * cellCols + (barSlots - 1) * gapCols;
-	const int filledVirtualCols = (percent * totalVirtualCols) / 100;
-
-	lcdSetCursor(16);
-	for (int slot = 0; slot < barSlots; ++slot) {
-		const int cellStart = slot * (cellCols + gapCols);
-		int fillInCell = filledVirtualCols - cellStart;
-		if (fillInCell < 0) fillInCell = 0;
-		if (fillInCell > cellCols) fillInCell = cellCols;
-
-		if (fillInCell == 0) {
-			lcdDisChar(' ');
-		} else {
-			lcdDisCustom(fillInCell);
-		}
-	}
-}
+static BrightnessScreenState s_brightnessScreen;
+static BatteryInfoScreenState s_batteryInfoScreen;
+static ConnectInfoScreenState s_connectInfoScreen;
 
 static void _showTogglePrompt(const char* itemName, bool enabled) {
 	char line1[17];
@@ -86,7 +70,7 @@ static bool _waitToggleConfirm(const char* itemName, bool currentEnabled) {
 				overlayStarted = true;
 				lcdPushOverlayFrame();
 				lcdClear();
-				_renderToggleProgress(0);
+				renderHoldProgressBar("Hold to toggle", 0);
 			}
 
 			if (overlayStarted) {
@@ -96,7 +80,7 @@ static bool _waitToggleConfirm(const char* itemName, bool currentEnabled) {
 					? 100
 					: static_cast<uint8_t>(min(100UL, (progressElapsed * 100UL) / progressWindow));
 
-				_renderToggleProgress(percent);
+				renderHoldProgressBar("Hold to toggle", percent);
 
 				if (pressDurationMs >= TOGGLE_TRIGGER_MS) {
 					lcdPopOverlayFrame();
@@ -117,43 +101,52 @@ static bool _waitToggleConfirm(const char* itemName, bool currentEnabled) {
 		vTaskDelay(pdMS_TO_TICKS(20));
 	}
 }
-}
 
-void _enterBrightnessScreen() {
-	// 手动亮度调节界面：左右键改亮度，中键保存返回。
-	lcdText("Brightness:", 1);
+static void _renderBrightnessScreen() {
 	char buf[16];
 	snprintf(buf, sizeof(buf), "%d%%", (brightness * 100 + 127) / 255);
+	lcdText("Brightness:", 1);
 	lcdText(buf, 2);
+}
 
-	int lastBrightness = brightness;
-
-	while (!isButtonReadyToRespond(CENTER)) {
-		if (isButtonReadyToRespond(LEFT, 10)) {
-			buzzerPlayNavigateSound();
-			changeBrightness(-1);
-		}
-		if (isButtonReadyToRespond(RIGHT, 10)) {
-			buzzerPlayNavigateSound();
-			changeBrightness(1);
-		}
-
-		// 只有亮度变化才重绘文字
-		if (brightness != lastBrightness) {
-			snprintf(buf, sizeof(buf), "%d%%", (brightness * 100 + 127) / 255);
-			lcdText("Brightness:", 1);
-			lcdText(buf, 2);
-			lastBrightness = brightness;
-		}
-
-		vTaskDelay(10 / portTICK_PERIOD_MS);  // 节流
+static void _renderBatteryInfoScreen() {
+	if (!isfuelICConnected) {
+		lcdText("Fuel gauge N/A", 1);
+		lcdText("C:Back", 2);
+		return;
 	}
-	buzzerPlaySelectSound();
 
-	lcdText("Brightness saved", 1);
-	lcdText("Back to Menu", 2);
-	LOG_SYSTEM_INFO("Brightness set to %d%%", (brightness * 100 + 127) / 255);
-	delay(500);
+	readBatteryInfo();
+	uint16_t voltage = readVoltage();
+	int16_t current = readAverageCurrent();
+	uint8_t soc = readStateOfCharge();
+	uint16_t remainingCap = readRemainingCapacity();
+
+	lcdText("" + String(voltage) + "mV " + String(current) + "mA", 1);
+	lcdText(String(soc) + "% " + String(remainingCap) + "mAh", 2);
+}
+
+static void _renderConnectInfoScreen() {
+	if (WiFi.status() == WL_CONNECTED) {
+		lcdText("SSID:" + wifiConfigManager.getSSID(), 1);
+		lcdText("IP:" + WiFi.localIP().toString(), 2);
+	} else {
+		lcdText("Not Connected", 1);
+		lcdText("C:Back", 2);
+	}
+}
+
+}
+
+void enterBrightnessInterface() {
+    // 开发注释：新增同类“参数页”时，复用 active/lastValue/exitPending 三段式状态即可。
+    // 手动亮度调节界面：左右键改亮度，中键保存返回（非阻塞）。
+	s_brightnessScreen = BrightnessScreenState{};
+	s_brightnessScreen.active = true;
+	s_brightnessScreen.lastBrightness = brightness;
+	enterAppInterface(handleBrightnessInterface, false);
+	globalButtonDelay(FIRST_TIME_DELAY);
+	_renderBrightnessScreen();
 }
 
 void _toggleAutoBrightness() {
@@ -217,48 +210,26 @@ void _setupWebSetting(){
 	LOG_WEB_INFO("Web configured");
 }
 
-void _connectInfo(){
-	// 展示当前 WiFi 连接信息，按中键返回菜单。
-	if (WiFi.status() == WL_CONNECTED) {
-		lcdText("SSID:" + wifiConfigManager.getSSID(), 1);
-		lcdText("IP:" + WiFi.localIP().toString(), 2);
-	}
-	else {
-		lcdText("Not Connected", 1);
-		lcdText("", 2);
-	}
-
-	for(;;){
-		if(isButtonReadyToRespond(CENTER)){
-			clearCurrentInterface();
-			return;
-		}
-		vTaskDelay(10 / portTICK_PERIOD_MS);
-	}
+void enterConnectInfoInterface(){
+    // 开发注释：新增同类“信息页”时，复用 active + lastRefreshMs + appShouldRunPeriodic 模式。
+    // 展示当前 WiFi 连接信息，按中键返回（非阻塞）。
+	s_connectInfoScreen = ConnectInfoScreenState{};
+	s_connectInfoScreen.active = true;
+	s_connectInfoScreen.lastRefreshMs = millis() - 2000;
+	enterAppInterface(handleConnectInfoInterface, true);
+	globalButtonDelay(FIRST_TIME_DELAY);
+	_renderConnectInfoScreen();
 }
 
-void _enterBatteryInfoScreen() {
-	// 电池信息界面：周期刷新读数，按中键返回。
-	unsigned long lastBatteryUpdate = millis() - 10000; // 强制首次更新
-	while(true){
-		if(millis() - lastBatteryUpdate >= 10000 && isfuelICConnected){
-			readBatteryInfo();
-			uint16_t voltage = readVoltage();
-			int16_t current = readAverageCurrent();
-			uint8_t soc = readStateOfCharge();
-			uint16_t remainingCap = readRemainingCapacity();
-
-			lcdText("" + String(voltage) + "mV " + String(current) + "mA", 1);
-			lcdText(String(soc) + "% " + String(remainingCap) + "mAh", 2);
-
-			lastBatteryUpdate = millis();
-		}
-		if(isButtonReadyToRespond(CENTER)){
-			clearCurrentInterface();
-			return;
-		}
-		vTaskDelay(10 / portTICK_PERIOD_MS);
-	}
+void enterBatteryInfoInterface() {
+    // 开发注释：新增同类“周期采样页”时，仅替换刷新间隔与 render 函数即可。
+    // 电池信息界面：周期刷新读数，按中键返回（非阻塞）。
+	s_batteryInfoScreen = BatteryInfoScreenState{};
+	s_batteryInfoScreen.active = true;
+	s_batteryInfoScreen.lastBatteryUpdate = millis() - 10000;
+	enterAppInterface(handleBatteryInfoInterface, false);
+	globalButtonDelay(FIRST_TIME_DELAY);
+	_renderBatteryInfoScreen();
 }
 
 void _rebootSystem(){
@@ -268,4 +239,72 @@ void _rebootSystem(){
 	LOG_SYSTEM_INFO("System rebooting...");
 	delay(400);
 	ESP.restart();
+}
+
+static void handleBrightnessInterface() {
+	if (!s_brightnessScreen.active) {
+		return;
+	}
+
+	const unsigned long nowMs = millis();
+	if (s_brightnessScreen.exitPending) {
+		if ((long)(nowMs - s_brightnessScreen.exitAtMs) >= 0) {
+			s_brightnessScreen.active = false;
+			exitAppInterface(FIRST_TIME_DELAY);
+		}
+		return;
+	}
+
+	if (isButtonReadyToRespond(LEFT, 10)) {
+		buzzerPlayNavigateSound();
+		changeBrightness(-1);
+	}
+	if (isButtonReadyToRespond(RIGHT, 10)) {
+		buzzerPlayNavigateSound();
+		changeBrightness(1);
+	}
+
+	if (brightness != s_brightnessScreen.lastBrightness) {
+		s_brightnessScreen.lastBrightness = brightness;
+		_renderBrightnessScreen();
+	}
+
+	if (isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)) {
+		buzzerPlaySelectSound();
+		lcdText("Brightness saved", 1);
+		lcdText("Back to Menu", 2);
+		LOG_SYSTEM_INFO("Brightness set to %d%%", (brightness * 100 + 127) / 255);
+		s_brightnessScreen.exitPending = true;
+		s_brightnessScreen.exitAtMs = nowMs + 500;
+	}
+}
+
+static void handleBatteryInfoInterface() {
+	if (!s_batteryInfoScreen.active) {
+		return;
+	}
+
+	if (appHandleCenterExit()) {
+		s_batteryInfoScreen.active = false;
+		return;
+	}
+
+	if (appShouldRunPeriodic(s_batteryInfoScreen.lastBatteryUpdate, 10000U)) {
+		_renderBatteryInfoScreen();
+	}
+}
+
+static void handleConnectInfoInterface() {
+	if (!s_connectInfoScreen.active) {
+		return;
+	}
+
+	if (appHandleCenterExit()) {
+		s_connectInfoScreen.active = false;
+		return;
+	}
+
+	if (appShouldRunPeriodic(s_connectInfoScreen.lastRefreshMs, 2000U)) {
+		_renderConnectInfoScreen();
+	}
 }

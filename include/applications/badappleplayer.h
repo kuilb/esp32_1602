@@ -100,10 +100,14 @@ const LyricLine lyrics[] = {
 const int lyricCount = sizeof(lyrics) / sizeof(lyrics[0]);
 
 /**
- * @brief 播放Bad Apple原始帧数据文件（每帧64字节）
- * @param path SPIFFS文件系统中的文件路径
+ * @brief 进入 Bad Apple 界面（非阻塞，注册到状态机）
  */
-void playBadAppleFromFileRaw(const char* path);
+void enterBadAppleInterface();
+
+/**
+ * @brief 处理 Bad Apple 界面状态机，每帧调用一次
+ */
+void handleBadAppleInterface();
 
 
 #endif

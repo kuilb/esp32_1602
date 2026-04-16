@@ -12,6 +12,9 @@ const byte DNS_PORT = 53;
 // 当前是否处于配网模式的标志位
 bool inConfigMode = false;
 
+// 待执行重启标志（在回调中不能直接调用 ESP.restart()，否则会在 WiFi 事件回调中卡死）
+volatile bool pendingRestart = false;
+
 // WiFi连接状态
 WiFiConnectionState wifiConnectionState = WIFI_IDLE;
 
@@ -122,15 +125,16 @@ void wifiSethandler(){
 	LOG_NETWORK_INFO("ssid: %s", ssid.c_str());
 	_saveWiFiCredentials(ssid, password);
 	apServer.send(200, "application/json", "{\"success\":true}");
-	delay(500);
-	ESP.restart();
+	// 不在回调内直接 restart，否则 WiFi AP/STA 事件会在重启过程中乱序触发导致卡死
+	pendingRestart = true;
 }
 
 // 进入配网
 void enterConfigMode() {
+	inConfigMode = true;  // 先置位，让正在运行的 wifiConnectTask 感知并跳过 WiFi.mode(WIFI_OFF)
+
 	updateColor(CRGB::Purple);  // 配网紫灯
 
-	inConfigMode = true;
 	WiFi.softAP("1602A_Config");
 
     LOG_WIFI_INFO("Entering config mode");
@@ -210,7 +214,7 @@ void wifiConnectTask(void* parameter) {
 	
 	// 连接中蓝灯闪烁
 	uint32_t lastDotMs = 0;
-	while (millis() - startTime < 15000 && !shouldExitTasks) {
+	while (millis() - startTime < 15000 && !shouldExitTasks && !inConfigMode) {
 		const IPAddress ipNow = WiFi.localIP();
 		if (WiFi.status() == WL_CONNECTED || ipNow != IPAddress(0, 0, 0, 0)) {
 			break;
@@ -241,7 +245,10 @@ void wifiConnectTask(void* parameter) {
 	}
 
 	const IPAddress ipAfter = WiFi.localIP();
-	if (WiFi.status() == WL_CONNECTED || ipAfter != IPAddress(0, 0, 0, 0)) {
+	if (inConfigMode) {
+		// 配网模式已启动，跳过连接结果处理，不修改 WiFi 状态
+		LOG_WIFI_INFO("WiFi connect task: config mode active, aborting without touching WiFi mode");
+	} else if (WiFi.status() == WL_CONNECTED || ipAfter != IPAddress(0, 0, 0, 0)) {
 		wifiConnectionState = WIFI_CONNECTED;
 		LOG_WIFI_DEBUG("WiFi connected successfully");
 		
@@ -274,10 +281,12 @@ void wifiConnectTask(void* parameter) {
 	} else {
 			wifiConnectionState = WIFI_FAILED;
 			// 关闭射频，防止 WiFi 底层在后台继续自动尝试连接
-			WiFi.disconnect(true);
-			WiFi.mode(WIFI_OFF);
+			// 仅在非配网模式下关闭，避免把已启动的 AP 一并关掉
+			if (!inConfigMode) {
+				WiFi.disconnect(true);
+				WiFi.mode(WIFI_OFF);
+			}
 			LOG_WIFI_ERROR("can't connect to WiFi");
-
 			updateColor(CRGB::Red);  // 失败变红
 	}
 	

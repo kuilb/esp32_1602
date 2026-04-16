@@ -3,6 +3,7 @@
 #include <cstring>
 #include <Arduino.h>
 #include "esp_rom_sys.h"
+#include "driver/ledc.h"
 
 inline void _gpioWrite(int data, int mode); // 前置声明
 int lcdCursor = 0;  // 当前光标位置，全局变量 0~31
@@ -13,6 +14,15 @@ int contrast = 128;  // 默认对比度
 
 // 自定义字符槽位自动管理
 static int currentCharSlot = 0;     // 当前自动分配的槽位 (0~7)
+
+// ==============================
+// CGRAM 差分写入统计（用于效率分析）
+// ==============================
+// diff 策略：仅当槽位内容变化时写入
+// 全量策略基线：每帧所有被使用的槽位都无条件写入
+static uint32_t s_cgramDiffWrites    = 0;  // 实际触发的 CGRAM 写入次数（差分）
+static uint32_t s_cgramFullBaseline  = 0;  // 全量重写基线：每帧每个有效槽累加
+static uint32_t s_cgramFrameCount    = 0;  // 调用 lcdRenderDiff 的总帧数
 
 static constexpr uint8_t LCD_DDRAM_SIZE = 32;
 static constexpr uint8_t LCD_CGRAM_SLOTS = 8;
@@ -173,6 +183,37 @@ inline void _initLcdBacklightPwm(uint8_t initialDuty = 255) {
     ledcSetup(LCD_BLA_PWM_CHANNEL, LCD_BLA_PWM_FREQ, LCD_BLA_PWM_RESOLUTION);
     ledcAttachPin(LCD_BLA_PWM_PIN, LCD_BLA_PWM_CHANNEL);
     ledcWrite(LCD_BLA_PWM_CHANNEL, initialDuty);        // 设置初始亮度
+}
+
+/**
+ * @brief 将背光和对比度 LEDC timer 切换为 RC_FAST 时钟源
+ * @details 必须在 lcdInit() 之后调用。RC_FAST 在 light sleep 期间持续运行，
+ *          防止 CPU 进入 light sleep 时 APB 停摆导致 PWM 输出异常（背光闪烁）。
+ */
+void lcdReconfigPwmForLightSleep() {
+    // 背光：channel 0 → timer 0
+    ledc_timer_config_t bla_timer = {};
+    bla_timer.speed_mode      = LEDC_LOW_SPEED_MODE;
+    bla_timer.duty_resolution = static_cast<ledc_timer_bit_t>(LCD_BLA_PWM_RESOLUTION);
+    bla_timer.timer_num       = LEDC_TIMER_0;
+    bla_timer.freq_hz         = LCD_BLA_PWM_FREQ;
+    bla_timer.clk_cfg         = LEDC_USE_RTC8M_CLK;  // RC_FAST/RTC8M 在 light sleep 期间不停摆
+    esp_err_t err = ledc_timer_config(&bla_timer);
+    if (err != ESP_OK) {
+        Serial.printf("[LCD] backlight timer reconfig failed: %d\n", static_cast<int>(err));
+    }
+
+    // 对比度：channel 2 → timer 1
+    ledc_timer_config_t ctl_timer = {};
+    ctl_timer.speed_mode      = LEDC_LOW_SPEED_MODE;
+    ctl_timer.duty_resolution = static_cast<ledc_timer_bit_t>(LCD_CTL_PWM_RESOLUTION);
+    ctl_timer.timer_num       = LEDC_TIMER_1;
+    ctl_timer.freq_hz         = LCD_CTL_PWM_FREQ;
+    ctl_timer.clk_cfg         = LEDC_USE_RTC8M_CLK;
+    err = ledc_timer_config(&ctl_timer);
+    if (err != ESP_OK) {
+        Serial.printf("[LCD] contrast timer reconfig failed: %d\n", static_cast<int>(err));
+    }
 }
 
 // 改变当前亮度值
@@ -438,8 +479,11 @@ uint8_t lcdRenderDiff(const uint8_t ddram32[32], const uint8_t cgram8x8[8][8], c
     }
 
     // 先更新本帧用到的 CGRAM 槽位（仅当点阵变化时才写）
+    ++s_cgramFrameCount;
     for (int slot = 0; slot < 8; slot++) {
         if (!effectiveUsed[slot]) continue;
+
+        ++s_cgramFullBaseline;  // 全量策略基线：每个有效槽都会写
 
         const bool needWrite = (!s_hwFrame.valid)
             || (!s_hwFrame.cgramUsed[slot])
@@ -448,6 +492,7 @@ uint8_t lcdRenderDiff(const uint8_t ddram32[32], const uint8_t cgram8x8[8][8], c
             _writeCgramSlot(slot, cgram8x8[slot]);
             std::memcpy(s_hwFrame.cgram[slot], cgram8x8[slot], 8);
             slotChanged[slot] = true;
+            ++s_cgramDiffWrites;  // 差分策略：仅内容实际变化时计数
         }
         s_hwFrame.cgramUsed[slot] = true;
     }
@@ -498,4 +543,16 @@ void lcdPopOverlayFrame() {
 
     std::memcpy(&s_pendingFrame, &s_overlayBackupFrame, sizeof(LcdFrameState));
     s_overlayBackupValid = false;
+}
+
+void lcdResetCgramStats() {
+    s_cgramDiffWrites   = 0;
+    s_cgramFullBaseline = 0;
+    s_cgramFrameCount   = 0;
+}
+
+void lcdGetCgramStats(uint32_t* diffWrites, uint32_t* fullBaseline, uint32_t* frameCount) {
+    if (diffWrites)   *diffWrites   = s_cgramDiffWrites;
+    if (fullBaseline) *fullBaseline = s_cgramFullBaseline;
+    if (frameCount)   *frameCount   = s_cgramFrameCount;
 }

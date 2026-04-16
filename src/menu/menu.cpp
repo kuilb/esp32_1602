@@ -45,6 +45,7 @@ enum SettingsMenuIndex {
 
 // 菜单状态变量
 volatile bool inMenuMode = true;
+volatile bool wirelessScreenActive = false;
 volatile bool isReadyToDisplay = false;
 
 static MenuContext s_menuContext = {
@@ -84,6 +85,8 @@ void setCurrentInterface(InterfaceHandler handler) {
 
 void clearCurrentInterface() {
     s_currentHandler = nullptr;
+    // 统一回收应用界面联网声明，避免某些退出路径绕过应用内部清理导致状态残留。
+    resetAppInterfaceNetworkRequiredToDefault();
     s_menuContext.isDisplayNeedsUpdate = true;
 }
 
@@ -91,12 +94,70 @@ bool isInSubInterface() {
     return s_currentHandler != nullptr;
 }
 
+void enterAppInterface(InterfaceHandler handler, bool networkRequired) {
+    wirelessScreenActive = false;
+    setAppInterfaceNetworkRequired(networkRequired);
+    setCurrentInterface(handler);
+}
+
+void exitAppInterface(unsigned long delayMs) {
+    clearCurrentInterface();
+    globalButtonDelay(delayMs);
+}
+
+bool appHandleCenterExit(unsigned long debounceMs, unsigned long delayMs) {
+    if (!isButtonReadyToRespond(CENTER, debounceMs)) {
+        return false;
+    }
+    exitAppInterface(delayMs);
+    return true;
+}
+
+bool appHandleLeftRightStep(int& value,
+                            int minValue,
+                            int maxValue,
+                            int step,
+                            unsigned long debounceMs) {
+    if (maxValue < minValue) {
+        return false;
+    }
+
+    if (step <= 0) {
+        step = 1;
+    }
+
+    int next = value;
+    if (isButtonReadyToRespond(LEFT, debounceMs) && value > minValue) {
+        next = max(minValue, value - step);
+    } else if (isButtonReadyToRespond(RIGHT, debounceMs) && value < maxValue) {
+        next = min(maxValue, value + step);
+    }
+
+    if (next == value) {
+        return false;
+    }
+
+    value = next;
+    buzzerPlayNavigateSound();
+    return true;
+}
+
+bool appShouldRunPeriodic(unsigned long& lastRunMs, unsigned long intervalMs) {
+    const unsigned long nowMs = millis();
+    if (intervalMs == 0 || (uint32_t)(nowMs - lastRunMs) >= intervalMs) {
+        lastRunMs = nowMs;
+        return true;
+    }
+    return false;
+}
+
 extern WifiConfigManager wifiConfigManager;
 
-void _enterWirelessScreen(){
+void enterWirelessScreenInterface(){
     // 进入无线界面：未联网则启动配网，已联网则展示连接信息。
     LOG_MENU_INFO("Entering Wireless Screen");
     inMenuMode = false;
+    wirelessScreenActive = true;
 
     // WiFi 未连接时，启动配网
     if (WiFi.status() != WL_CONNECTED) {
@@ -110,26 +171,6 @@ void _enterWirelessScreen(){
         lcdText("SSID:" + wifiConfigManager.getSSID(),1);
         lcdText("IP:" + WiFi.localIP().toString(),2);
     }
-}
-
-void _setClockInterface(){
-    // 切换到时钟应用状态机。
-    enterClockInterface();
-}
-
-void _setWeatherInterface(){
-    // 切换到天气应用状态机。
-    enterWeatherInterface();
-}
-
-void _playBadAppleWrapper() {
-    // 播放 Bad Apple 动画文件。
-    playBadAppleFromFileRaw("/badapple.bin");
-}
-
-void _startPomodoroWrapper() {
-    // 启动番茄钟应用（25分钟工作 + 5分钟休息循环）。
-    runPomodoroApp();
 }
 
 static const MenuNavigationCallbacks kMenuNavigationCallbacks = {
@@ -305,6 +346,7 @@ void menuHandleBackAction() {
     if (!inMenuMode) {
         buzzerPlayBackSound();
         inMenuMode = true;
+        wirelessScreenActive = false;
         clearCurrentInterface();
         s_menuContext.currentMenu = &allMenus[MENU_MAIN];
         s_menuContext.menuCursor = 0;
@@ -498,11 +540,13 @@ void _menuTask(void* parameter) {
         if (inMenuMode) {
             _dispatchCurrentInterfaceState();
         }
+        const bool interfaceActive = inMenuMode && isInSubInterface();
         const bool menuIdleNoSync = inMenuMode
+            && !interfaceActive
             && !inConfigMode
             && !clientConnected
             && (timeSyncState != TIME_SYNC_IN_PROGRESS);
-        vTaskDelay(pdMS_TO_TICKS(menuIdleNoSync ? 120 : 50));
+        vTaskDelay(pdMS_TO_TICKS(interfaceActive ? 5 : (menuIdleNoSync ? 120 : 50)));
     }
     
     // 任务退出清理

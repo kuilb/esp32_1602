@@ -1,7 +1,58 @@
 #include "./applications/badappleplayer.h"
 #include "hardware/buzzer.h"
+#include <cstring>
 
 static const uint8_t BADAPPLE_BUZZER_VOLUME = 35;
+static const int64_t kBadAppleFrameDurationUs = 33333;
+
+struct BadAppleRuntimeState {
+    bool active = false;
+    File file;
+    int totalFrames = 0;
+    int currentFrame = 0;
+    int melodyIndex = 0;
+    int64_t startTime = 0;
+    int64_t nextFrameTime = 0;
+    int64_t nextNoteTime = 0;
+    uint16_t currentFreq = 0;
+    uint16_t currentDur = 0;
+    uint32_t melodyCumulativeMs[4096] = {0};
+    uint32_t frameTimestampMs[8192] = {0};
+};
+
+static BadAppleRuntimeState s_badapple;
+
+static void _resetBadAppleRuntimeState() {
+    s_badapple.active = false;
+    s_badapple.file = File();
+    s_badapple.totalFrames = 0;
+    s_badapple.currentFrame = 0;
+    s_badapple.melodyIndex = 0;
+    s_badapple.startTime = 0;
+    s_badapple.nextFrameTime = 0;
+    s_badapple.nextNoteTime = 0;
+    s_badapple.currentFreq = 0;
+    s_badapple.currentDur = 0;
+    std::memset(s_badapple.melodyCumulativeMs, 0, sizeof(s_badapple.melodyCumulativeMs));
+    std::memset(s_badapple.frameTimestampMs, 0, sizeof(s_badapple.frameTimestampMs));
+}
+
+static void _stopBadApplePlayback(bool completed) {
+    if (s_badapple.file) {
+        s_badapple.file.close();
+    }
+    buzzerNoTone();
+    const int64_t endTime = esp_timer_get_time();
+    if (s_badapple.startTime > 0) {
+        const int64_t totalUs = endTime - s_badapple.startTime;
+        LOG_DISPLAY_INFO("Bad Apple playback %s. Total time: %lld us (%.2f s)",
+            completed ? "finished" : "stopped",
+            totalUs,
+            totalUs / 1000000.0f);
+    }
+    _resetBadAppleRuntimeState();
+    exitAppInterface(FIRST_TIME_DELAY);
+}
 
 static inline void _setBadAppleTone(uint16_t frequency) {
     if (frequency > 0) {
@@ -120,159 +171,118 @@ void _processBadapple(const uint8_t* raw, int currentFrame) {
     _lyricDisplay(lyric,2);
 }
 
+void enterBadAppleInterface() {
+    // 统一应用入口：非联网、非阻塞状态机。
+    enterAppInterface(handleBadAppleInterface, false);
 
-// 播放 Bad Apple 原始帧数据（每帧64字节，不含协议头）
-void playBadAppleFromFileRaw(const char* path) {
-    Serial.println("尝试打开文件: " + String(path));
-    
-    // 检查文件是否存在
-    if (!SPIFFS.exists(path)) {
-        LOG_SYSTEM_WARN("Bad Apple file not found: %s", path);
-        lcdText("File Not Found",1);
-        lcdText(" ",2);
-        delay(1000);
-        return;
-    }
-    
-    File file = SPIFFS.open(path, "r");
-    if (!file) {
-        LOG_SYSTEM_WARN("Failed to open Bad Apple file: %s", path);
-        lcdText("Err Open File",1);
-        lcdText(" ",2);
-        delay(1000);
+    if (!SPIFFS.exists("/badapple.bin")) {
+        LOG_SYSTEM_WARN("Bad Apple file not found: /badapple.bin");
+        lcdText("File Not Found", 1);
+        lcdText(" ", 2);
+        exitAppInterface(FIRST_TIME_DELAY);
         return;
     }
 
-    LOG_SYSTEM_INFO("Playing Bad Apple from file: %s, size: %d bytes", path, file.size());
-    int totalFrames = (int)(file.size() / 64);
-    LOG_SYSTEM_INFO("Melody length: %d, Frame count: %d", badAppleMelodyLength, totalFrames);
-
-    // 计算音频总时长（ms）
-    uint64_t audioTotalMs = 0;
-    for (int i = 0; i < badAppleMelodyLength; ++i) {
-        audioTotalMs += pgm_read_word(&badAppleMelodyDurations[i]);
+    _resetBadAppleRuntimeState();
+    s_badapple.file = SPIFFS.open("/badapple.bin", "r");
+    if (!s_badapple.file) {
+        LOG_SYSTEM_WARN("Failed to open Bad Apple file: /badapple.bin");
+        lcdText("Err Open File", 1);
+        lcdText(" ", 2);
+        exitAppInterface(FIRST_TIME_DELAY);
+        return;
     }
-    float audioTotalSec = audioTotalMs / 1000.0f;
 
-    // 计算画面总时长（ms）
-    const int64_t frameDurationUs = 33333; // 1000000 / 30
-    float videoTotalMs = totalFrames * frameDurationUs / 1000.0f;
-    float videoTotalSec = videoTotalMs / 1000.0f;
-
-    LOG_SYSTEM_INFO("Audio total: %llu ms (%.2f s), Video total: %.0f ms (%.2f s)", audioTotalMs, audioTotalSec, videoTotalMs, videoTotalSec);
-
-    // 预计算每个音符的累计起始时间（ms）
-    static uint32_t melodyCumulativeMs[4096]; // 足够大
-    melodyCumulativeMs[0] = 0;
+    s_badapple.totalFrames = static_cast<int>(s_badapple.file.size() / 64);
     for (int i = 1; i < badAppleMelodyLength; ++i) {
-        melodyCumulativeMs[i] = melodyCumulativeMs[i-1] + pgm_read_word(&badAppleMelodyDurations[i-1]);
+        s_badapple.melodyCumulativeMs[i] = s_badapple.melodyCumulativeMs[i - 1]
+            + pgm_read_word(&badAppleMelodyDurations[i - 1]);
+    }
+    for (int i = 0; i < s_badapple.totalFrames; ++i) {
+        s_badapple.frameTimestampMs[i] = static_cast<uint32_t>(i * kBadAppleFrameDurationUs / 1000);
     }
 
-    // 计算每帧的理论时间戳（ms）
-    static uint32_t frameTimestampMs[8192]; // 足够大
-    for (int i = 0; i < totalFrames; ++i) {
-        frameTimestampMs[i] = (uint32_t)(i * frameDurationUs / 1000);
+    s_badapple.startTime = esp_timer_get_time();
+    s_badapple.nextFrameTime = s_badapple.startTime;
+    s_badapple.melodyIndex = 0;
+    if (badAppleMelodyLength > 0) {
+        s_badapple.currentFreq = pgm_read_word(&badAppleMelodyFrequencies[0]);
+        s_badapple.currentDur = pgm_read_word(&badAppleMelodyDurations[0]);
+        s_badapple.nextNoteTime = s_badapple.startTime + static_cast<int64_t>(s_badapple.currentDur) * 1000;
+        _setBadAppleTone(s_badapple.currentFreq);
+    }
+    s_badapple.active = true;
+
+    lcdText(" ", 1);
+    lcdText(" ", 2);
+    LOG_SYSTEM_INFO("Bad Apple state-machine started: frames=%d melody=%d",
+        s_badapple.totalFrames,
+        badAppleMelodyLength);
+}
+
+void handleBadAppleInterface() {
+    if (!s_badapple.active) {
+        return;
     }
 
-    const size_t frameSize = 64;
-    uint8_t frame[frameSize];
-    int currentFrame = 0;
-    lcdText(" ",1);
-    lcdText(" ",2);
+    int64_t now = esp_timer_get_time();
 
-    // 使用微秒级计时器进行精确控制 (30 FPS)
-    int64_t startTime = esp_timer_get_time();
-    int64_t nextFrameTime = startTime;
-
-    // 音符同步推进
-    int melodyIndex = 0;
-    int64_t now = startTime;
-    int64_t nextNoteTime = now;
-    uint16_t currentFreq = 0;
-    uint16_t currentDur = 0;
-    // 初始化第一音符
-    if (melodyIndex < badAppleMelodyLength) {
-        currentFreq = pgm_read_word(&badAppleMelodyFrequencies[melodyIndex]);
-        currentDur = pgm_read_word(&badAppleMelodyDurations[melodyIndex]);
-        nextNoteTime = now + currentDur * 1000;
-        _setBadAppleTone(currentFreq);
+    while (now >= s_badapple.nextNoteTime && s_badapple.melodyIndex < badAppleMelodyLength - 1) {
+        s_badapple.melodyIndex++;
+        s_badapple.currentFreq = pgm_read_word(&badAppleMelodyFrequencies[s_badapple.melodyIndex]);
+        s_badapple.currentDur = pgm_read_word(&badAppleMelodyDurations[s_badapple.melodyIndex]);
+        s_badapple.nextNoteTime += static_cast<int64_t>(s_badapple.currentDur) * 1000;
+        _setBadAppleTone(s_badapple.currentFreq);
     }
 
-    while (file.available() >= frameSize && melodyIndex < badAppleMelodyLength) {
-        now = esp_timer_get_time();
+    if (buttonJustPressed[CENTER] && s_badapple.currentFrame >= 15) {
+        _stopBadApplePlayback(false);
+        return;
+    }
 
-        // 调试信息：当前帧、音符索引、计时器
-        if (currentFrame % 10 == 0 || melodyIndex % 10 == 0) {
-            LOG_SYSTEM_DEBUG("Frame: %d/%d, Melody: %d/%d, Timer(us): %lld", currentFrame, (int)(file.size() / frameSize), melodyIndex, badAppleMelodyLength, now);
+    bool seeked = false;
+    int seekFrame = s_badapple.currentFrame;
+    if (buttonJustPressed[LEFT]) {
+        seekFrame = max(0, s_badapple.currentFrame - 20);
+        seeked = true;
+    } else if (buttonJustPressed[RIGHT]) {
+        seekFrame = min(s_badapple.totalFrames - 1, s_badapple.currentFrame + 10);
+        seeked = true;
+    }
+
+    if (seeked) {
+        s_badapple.currentFrame = seekFrame;
+        s_badapple.file.seek(static_cast<size_t>(s_badapple.currentFrame) * 64, SeekSet);
+        s_badapple.nextFrameTime = now;
+
+        uint32_t targetMs = s_badapple.frameTimestampMs[s_badapple.currentFrame];
+        int newMelodyIdx = 0;
+        while (newMelodyIdx < badAppleMelodyLength - 1
+            && s_badapple.melodyCumulativeMs[newMelodyIdx + 1] <= targetMs) {
+            ++newMelodyIdx;
         }
+        s_badapple.melodyIndex = newMelodyIdx;
+        s_badapple.currentFreq = pgm_read_word(&badAppleMelodyFrequencies[s_badapple.melodyIndex]);
+        s_badapple.currentDur = pgm_read_word(&badAppleMelodyDurations[s_badapple.melodyIndex]);
+        uint32_t melodyElapsedMs = s_badapple.melodyCumulativeMs[s_badapple.melodyIndex];
+        uint32_t deltaMs = (targetMs > melodyElapsedMs) ? (targetMs - melodyElapsedMs) : 0;
+        uint32_t remainMs = (s_badapple.currentDur > deltaMs) ? (s_badapple.currentDur - deltaMs) : 1;
+        s_badapple.nextNoteTime = now + static_cast<int64_t>(remainMs) * 1000;
+        _setBadAppleTone(s_badapple.currentFreq);
+    }
 
-        // 音符推进
-        if (now >= nextNoteTime && melodyIndex < badAppleMelodyLength - 1) {
-            melodyIndex++;
-            currentFreq = pgm_read_word(&badAppleMelodyFrequencies[melodyIndex]);
-            currentDur = pgm_read_word(&badAppleMelodyDurations[melodyIndex]);
-            nextNoteTime += currentDur * 1000;
-            _setBadAppleTone(currentFreq);
-        }
-
-        // 画面推进
-        if (now >= nextFrameTime) {
-            // 读取并显示当前帧
-            file.read(frame, frameSize);
-            _processBadapple(frame, currentFrame);
-            currentFrame++;
-            nextFrameTime += frameDurationUs;
+    if (now >= s_badapple.nextFrameTime) {
+        const size_t frameSize = 64;
+        if (s_badapple.file.available() >= static_cast<int>(frameSize)
+            && s_badapple.melodyIndex < badAppleMelodyLength) {
+            uint8_t frame[frameSize];
+            s_badapple.file.read(frame, frameSize);
+            _processBadapple(frame, s_badapple.currentFrame);
+            s_badapple.currentFrame++;
+            s_badapple.nextFrameTime += kBadAppleFrameDurationUs;
         } else {
-            // 等待下一个事件
-            int64_t waitUs = std::min(nextFrameTime, nextNoteTime) - now;
-            if (waitUs > 2000) {
-                vTaskDelay(pdMS_TO_TICKS(waitUs / 1000));
-            } else if (waitUs > 0) {
-                delayMicroseconds(waitUs);
-            }
-        }
-
-        // 退出条件
-        if(buttonJustPressed[CENTER] && currentFrame >= 15){
-            clearCurrentInterface();
-            buzzerNoTone();
-            break;
-        }
-        // 快退/快进
-        bool seeked = false;
-        int seekFrame = currentFrame;
-        if(buttonJustPressed[LEFT]){
-            seekFrame = max(0, currentFrame - 20);
-            seeked = true;
-        } else if(buttonJustPressed[RIGHT]){
-            seekFrame = min((int)(file.size() / frameSize) - 1, currentFrame + 10);
-            seeked = true;
-        }
-        if (seeked) {
-            currentFrame = seekFrame;
-            file.seek(currentFrame * frameSize, SeekSet);
-            nextFrameTime = esp_timer_get_time();
-            // 精准音符同步：找到累计音符时长 >= 当前帧理论时间戳的第一个音符
-            uint32_t targetMs = frameTimestampMs[currentFrame];
-            int newMelodyIdx = 0;
-            while (newMelodyIdx < badAppleMelodyLength-1 && melodyCumulativeMs[newMelodyIdx+1] <= targetMs) {
-                ++newMelodyIdx;
-            }
-            melodyIndex = newMelodyIdx;
-            currentFreq = pgm_read_word(&badAppleMelodyFrequencies[melodyIndex]);
-            currentDur = pgm_read_word(&badAppleMelodyDurations[melodyIndex]);
-            now = esp_timer_get_time();
-            // 计算下一个音符的绝对时间戳
-            uint32_t melodyElapsedMs = melodyCumulativeMs[melodyIndex];
-            nextNoteTime = now + (currentDur - (targetMs - melodyElapsedMs)) * 1000;
-            _setBadAppleTone(currentFreq);
+            _stopBadApplePlayback(true);
+            return;
         }
     }
-
-    int64_t endTime = esp_timer_get_time();
-    file.close();
-    buzzerNoTone();
-    int64_t totalUs = endTime - startTime;
-    float totalSec = totalUs / 1000000.0f;
-    LOG_DISPLAY_INFO("Bad Apple playback finished. Total time: %lld us (%.2f s)", totalUs, totalSec);
 }

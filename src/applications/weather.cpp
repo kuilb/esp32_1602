@@ -22,6 +22,10 @@ static bool s_weatherReadyToDisplay = false;
 static unsigned long s_lastWeatherFail = 0;
 static unsigned long s_lastWeatherFailSoundMs = 0;
 
+static void _exitWeatherToMenu(unsigned long delayMs = FIRST_TIME_DELAY) {
+    exitAppInterface(delayMs);
+}
+
 static void _playWeatherFailSoundThrottled(unsigned long intervalMs = 2500) {
     const unsigned long now = millis();
     if (now - s_lastWeatherFailSoundMs < intervalMs) {
@@ -41,7 +45,6 @@ static bool _ensureWeatherTimeSynced() {
             lcdText("Time not synced", 1);
             lcdText("", 2);
             _playWeatherFailSoundThrottled();
-            delay(500);
             return false;
         }
     }
@@ -50,13 +53,12 @@ static bool _ensureWeatherTimeSynced() {
 
 void enterWeatherInterface() {
     s_weatherIsNewInterface = true;
-    setCurrentInterface(handleWeatherInterface);
+    enterAppInterface(handleWeatherInterface, true);
 }
 
 void handleWeatherInterface() {
     if (!_ensureWeatherTimeSynced()) {
-        clearCurrentInterface();
-        globalButtonDelay(FIRST_TIME_DELAY);
+        _exitWeatherToMenu();
         return;
     }
 
@@ -65,26 +67,21 @@ void handleWeatherInterface() {
         lcdText("No WiFi", 1);
         lcdText(" ", 2);
         _playWeatherFailSoundThrottled();
-        clearCurrentInterface();
-        globalButtonDelay(FIRST_TIME_DELAY);
+        _exitWeatherToMenu();
         return;
     }
     if (!qweatherAuthConfigManager.checkApiConfigValid()) {
         lcdText("No API config", 1);
         lcdText("Use web config", 2);
         _playWeatherFailSoundThrottled();
-        clearCurrentInterface();
-        globalButtonDelay(FIRST_TIME_DELAY);
-        delay(600);
+        _exitWeatherToMenu();
         return;
     }
     if (!qweatherAuthConfigManager.checkLocationConfigValid()) {
         lcdText("No City Set", 1);
         lcdText("Use Web Config", 2);
         _playWeatherFailSoundThrottled();
-        clearCurrentInterface();
-        globalButtonDelay(FIRST_TIME_DELAY);
-        delay(600);
+        _exitWeatherToMenu();
         return;
     }
 
@@ -101,8 +98,7 @@ void handleWeatherInterface() {
                 _playWeatherFailSoundThrottled(4000);
                 s_weatherReadyToDisplay = false;
                 s_lastWeatherFail = millis();
-                clearCurrentInterface();
-                globalButtonDelay(FIRST_TIME_DELAY);
+                _exitWeatherToMenu();
                 return;
             }
         }
@@ -117,8 +113,7 @@ void handleWeatherInterface() {
 
     if (isButtonReadyToRespond(CENTER, BUTTON_DEBOUNCE_DELAY)) {
         LOG_WEATHER_INFO("Exit weather interface to menu");
-        clearCurrentInterface();
-        globalButtonDelay(FIRST_TIME_DELAY);
+        _exitWeatherToMenu();
         return;
     }
 

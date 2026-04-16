@@ -290,27 +290,27 @@ void readLightInfo() {
     }
 
     // ==================== 串口输出 ====================
-    LOG_ALS_DEBUG("========== OPT3001 光传感器信息 ==========");
+    // LOG_ALS_DEBUG("========== OPT3001 光传感器信息 ==========");
     
-    LOG_ALS_DEBUG("--- 设备识别 ---");
-    LOG_ALS_DEBUG("制造商ID: 0x%04X %s", mfgId, mfgId == OPT3001_MANUFACTURER_ID ? "(TI)" : "(未知)");
-    LOG_ALS_DEBUG("设备ID: 0x%04X %s", devId, devId == OPT3001_DEVICE_ID ? "(OPT3001)" : "(未知)");
+    // LOG_ALS_DEBUG("--- 设备识别 ---");
+    // LOG_ALS_DEBUG("制造商ID: 0x%04X %s", mfgId, mfgId == OPT3001_MANUFACTURER_ID ? "(TI)" : "(未知)");
+    // LOG_ALS_DEBUG("设备ID: 0x%04X %s", devId, devId == OPT3001_DEVICE_ID ? "(OPT3001)" : "(未知)");
     
-    LOG_ALS_DEBUG("--- 光照测量 ---");
-    LOG_ALS_DEBUG("光照强度: %.2f lux", lux);
-    LOG_ALS_DEBUG("原始结果: 0x%04X", rawResult);
-    LOG_ALS_DEBUG("转换状态: %s", convReady ? "完成" : "进行中");
-    LOG_ALS_DEBUG("溢出状态: %s", overflow ? "是" : "否");
+    // LOG_ALS_DEBUG("--- 光照测量 ---");
+    // LOG_ALS_DEBUG("光照强度: %.2f lux", lux);
+    // LOG_ALS_DEBUG("原始结果: 0x%04X", rawResult);
+    // LOG_ALS_DEBUG("转换状态: %s", convReady ? "完成" : "进行中");
+    // LOG_ALS_DEBUG("溢出状态: %s", overflow ? "是" : "否");
     
-    LOG_ALS_DEBUG("--- 配置信息 ---");
-    LOG_ALS_DEBUG("配置寄存器: 0x%04X", config);
-    LOG_ALS_DEBUG("量程编号: %d", rangeNumber);
-    LOG_ALS_DEBUG("转换时间: %s", is800ms ? "800ms" : "100ms");
-    LOG_ALS_DEBUG("工作模式: %s", modeStr);
+    // LOG_ALS_DEBUG("--- 配置信息 ---");
+    // LOG_ALS_DEBUG("配置寄存器: 0x%04X", config);
+    // LOG_ALS_DEBUG("量程编号: %d", rangeNumber);
+    // LOG_ALS_DEBUG("转换时间: %s", is800ms ? "800ms" : "100ms");
+    // LOG_ALS_DEBUG("工作模式: %s", modeStr);
     
-    LOG_ALS_DEBUG("--- 阈值设置 ---");
-    LOG_ALS_DEBUG("低阈值: %.2f lux %s", lowLimit, flagLow ? "[已触发]" : "");
-    LOG_ALS_DEBUG("高阈值: %.2f lux %s", highLimit, flagHigh ? "[已触发]" : "");
+    // LOG_ALS_DEBUG("--- 阈值设置 ---");
+    // LOG_ALS_DEBUG("低阈值: %.2f lux %s", lowLimit, flagLow ? "[已触发]" : "");
+    // LOG_ALS_DEBUG("高阈值: %.2f lux %s", highLimit, flagHigh ? "[已触发]" : "");
     
-    LOG_ALS_DEBUG("==========================================\n");
+    // LOG_ALS_DEBUG("==========================================\n");
 }

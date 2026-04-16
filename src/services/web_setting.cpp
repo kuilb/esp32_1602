@@ -5,6 +5,7 @@
 #include "./services/auto_brightness.h"
 #include "./services/config_manager.h"
 #include "./hardware/buzzer.h"
+#include "./applications/weather.h"
 #include "esp32-hal-cpu.h"
 
 extern QWeatherAuthConfigManager qweatherAuthConfigManager;

@@ -1,23 +1,25 @@
 #include "./menu/menu.h"
+#include "./applications/clock.h"
+#include "./applications/weather.h"
+#include "./applications/pomodoro.h"
+#include "./applications/badappleplayer.h"
 #include "./applications/setting.h"
 #include "./applications/about.h"
 
-// 菜单动作函数由 menu.cpp 提供实现，这里只做声明用于菜单表绑定。
-void _enterWirelessScreen();
-void _setClockInterface();
-void _setWeatherInterface();
-void _playBadAppleWrapper();
-void _startPomodoroWrapper();
+// 新应用接入最小步骤：
+// 1) include 对应应用头；
+// 2) 在 mainMenuItems 添加 APP_MENU_ITEM("Name", enterXxxInterface, true/false)；
+// 3) 无需额外 wrapper，网络需求由第三个参数统一声明。
 
 // 主菜单
 const MenuItem mainMenuItems[] = {
-    {"Wireless Screen",     _enterWirelessScreen, MENU_NONE},
-    {"Clock",               _setClockInterface, MENU_NONE},
-    {"Weather",             _setWeatherInterface, MENU_NONE},
-    {"Pomodoro",            _startPomodoroWrapper, MENU_NONE},
+    {"Wireless Screen",     enterWirelessScreenInterface, MENU_NONE},
+    APP_MENU_ITEM("Clock",     enterClockInterface, false),
+    APP_MENU_ITEM("Weather",   enterWeatherInterface, true),
+    APP_MENU_ITEM("Pomodoro",  enterPomodoroInterface, false),
     {"Settings",            NULL, MENU_SETTINGS},
     {"About",               NULL, MENU_ABOUT},
-    {"Bad Apple",           _playBadAppleWrapper, MENU_NONE}
+    APP_MENU_ITEM("Bad Apple", enterBadAppleInterface, false)
 };
 
 // 设置菜单
@@ -26,8 +28,8 @@ const MenuItem settingsMenuItems[] = {
     {"WiFi Config",     NULL, MENU_WIFI_CONFIG},
     {"Auto Bright",     _toggleAutoBrightness, MENU_NONE},
     {"Sound FX",        _toggleSoundEffects, MENU_NONE},
-    {"Brightness",      _enterBrightnessScreen, MENU_NONE},
-    {"Battery info",    _enterBatteryInfoScreen, MENU_NONE},
+    {"Brightness",      enterBrightnessInterface, MENU_NONE},
+    {"Battery info",    enterBatteryInfoInterface, MENU_NONE},
     {"Reset fuel IC",   _resetFuelGauge, MENU_NONE},
     {"Reboot",          _rebootSystem, MENU_NONE},
     {"Return",          NULL, MENU_MAIN}
@@ -35,7 +37,7 @@ const MenuItem settingsMenuItems[] = {
 
 // WiFi 配置菜单
 const MenuItem wifiConfigMenuItems[] = {
-    {"connect Info",    _connectInfo, MENU_NONE},
+    {"connect Info",    enterConnectInfoInterface, MENU_NONE},
     {"Reset Wifi",      _resetWifi, MENU_NONE},
     {"Return",          NULL, MENU_SETTINGS}
 };

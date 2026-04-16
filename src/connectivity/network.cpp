@@ -13,6 +13,13 @@ std::deque<FramePacket> frameCache;     // 用双端队列方便插入删除
 // 连接用
 WiFiServer server(CONNECT_PORT);        //连接端口
 bool clientConnected = false;
+static volatile bool s_appInterfaceNetworkRequired =
+#if APP_INTERFACE_DEFAULT_NETWORK_REQUIRED
+    true;
+#else
+    false;
+#endif
+static volatile bool s_appInterfaceNetworkRequiredOverridden = false;
 
 // 网络用缓存
 std::vector<uint8_t> recvBuffer;
@@ -23,6 +30,33 @@ static uint32_t s_duplicateDisplayPackets = 0;
 static uint32_t s_lastDuplicateLogMs = 0;
 static bool s_clientHasReceivedPayload = false;
 static const uint32_t kInitialClientSilentTimeoutMs = 20000;
+static const uint32_t kPostAcceptConnectedGraceMs = 1200;
+static const uint32_t kTransientDisconnectDebounceMs = 1200;
+static bool s_connectedCached = false;
+static uint32_t s_lastConnectedCheckMs = 0;
+static uint32_t s_disconnectSuspectSinceMs = 0;
+
+static bool _checkClientConnectedLocked(uint32_t nowMs) {
+    if (!clientConnected) {
+        s_connectedCached = false;
+        return false;
+    }
+
+    // 新连接短时间内可能出现底层 connected() 抖动，先按“已连接”处理，
+    // 给首包/心跳一个到达窗口，避免误判秒断。
+    if (!s_clientHasReceivedPayload
+        && (uint32_t)(nowMs - lastClientActivity) < kPostAcceptConnectedGraceMs) {
+        s_connectedCached = true;
+        return true;
+    }
+
+    // 限频检查底层 connected()，避免高频调用触发大量核心日志。
+    if (!s_connectedCached || (uint32_t)(nowMs - s_lastConnectedCheckMs) >= 200) {
+        s_connectedCached = client.connected();
+        s_lastConnectedCheckMs = nowMs;
+    }
+    return s_connectedCached;
+}
 
 static void _cleanupClientStreamState() {
     recvBuffer.clear();
@@ -30,6 +64,9 @@ static void _cleanupClientStreamState() {
     frameCache.clear();
     s_lastDisplayPacket.clear();
     s_clientHasReceivedPayload = false;
+    s_connectedCached = false;
+    s_lastConnectedCheckMs = 0;
+    s_disconnectSuspectSinceMs = 0;
 }
 
 static size_t trimFrameCacheLockedByPolicy(uint32_t nowMs) {
@@ -50,15 +87,28 @@ static size_t trimFrameCacheLockedByPolicy(uint32_t nowMs) {
     return dropped;
 }
 
-static void logTrimIfNeeded(size_t dropped, uint32_t nowMs) {
-    static uint32_t lastLogMs = 0;
-    if (dropped == 0) return;
-    if ((uint32_t)(nowMs - lastLogMs) < 500) return;
-    lastLogMs = nowMs;
-    LOG_NETWORK_WARN("Frame cache trimmed (dropped=%u), keep latency <= %u ms (size=%u).",
-        static_cast<unsigned int>(dropped),
-        static_cast<unsigned int>(MAX_LATENCY_MS),
-        static_cast<unsigned int>(frameCache.size()));
+static void logTrimIfNeeded(size_t policyDropped, size_t replaceDropped, uint32_t nowMs) {
+    static uint32_t lastPolicyLogMs = 0;
+    static uint32_t lastReplaceLogMs = 0;
+    static uint32_t replaceAccum = 0;
+
+    if (policyDropped > 0 && (uint32_t)(nowMs - lastPolicyLogMs) >= 500) {
+        lastPolicyLogMs = nowMs;
+        LOG_NETWORK_WARN("Frame cache policy drop (dropped=%u), keep latency <= %u ms (size=%u).",
+            static_cast<unsigned int>(policyDropped),
+            static_cast<unsigned int>(MAX_LATENCY_MS),
+            static_cast<unsigned int>(frameCache.size()));
+    }
+
+    if (replaceDropped > 0) {
+        replaceAccum += static_cast<uint32_t>(replaceDropped);
+        if ((uint32_t)(nowMs - lastReplaceLogMs) >= 2000) {
+            lastReplaceLogMs = nowMs;
+            LOG_NETWORK_DEBUG("Realtime frame replacement dropped=%u (2s)",
+                static_cast<unsigned int>(replaceAccum));
+            replaceAccum = 0;
+        }
+    }
 }
 
 void initNetwork() {
@@ -137,12 +187,15 @@ void acceptClientIfNew() {
         if (clientMutex != nullptr && xSemaphoreTake(clientMutex, pdMS_TO_TICKS(25)) == pdTRUE) {
             client = server.accept();
             if (client) {
+                _cleanupClientStreamState();
                 clientConnected = true;
+                s_connectedCached = true;
+                s_lastConnectedCheckMs = millis();
+                // 立即唤醒 WiFi：防止 sleep 模式在连接建立瞬间导致 RST
+                WiFi.setSleep(false);
                 // 低延迟：关闭 Nagle，减少小包合并带来的额外等待
                 client.setNoDelay(true);
                 updateColor(CRGB::Orange);      // RGB灯=黄色
-                lastClientActivity = millis();
-                _cleanupClientStreamState();
                 lastClientActivity = millis();
 
                 LOG_NETWORK_INFO("Socket Client connected from %s:%d",
@@ -165,15 +218,39 @@ void receiveClientData() {
 
     bool connectedNow = false;
     int availableNow = 0;
+    uint32_t nowMs = 0;
     if (clientMutex != nullptr && xSemaphoreTake(clientMutex, pdMS_TO_TICKS(25)) == pdTRUE) {
-        connectedNow = clientConnected && client.connected();
-        if (connectedNow) {
+        nowMs = millis();
+        connectedNow = _checkClientConnectedLocked(nowMs);
+        if (clientConnected) {
             availableNow = client.available();
+        }
+
+        // 某些场景 connected() 会短暂抖动为 false，但缓冲区仍有数据可读，
+        // 此时不应判定断连。
+        if (!connectedNow && availableNow > 0) {
+            connectedNow = true;
+            s_connectedCached = true;
+            s_lastConnectedCheckMs = nowMs;
         }
         xSemaphoreGive(clientMutex);
     } else {
         // 无法获取锁时，跳过本轮，避免与其他任务并发访问 client
         return;
+    }
+
+    // 断连去抖：必须持续一段时间判定为断开，避免误判导致重连风暴。
+    if (!connectedNow) {
+        if (s_disconnectSuspectSinceMs == 0) {
+            s_disconnectSuspectSinceMs = nowMs;
+            return;
+        }
+
+        if ((uint32_t)(nowMs - s_disconnectSuspectSinceMs) < kTransientDisconnectDebounceMs) {
+            return;
+        }
+    } else {
+        s_disconnectSuspectSinceMs = 0;
     }
 
     if (connectedNow) {
@@ -182,8 +259,8 @@ void receiveClientData() {
 
             int len = 0;
             if (clientMutex != nullptr && xSemaphoreTake(clientMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                // 再次确认连接，避免锁外状态变化
-                if (clientConnected && client.connected()) {
+                // 锁内以缓存连接态为准，避免重复调用 connected() 产生额外日志与开销。
+                if (clientConnected) {
                     len = client.read(buf, sizeof(buf));
                 } else {
                     len = -1;
@@ -196,18 +273,18 @@ void receiveClientData() {
             if (len > 0) {
                 s_clientHasReceivedPayload = true;
                 // 以“未消费数据量”为准判断是否溢出；必要时先进行一次紧凑化，降低误判断连概率
-                const size_t used = (recvBuffer.size() >= recvHead) ? (recvBuffer.size() - recvHead) : recvBuffer.size();
-                if (used + static_cast<size_t>(len) > MAX_RECV_BUFFER_SIZE) {
-                    if (recvHead > 0) {
-                        recvBuffer.erase(recvBuffer.begin(), recvBuffer.begin() + recvHead);
-                        recvHead = 0;
-                    }
+                // Lazy compaction: erase dead prefix only when it occupies half the buffer,
+                // amortising the O(n) memmove; ensures overflow check always uses actual unread bytes.
+                if (recvHead > 0 && recvHead >= recvBuffer.size() / 2) {
+                    recvBuffer.erase(recvBuffer.begin(), recvBuffer.begin() + recvHead);
+                    recvHead = 0;
                 }
-                if (recvBuffer.size() + static_cast<size_t>(len) > MAX_RECV_BUFFER_SIZE) {
+                const size_t unread = recvBuffer.size() - recvHead;
+                if (unread + static_cast<size_t>(len) > MAX_RECV_BUFFER_SIZE) {
                     LOG_NETWORK_ERROR(
-                        "Receive buffer overflow (incoming=%d, current=%u, max=%u), disconnecting client.",
+                        "Receive buffer overflow (incoming=%d, unread=%u, max=%u), disconnecting client.",
                         len,
-                        static_cast<unsigned int>(recvBuffer.size()),
+                        static_cast<unsigned int>(unread),
                         static_cast<unsigned int>(MAX_RECV_BUFFER_SIZE));
                     _cleanupClientStreamState();
                     updateColor(CRGB::Green);
@@ -224,6 +301,7 @@ void receiveClientData() {
             } else if (len < 0) {
                 // read() 失败时 len 可能为 -1；若不处理会导致 buf + len 指针越界，进而破坏堆/网络栈
                 LOG_NETWORK_ERROR("Socket read failed (len=%d). Disconnecting client.", len);
+                s_connectedCached = false;
                 _cleanupClientStreamState();
                 updateColor(CRGB::Green);
                 if (clientMutex != nullptr && xSemaphoreTake(clientMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
@@ -235,9 +313,9 @@ void receiveClientData() {
             }
         }
 
-        // 检查接收缓冲区大小，防止内存耗尽
-        if (recvBuffer.size() > MAX_RECV_BUFFER_SIZE) {
-            LOG_NETWORK_ERROR("Receive buffer overflow, disconnecting client. Size: %u", static_cast<unsigned int>(recvBuffer.size()));
+        // 检查接收缓冲区大小，防止内存耗尽（此处同样基于未读字节数）
+        if (recvBuffer.size() - recvHead > MAX_RECV_BUFFER_SIZE) {
+            LOG_NETWORK_ERROR("Receive buffer overflow, disconnecting client. Unread: %u", static_cast<unsigned int>(recvBuffer.size() - recvHead));
             _cleanupClientStreamState();
             return;
         }
@@ -310,22 +388,28 @@ void receiveClientData() {
                         // 一律入队，让显示侧消费；避免在收包路径直接渲染导致 TCP 缓冲被拖慢引发丢包/卡顿
                         // 对于“立即帧”(frameInterval=0)：只保留最新一帧，降低排队导致的显示滞后
                         const uint32_t nowMs = millis();
-                        size_t dropped = 0;
+                        size_t droppedByReplace = 0;
 
                         if (frameInterval == 0) {
-                            dropped += frameCache.size();
-                            frameCache.clear();
-                        } else if (frameCache.size() >= MAX_CACHE_SIZE && !frameCache.empty()) {
+                            // 即时帧保留最近 N 帧，既控制延迟也给显示侧留出小幅追帧空间。
+                            while (!frameCache.empty() && frameCache.size() >= IMMEDIATE_FRAME_CACHE_KEEP) {
+                                frameCache.pop_front();
+                                droppedByReplace++;
+                            }
+                        }
+
+                        if (frameCache.size() >= MAX_CACHE_SIZE && !frameCache.empty()) {
                             frameCache.pop_front();
-                            dropped++;
+                            droppedByReplace++;
                         }
 
                         frameCache.push_back({std::move(fullPacket), frameInterval, nowMs});
                         s_lastDisplayPacket = frameCache.back().data;
 
                         // 按真实最大允许延迟继续修剪（可能一次丢多帧）
-                        dropped += trimFrameCacheLockedByPolicy(nowMs);
-                        logTrimIfNeeded(dropped, nowMs);
+                        const size_t droppedByPolicy = trimFrameCacheLockedByPolicy(nowMs);
+                        const size_t dropped = droppedByReplace + droppedByPolicy;
+                        logTrimIfNeeded(droppedByPolicy, droppedByReplace, nowMs);
 
                         // 统计
                         gFramesEnqueued++;
@@ -369,6 +453,7 @@ void receiveClientData() {
             if (clientMutex != nullptr && xSemaphoreTake(clientMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
                 client.stop();
                 clientConnected = false;
+                s_connectedCached = false;
                 xSemaphoreGive(clientMutex);
             }
             _cleanupClientStreamState();
@@ -387,9 +472,33 @@ void receiveClientData() {
         if (clientMutex != nullptr && xSemaphoreTake(clientMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             client.stop();
             clientConnected = false;
+            s_connectedCached = false;
             xSemaphoreGive(clientMutex);
         }
         _cleanupClientStreamState();
         LOG_NETWORK_INFO("Client disconnected.");
     }
+}
+
+void setAppInterfaceNetworkRequired(bool required) {
+    s_appInterfaceNetworkRequired = required;
+    s_appInterfaceNetworkRequiredOverridden = true;
+}
+
+void resetAppInterfaceNetworkRequiredToDefault() {
+    s_appInterfaceNetworkRequired =
+#if APP_INTERFACE_DEFAULT_NETWORK_REQUIRED
+        true;
+#else
+        false;
+#endif
+    s_appInterfaceNetworkRequiredOverridden = false;
+}
+
+bool isAppInterfaceNetworkRequired() {
+    return s_appInterfaceNetworkRequired;
+}
+
+bool hasAppInterfaceNetworkRequirementOverride() {
+    return s_appInterfaceNetworkRequiredOverridden;
 }

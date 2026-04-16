@@ -34,6 +34,13 @@ extern int brightness;                  /**< 当前背光亮度（0~255），初
 void setLcdBrightness(uint8_t duty);
 
 /**
+ * @brief 将 LEDC PWM timer 切换为 RC_FAST 时钟源以兼容 light sleep
+ * @details 需在 lcdInit() 之后调用一次；RC_FAST 时钟在 light sleep 期间持续运行，
+ *          防止 APB 停摆时背光/对比度 PWM 输出异常。
+ */
+void lcdReconfigPwmForLightSleep();
+
+/**
  * @brief 改变当前亮度值
  * @details 根据增量值调整当前背光亮度，防止超出范围
  * @param[in] delta 增量值（可以为负值）
@@ -145,5 +152,18 @@ void lcdPushOverlayFrame();
  * @brief 恢复最近一次保存的LCD帧
  */
 void lcdPopOverlayFrame();
+
+/**
+ * @brief 重置 CGRAM 差分效率统计计数器
+ */
+void lcdResetCgramStats();
+
+/**
+ * @brief 读取 CGRAM 差分写入统计数据
+ * @param[out] diffWrites    差分策略实际写入的槽位次数
+ * @param[out] fullBaseline  全量重写策略的等效写入次数（每帧每有效槽各一次）
+ * @param[out] frameCount    统计期间渲染的总帧数
+ */
+void lcdGetCgramStats(uint32_t* diffWrites, uint32_t* fullBaseline, uint32_t* frameCount);
 
 #endif
